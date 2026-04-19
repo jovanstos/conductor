@@ -5,6 +5,8 @@ import * as tauri from '../lib/tauri'
 export type PendingRunConfig = {
   workflowId: string
   input: string
+  presetProjectPath?: string
+  presetProjectName?: string
 }
 
 interface RunStore {

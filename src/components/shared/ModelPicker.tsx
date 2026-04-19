@@ -132,18 +132,23 @@ export default function ModelPicker({
 
           {/* Temperature and tokens */}
           <div className="px-3 py-3 border-t border-white/8 space-y-3 bg-white/2">
-            <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white/35 w-20">Temperature</label>
-              <input
-                type="range" min={0} max={1} step={0.05}
-                value={value.temperature}
-                onChange={(e) => onChange({ ...value, temperature: Number(e.target.value) })}
-                className="flex-1 accent-purple-500"
-              />
-              <span className="text-[11px] text-white/50 w-6 text-right">{value.temperature}</span>
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <label className="text-[10px] text-white/35 w-20">Creativity</label>
+                <input
+                  type="range" min={0} max={1} step={0.05}
+                  value={value.temperature}
+                  onChange={(e) => onChange({ ...value, temperature: Number(e.target.value) })}
+                  className="flex-1 accent-purple-500"
+                />
+                <span className="text-[11px] text-white/50 w-6 text-right">{value.temperature}</span>
+              </div>
+              <p className="text-[9px] text-white/20 pl-0.5">
+                Low = focused & predictable · High = creative & varied
+              </p>
             </div>
             <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white/35 w-20">Max tokens</label>
+              <label className="text-[10px] text-white/35 w-20">Max length</label>
               <input
                 type="number" value={value.maxTokens} min={256} max={16384}
                 onChange={(e) => onChange({ ...value, maxTokens: Number(e.target.value) })}

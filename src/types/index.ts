@@ -9,7 +9,10 @@ export type ModelConfig = {
   temperature: number
 }
 
-export type NodeType = 'agent' | 'loop' | 'review_gate' | 'decision' | 'merge'
+export type NodeType = 'agent' | 'loop' | 'review_gate' | 'start' | 'end' | 'decision' | 'merge'
+
+export type StartNodeData = { label?: string }
+export type EndNodeData = { label?: string }
 
 export type AgentNodeData = {
   name: string
@@ -37,7 +40,7 @@ export type WorkflowNode = {
   id: string
   type: NodeType
   position: { x: number; y: number }
-  data: AgentNodeData | LoopNodeData | ReviewGateData
+  data: AgentNodeData | LoopNodeData | ReviewGateData | StartNodeData | EndNodeData
 }
 
 export type WorkflowEdge = {

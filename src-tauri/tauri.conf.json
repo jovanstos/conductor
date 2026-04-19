@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "conductor",
+  "productName": "Conductor",
   "version": "0.1.0",
   "identifier": "com.jovan.conductor",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "conductor",
+        "title": "Conductor",
         "width": 1280,
         "height": 800,
         "minWidth": 900,

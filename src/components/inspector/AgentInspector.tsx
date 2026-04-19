@@ -1,8 +1,15 @@
 import { useState, useEffect } from 'react'
-import type { WorkflowNode, AgentNodeData } from '../../types'
+import type { WorkflowNode, AgentNodeData, Template } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { BUILT_IN_TEMPLATES } from '../../lib/defaults'
+import { getTemplates, saveTemplate, deleteTemplate } from '../../lib/tauri'
 import ModelPicker from '../shared/ModelPicker'
+
+const CONTEXT_MODE_HELP: Record<string, string> = {
+  full_chain: 'Sees everything every prior agent wrote — great for a final editor or report writer.',
+  previous: 'Sees only the output from the immediately preceding agent — good for focused review steps.',
+  none: 'Only sees the original task description — use for a fresh, unbiased perspective.',
+}
 
 export default function AgentInspector({ node }: { node: WorkflowNode }) {
   const { updateNode } = useWorkflowStore()
@@ -16,6 +23,12 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
 
+  // Custom template save state
+  const [showSaveForm, setShowSaveForm] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [saveCategory, setSaveCategory] = useState('My Templates')
+  const [userTemplates, setUserTemplates] = useState<Template[]>([])
+
   useEffect(() => {
     setName(d.name)
     setRole(d.roleDescription)
@@ -23,7 +36,14 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
     setContextMode(d.contextMode)
     setMaxTokens(d.maxTokens)
     setShowTemplates(false)
+    setShowSaveForm(false)
   }, [node.id])
+
+  useEffect(() => {
+    if (showTemplates) {
+      getTemplates().then((all) => setUserTemplates(all.filter((t) => !t.isBuiltIn))).catch(() => {})
+    }
+  }, [showTemplates])
 
   function save(patch?: Partial<AgentNodeData>) {
     updateNode(node.id, {
@@ -31,21 +51,51 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
     })
   }
 
-  function applyTemplate(t: typeof BUILT_IN_TEMPLATES[number]) {
+  function applyTemplate(t: Template | typeof BUILT_IN_TEMPLATES[number]) {
+    const roleDesc = 'roleDescription' in t ? t.roleDescription : t.description
     setName(t.name)
-    setRole(t.roleDescription)
+    setRole(roleDesc)
     setPrompt(t.systemPrompt)
     updateNode(node.id, {
-      data: { ...d, name: t.name, roleDescription: t.roleDescription, systemPrompt: t.systemPrompt },
+      data: { ...d, name: t.name, roleDescription: roleDesc, systemPrompt: t.systemPrompt },
     })
     setShowTemplates(false)
   }
 
-  // Group templates by category
+  async function handleSaveTemplate() {
+    if (!saveName.trim()) return
+    const template: Template = {
+      id: crypto.randomUUID(),
+      name: saveName.trim(),
+      category: saveCategory.trim() || 'My Templates',
+      description: role,
+      systemPrompt: prompt,
+      isBuiltIn: false,
+    }
+    await saveTemplate(template)
+    setUserTemplates((prev) => [...prev, template])
+    setShowSaveForm(false)
+    setSaveName('')
+  }
+
+  async function handleDeleteUserTemplate(id: string) {
+    await deleteTemplate(id)
+    setUserTemplates((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const hasPrompt = prompt.trim().length > 0
   const categories = [...new Set(BUILT_IN_TEMPLATES.map((t) => t.category))]
 
   return (
     <div className="space-y-4">
+      {!hasPrompt && (
+        <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2.5">
+          <p className="text-[11px] text-amber-300/80 leading-relaxed">
+            No instructions yet. Load a template to get started quickly, or write your own system prompt.
+          </p>
+        </div>
+      )}
+
       {/* Template picker */}
       <div>
         <button
@@ -57,10 +107,41 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
         </button>
 
         {showTemplates && (
-          <div className="mt-1 bg-[#0f0f14] border border-white/8 rounded-xl overflow-hidden">
+          <div className="mt-1 bg-[#0f0f14] border border-white/8 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
+            {/* User templates */}
+            {userTemplates.length > 0 && (
+              <div>
+                <p className="px-3 py-1.5 text-[9px] text-white/25 uppercase tracking-widest bg-white/3 sticky top-0">
+                  My Templates
+                </p>
+                {userTemplates.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-1 border-b border-white/4 hover:bg-white/6 transition-colors"
+                  >
+                    <button
+                      onClick={() => applyTemplate(t)}
+                      className="flex-1 text-left px-3 py-2"
+                    >
+                      <p className="text-sm text-white/80">{t.name}</p>
+                      <p className="text-[10px] text-white/35">{t.description}</p>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteUserTemplate(t.id)}
+                      className="px-2 text-white/20 hover:text-red-400 text-[10px] transition-colors shrink-0"
+                      title="Delete template"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Built-in templates */}
             {categories.map((cat) => (
               <div key={cat}>
-                <p className="px-3 py-1.5 text-[9px] text-white/25 uppercase tracking-widest bg-white/3">
+                <p className="px-3 py-1.5 text-[9px] text-white/25 uppercase tracking-widest bg-white/3 sticky top-0">
                   {cat}
                 </p>
                 {BUILT_IN_TEMPLATES.filter((t) => t.category === cat).map((t) => (
@@ -108,7 +189,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
 
       <Field label="System prompt">
         <p className="text-[10px] text-white/25 mb-1.5">
-          This is the full instruction set for this agent. Templates above give you a great starting point.
+          The full instruction set for this employee. Templates above give you a great starting point.
         </p>
         <textarea
           className={`${inputCls} h-52 resize-y font-mono text-[11px] leading-relaxed`}
@@ -117,6 +198,51 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
           onBlur={() => save()}
         />
       </Field>
+
+      {/* Save as template */}
+      {hasPrompt && !showSaveForm && (
+        <button
+          onClick={() => { setSaveName(name); setShowSaveForm(true) }}
+          className="w-full text-left text-[10px] text-white/30 hover:text-white/55 flex items-center gap-1.5 transition-colors"
+        >
+          <span>＋</span> Save as template
+        </button>
+      )}
+
+      {showSaveForm && (
+        <div className="bg-white/3 border border-white/8 rounded-xl p-3 space-y-2">
+          <p className="text-[10px] text-white/40 uppercase tracking-wider">Save as template</p>
+          <input
+            autoFocus
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSaveTemplate()}
+            placeholder="Template name"
+            className={inputCls}
+          />
+          <input
+            value={saveCategory}
+            onChange={(e) => setSaveCategory(e.target.value)}
+            placeholder="Category (e.g. My Templates)"
+            className={inputCls}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveTemplate}
+              disabled={!saveName.trim()}
+              className="flex-1 bg-purple-600/80 hover:bg-purple-600 disabled:opacity-40 text-white text-xs py-1.5 rounded-lg transition-colors"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setShowSaveForm(false)}
+              className="text-xs text-white/30 hover:text-white/60 px-3 py-1.5 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Advanced section */}
       <button
@@ -131,7 +257,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
         <div className="space-y-3 pl-3 border-l border-white/8">
           <Field label="Context from prior agents">
             <select
-              className={inputCls}
+              className={selectCls}
               value={contextMode}
               onChange={(e) => {
                 const v = e.target.value as AgentNodeData['contextMode']
@@ -139,13 +265,16 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
                 save({ contextMode: v })
               }}
             >
-              <option value="full_chain">Full chain — sees all prior outputs</option>
-              <option value="previous">Previous node only</option>
-              <option value="none">None — only sees the original task</option>
+              <option style={optionStyle} value="full_chain">Full chain — sees all prior outputs</option>
+              <option style={optionStyle} value="previous">Previous agent only</option>
+              <option style={optionStyle} value="none">None — only sees the original task</option>
             </select>
+            <p className="text-[10px] text-white/30 mt-1.5 leading-relaxed">
+              {CONTEXT_MODE_HELP[contextMode]}
+            </p>
           </Field>
 
-          <Field label="Max output tokens">
+          <Field label="Max output length">
             <input
               type="number"
               className={inputCls}
@@ -155,7 +284,9 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
               onChange={(e) => setMaxTokens(Number(e.target.value))}
               onBlur={() => save()}
             />
-            <p className="text-[10px] text-white/25 mt-1">Higher = longer responses. Default 8096 is fine for most uses.</p>
+            <p className="text-[10px] text-white/25 mt-1">
+              Controls how long the agent's response can be. Default (8096) works well for most tasks.
+            </p>
           </Field>
         </div>
       )}
@@ -174,3 +305,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls =
   'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
+
+const selectCls =
+  'w-full bg-[#141418] border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
+
+const optionStyle = { background: '#141418', color: 'rgba(255,255,255,0.75)' }

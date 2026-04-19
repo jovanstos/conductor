@@ -81,39 +81,67 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
   const d = node.data as LoopNodeData
   const agentNodes = currentWorkflow?.nodes.filter((n) => n.type === 'agent') ?? []
 
+  const sameAgent = d.targetNodeId && d.reviewerNodeId && d.targetNodeId === d.reviewerNodeId
+  const missingTarget = !d.targetNodeId
+  const missingReviewer = !d.reviewerNodeId
+  const noAgents = agentNodes.length === 0
+
   return (
     <div className="space-y-4">
-      <Field label="Target node (does the work)">
+      {/* What is a loop — plain language */}
+      <div className="bg-white/3 rounded-lg px-3 py-2.5 text-[11px] text-white/40 leading-relaxed">
+        A loop has one agent do work, then another agent review it. If the reviewer isn't satisfied, the worker tries again — up to the max retries you set.
+      </div>
+
+      {/* Validation banner */}
+      {noAgents ? (
+        <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2.5 text-[11px] text-amber-300/80 leading-relaxed">
+          No agents in this workflow yet. Add Agent nodes to the canvas first, then assign them here.
+        </div>
+      ) : sameAgent ? (
+        <div className="bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-2.5 text-[11px] text-red-300/80">
+          Worker and reviewer can't be the same agent. Assign two different agents.
+        </div>
+      ) : (missingTarget || missingReviewer) ? (
+        <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2.5 text-[11px] text-amber-300/80">
+          {missingTarget && missingReviewer ? 'Assign both a worker and a reviewer to run this loop.' : missingTarget ? 'Assign a worker agent.' : 'Assign a reviewer agent.'}
+        </div>
+      ) : null}
+
+      <Field label="Worker — does the task">
         <select
-          className={inputCls}
+          className={`${selectCls} ${missingTarget ? 'border-amber-500/40' : ''}`}
           value={d.targetNodeId}
           onChange={(e) => updateNode(node.id, { data: { ...d, targetNodeId: e.target.value } })}
         >
-          <option value="">— select —</option>
+          <option style={optStyle} value="">— select agent —</option>
           {agentNodes.map((n) => (
-            <option key={n.id} value={n.id}>
+            <option style={optStyle} key={n.id} value={n.id}>
               {(n.data as AgentNodeData).name}
             </option>
           ))}
         </select>
       </Field>
 
-      <Field label="Reviewer node (evaluates)">
+      <Field label="Reviewer — approves or requests changes">
         <select
-          className={inputCls}
+          className={`${selectCls} ${missingReviewer ? 'border-amber-500/40' : ''}`}
           value={d.reviewerNodeId}
           onChange={(e) => updateNode(node.id, { data: { ...d, reviewerNodeId: e.target.value } })}
         >
-          <option value="">— select —</option>
+          <option style={optStyle} value="">— select agent —</option>
           {agentNodes.map((n) => (
-            <option key={n.id} value={n.id}>
+            <option style={optStyle} key={n.id} value={n.id}>
               {(n.data as AgentNodeData).name}
             </option>
           ))}
         </select>
+        <p className="text-[10px] text-white/25 mt-1">
+          Reviewer's output must include the word "APPROVED" to exit early.
+        </p>
       </Field>
 
-      <Field label="Max retries">
+      <Field label="Max attempts">
         <input
           type="number"
           className={inputCls}
@@ -122,18 +150,21 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
           max={10}
           onChange={(e) => updateNode(node.id, { data: { ...d, maxRetries: Number(e.target.value) } })}
         />
+        <p className="text-[10px] text-white/25 mt-1">
+          How many times the worker can try before giving up.
+        </p>
       </Field>
 
       <Field label="Exit condition">
         <select
-          className={inputCls}
+          className={selectCls}
           value={d.exitCondition}
           onChange={(e) =>
             updateNode(node.id, { data: { ...d, exitCondition: e.target.value as LoopNodeData['exitCondition'] } })
           }
         >
-          <option value="reviewer_approves">Exit when reviewer approves</option>
-          <option value="max_retries">Always run max retries</option>
+          <option style={optStyle} value="reviewer_approves">Stop as soon as reviewer approves</option>
+          <option style={optStyle} value="max_retries">Always run all attempts</option>
         </select>
       </Field>
     </div>
@@ -180,3 +211,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls =
   'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
+
+const selectCls =
+  'w-full bg-[#141418] border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
+
+const optStyle = { background: '#141418', color: 'rgba(255,255,255,0.75)' }

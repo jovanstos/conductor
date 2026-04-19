@@ -6,7 +6,6 @@ import { useRun } from './hooks/useRun'
 import Sidebar from './components/Sidebar'
 import NewWorkflowModal from './components/workflow/NewWorkflowModal'
 import WorkflowCanvas from './components/canvas/WorkflowCanvas'
-import WorkflowListView from './components/list/WorkflowListView'
 import Inspector from './components/inspector/Inspector'
 import RunDrawer from './components/run/RunDrawer'
 import RunStartModal from './components/run/RunStartModal'
@@ -23,9 +22,9 @@ function clamp(v: number, min: number, max: number) {
 }
 
 export default function App() {
-  const { loadWorkflows, currentWorkflow, viewMode, taskInput, setTaskInput } = useWorkflowStore()
+  const { loadWorkflows, currentWorkflow, taskInput, setTaskInput } = useWorkflowStore()
   const { cancelRun, isRunning, currentRun, gateInfo, showResultModal, pendingRun, setPendingRun } = useRunStore()
-  const { loadProviderStatuses, isOpen: settingsOpen } = useSettingsStore()
+  const { loadProviderStatuses, loadConfig, isOpen: settingsOpen } = useSettingsStore()
 
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
   const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT)
@@ -37,28 +36,38 @@ export default function App() {
   useEffect(() => {
     loadWorkflows()
     loadProviderStatuses()
-  }, [loadWorkflows, loadProviderStatuses])
+    loadConfig()
+  }, [loadWorkflows, loadProviderStatuses, loadConfig])
 
   async function handleRun() {
     if (!currentWorkflow || !taskInput.trim() || isRunning) return
 
-    // Validate
-    if (currentWorkflow.nodes.filter(n => n.type === 'agent').length === 0) {
-      setRunError('Add at least one Agent node to your workflow before running.')
+    const agents = currentWorkflow.nodes.filter(n => n.type === 'agent')
+    if (agents.length === 0) {
+      setRunError('Your workforce has no agents yet. Add at least one Agent node to the canvas first.')
       return
     }
+
     const badLoop = currentWorkflow.nodes.find(n => {
       if (n.type !== 'loop') return false
       const d = n.data as import('./types').LoopNodeData
       return !d.targetNodeId || !d.reviewerNodeId
     })
     if (badLoop) {
-      setRunError('A Loop node is missing its Worker or Reviewer. Click the loop to configure it.')
+      setRunError("A Loop node isn't fully set up. Click it and assign both a Worker and a Reviewer agent.")
+      return
+    }
+
+    const unconfiguredAll = agents.every(n => {
+      const d = n.data as import('./types').AgentNodeData
+      return !d.systemPrompt?.trim()
+    })
+    if (unconfiguredAll) {
+      setRunError("None of your agents have instructions yet. Click an agent and write a prompt, or load a template.")
       return
     }
 
     setRunError(null)
-    // Show the run start modal so user can choose workspace mode
     setPendingRun({ workflowId: currentWorkflow.id, input: taskInput })
   }
 
@@ -84,11 +93,6 @@ export default function App() {
 
           {currentWorkflow && (
             <div className="ml-auto flex items-center gap-2">
-              <div className="flex bg-white/5 rounded-md p-0.5">
-                <ViewToggleBtn mode="canvas" />
-                <ViewToggleBtn mode="list" />
-              </div>
-
               <input
                 className="w-64 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 outline-none focus:border-purple-500/50 placeholder:text-white/25"
                 placeholder="Describe your task..."
@@ -130,10 +134,8 @@ export default function App() {
           <div className="flex-1 overflow-hidden">
             {!currentWorkflow ? (
               <EmptyState />
-            ) : viewMode === 'canvas' ? (
-              <WorkflowCanvas />
             ) : (
-              <WorkflowListView />
+              <WorkflowCanvas />
             )}
           </div>
 
@@ -213,22 +215,6 @@ function DragHandle({ direction, onDelta }: { direction: 'h' | 'v'; onDelta: (d:
   )
 }
 
-// ── View toggle ──────────────────────────────────────────────────
-function ViewToggleBtn({ mode }: { mode: 'canvas' | 'list' }) {
-  const { viewMode, setViewMode } = useWorkflowStore()
-  const active = viewMode === mode
-  return (
-    <button
-      onClick={() => setViewMode(mode)}
-      className={`text-[11px] px-2.5 py-1 rounded transition-colors ${
-        active ? 'bg-purple-600 text-white' : 'text-white/40 hover:text-white/70'
-      }`}
-    >
-      {mode === 'canvas' ? '⬡ Canvas' : '≡ List'}
-    </button>
-  )
-}
-
 // ── Empty state ──────────────────────────────────────────────────
 function EmptyState() {
   const [showModal, setShowModal] = useState(false)
@@ -238,18 +224,21 @@ function EmptyState() {
       <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center text-3xl">
         ✦
       </div>
-      <div>
-        <p className="text-lg font-semibold text-white/80 mb-1">No workflow selected</p>
-        <p className="text-sm text-white/35">
-          Build a team of AI agents that work together to complete your tasks.
+      <div className="max-w-sm">
+        <p className="text-lg font-semibold text-white/80 mb-2">Build your AI workforce</p>
+        <p className="text-sm text-white/35 leading-relaxed">
+          Create a workflow and fill it with AI agents — each one a specialist employee that does exactly what you tell it to. Chain them together and run any task, start to finish.
         </p>
       </div>
-      <button
-        onClick={() => setShowModal(true)}
-        className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
-      >
-        + Create a Workflow
-      </button>
+      <div className="flex flex-col items-center gap-2">
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
+        >
+          + Create a Workflow
+        </button>
+        <p className="text-[11px] text-white/20">Start from a template or build from scratch</p>
+      </div>
       {showModal && <NewWorkflowModal onClose={() => setShowModal(false)} />}
     </div>
   )

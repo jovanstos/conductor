@@ -38,13 +38,18 @@ export const OLLAMA_MODELS = [
 ];
 
 export function newWorkflow(name: string): Workflow {
+  const startId = uuidv4()
+  const endId = uuidv4()
   return {
     id: uuidv4(),
     name,
     description: "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    nodes: [],
+    nodes: [
+      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
+      { id: endId, type: 'end', position: { x: 700, y: 200 }, data: {} },
+    ],
     edges: [],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
@@ -188,12 +193,14 @@ export function newAgentNodeData(
   };
 }
 
-// Content Factory: Writer + Editor loop → Final Polish
+// Content Factory: Start → Writer + Editor loop → Final Polish → End
 export function contentFactoryWorkflow(): Workflow {
+  const startId = uuidv4();
   const writerId = uuidv4();
   const editorId = uuidv4();
   const writerLoopId = uuidv4();
   const polisherId = uuidv4();
+  const endId = uuidv4();
 
   return {
     id: uuidv4(),
@@ -202,10 +209,11 @@ export function contentFactoryWorkflow(): Workflow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
+      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
       {
         id: writerId,
         type: "agent",
-        position: { x: 80, y: 100 },
+        position: { x: 300, y: 80 },
         data: {
           name: "Writer",
           roleDescription: "Drafts engaging content",
@@ -219,7 +227,7 @@ export function contentFactoryWorkflow(): Workflow {
       {
         id: editorId,
         type: "agent",
-        position: { x: 80, y: 280 },
+        position: { x: 300, y: 280 },
         data: {
           name: "Editor",
           roleDescription: "Reviews and improves the draft",
@@ -233,7 +241,7 @@ export function contentFactoryWorkflow(): Workflow {
       {
         id: writerLoopId,
         type: "loop",
-        position: { x: 360, y: 180 },
+        position: { x: 560, y: 180 },
         data: {
           targetNodeId: writerId,
           reviewerNodeId: editorId,
@@ -244,7 +252,7 @@ export function contentFactoryWorkflow(): Workflow {
       {
         id: polisherId,
         type: "agent",
-        position: { x: 600, y: 180 },
+        position: { x: 820, y: 180 },
         data: {
           name: "Final Polish",
           roleDescription: "Applies final polish and formatting",
@@ -254,25 +262,25 @@ export function contentFactoryWorkflow(): Workflow {
           maxTokens: 999999,
         } satisfies AgentNodeData,
       },
+      { id: endId, type: 'end', position: { x: 1060, y: 180 }, data: {} },
     ],
     edges: [
-      {
-        id: uuidv4(),
-        sourceNodeId: writerLoopId,
-        targetNodeId: polisherId,
-        contextMode: "full",
-      },
+      { id: uuidv4(), sourceNodeId: startId, targetNodeId: writerLoopId, contextMode: "full" },
+      { id: uuidv4(), sourceNodeId: writerLoopId, targetNodeId: polisherId, contextMode: "full" },
+      { id: uuidv4(), sourceNodeId: polisherId, targetNodeId: endId, contextMode: "full" },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
 }
 
-// Research Lab: Researcher + Fact Checker loop → Report Writer
+// Research Lab: Start → Researcher + Fact Checker loop → Report Writer → End
 export function researchLabWorkflow(): Workflow {
+  const startId = uuidv4();
   const researcherId = uuidv4();
   const factCheckerId = uuidv4();
   const researchLoopId = uuidv4();
   const reportWriterId = uuidv4();
+  const endId = uuidv4();
 
   return {
     id: uuidv4(),
@@ -281,10 +289,11 @@ export function researchLabWorkflow(): Workflow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
+      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
       {
         id: researcherId,
         type: "agent",
-        position: { x: 80, y: 100 },
+        position: { x: 300, y: 80 },
         data: {
           name: "Researcher",
           roleDescription: "Gathers and synthesizes information",
@@ -298,7 +307,7 @@ export function researchLabWorkflow(): Workflow {
       {
         id: factCheckerId,
         type: "agent",
-        position: { x: 80, y: 280 },
+        position: { x: 300, y: 280 },
         data: {
           name: "Fact Checker",
           roleDescription: "Critically evaluates the research",
@@ -312,7 +321,7 @@ export function researchLabWorkflow(): Workflow {
       {
         id: researchLoopId,
         type: "loop",
-        position: { x: 360, y: 180 },
+        position: { x: 560, y: 180 },
         data: {
           targetNodeId: researcherId,
           reviewerNodeId: factCheckerId,
@@ -323,7 +332,7 @@ export function researchLabWorkflow(): Workflow {
       {
         id: reportWriterId,
         type: "agent",
-        position: { x: 600, y: 180 },
+        position: { x: 820, y: 180 },
         data: {
           name: "Report Writer",
           roleDescription: "Turns research into a polished report",
@@ -334,21 +343,20 @@ export function researchLabWorkflow(): Workflow {
           templateId: "documentation-writer",
         } satisfies AgentNodeData,
       },
+      { id: endId, type: 'end', position: { x: 1060, y: 180 }, data: {} },
     ],
     edges: [
-      {
-        id: uuidv4(),
-        sourceNodeId: researchLoopId,
-        targetNodeId: reportWriterId,
-        contextMode: "full",
-      },
+      { id: uuidv4(), sourceNodeId: startId, targetNodeId: researchLoopId, contextMode: "full" },
+      { id: uuidv4(), sourceNodeId: researchLoopId, targetNodeId: reportWriterId, contextMode: "full" },
+      { id: uuidv4(), sourceNodeId: reportWriterId, targetNodeId: endId, contextMode: "full" },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
 }
 
-// The built-in Software Factory workflow
+// Software Factory: Start → Plan Loop → Review Gate → Dev Loop → End
 export function softwareFactoryWorkflow(): Workflow {
+  const startId = uuidv4();
   const plannerId = uuidv4();
   const planReviewerId = uuidv4();
   const plannerLoopId = uuidv4();
@@ -356,6 +364,7 @@ export function softwareFactoryWorkflow(): Workflow {
   const developerId = uuidv4();
   const testerId = uuidv4();
   const devLoopId = uuidv4();
+  const endId = uuidv4();
 
   return {
     id: uuidv4(),
@@ -365,10 +374,11 @@ export function softwareFactoryWorkflow(): Workflow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
+      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
       {
         id: plannerId,
         type: "agent",
-        position: { x: 80, y: 80 },
+        position: { x: 300, y: 80 },
         data: {
           name: "Planner",
           roleDescription: "Plans the architecture and requirements",
@@ -399,7 +409,7 @@ A structured markdown document with: Executive Summary, Requirements, Architectu
       {
         id: planReviewerId,
         type: "agent",
-        position: { x: 80, y: 260 },
+        position: { x: 300, y: 280 },
         data: {
           name: "Plan Reviewer",
           roleDescription: "Reviews the architecture plan",
@@ -431,7 +441,7 @@ Your response MUST end with either:
       {
         id: plannerLoopId,
         type: "loop",
-        position: { x: 360, y: 160 },
+        position: { x: 560, y: 180 },
         data: {
           targetNodeId: plannerId,
           reviewerNodeId: planReviewerId,
@@ -442,7 +452,7 @@ Your response MUST end with either:
       {
         id: reviewGateId,
         type: "review_gate",
-        position: { x: 580, y: 160 },
+        position: { x: 800, y: 180 },
         data: {
           message:
             "Review the Software Design Document. Approve to proceed to implementation, or provide feedback to revise.",
@@ -452,7 +462,7 @@ Your response MUST end with either:
       {
         id: developerId,
         type: "agent",
-        position: { x: 800, y: 80 },
+        position: { x: 1040, y: 80 },
         data: {
           name: "Developer",
           roleDescription: "Implements the approved design",
@@ -484,7 +494,7 @@ Complete, working code files with clear file structure and all imports listed.
       {
         id: testerId,
         type: "agent",
-        position: { x: 800, y: 260 },
+        position: { x: 1040, y: 280 },
         data: {
           name: "Tester",
           roleDescription: "Tests the implementation against requirements",
@@ -517,7 +527,7 @@ Your response MUST end with either:
       {
         id: devLoopId,
         type: "loop",
-        position: { x: 1060, y: 160 },
+        position: { x: 1300, y: 180 },
         data: {
           targetNodeId: developerId,
           reviewerNodeId: testerId,
@@ -525,20 +535,13 @@ Your response MUST end with either:
           exitCondition: "reviewer_approves",
         },
       },
+      { id: endId, type: 'end', position: { x: 1560, y: 180 }, data: {} },
     ],
     edges: [
-      {
-        id: uuidv4(),
-        sourceNodeId: plannerLoopId,
-        targetNodeId: reviewGateId,
-        contextMode: "full",
-      },
-      {
-        id: uuidv4(),
-        sourceNodeId: reviewGateId,
-        targetNodeId: devLoopId,
-        contextMode: "full",
-      },
+      { id: uuidv4(), sourceNodeId: startId, targetNodeId: plannerLoopId, contextMode: "full" },
+      { id: uuidv4(), sourceNodeId: plannerLoopId, targetNodeId: reviewGateId, contextMode: "full" },
+      { id: uuidv4(), sourceNodeId: reviewGateId, targetNodeId: devLoopId, contextMode: "full" },
+      { id: uuidv4(), sourceNodeId: devLoopId, targetNodeId: endId, contextMode: "full" },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };

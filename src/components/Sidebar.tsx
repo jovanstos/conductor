@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import type { Workflow, ProjectEntry } from '../types'
 import NewWorkflowModal from './workflow/NewWorkflowModal'
 import { listProjects } from '../lib/tauri'
-import type { ProjectEntry } from '../types'
 import ProjectView from './projects/ProjectView'
 
 export default function Sidebar() {
   const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow } =
     useWorkflowStore()
-  const { providerStatuses, openSettings } = useSettingsStore()
+  const { providerStatuses, openSettings, defaultProjectsPath } = useSettingsStore()
   const [search, setSearch] = useState('')
   const [showNewModal, setShowNewModal] = useState(false)
   const [projects, setProjects] = useState<ProjectEntry[]>([])
@@ -19,9 +19,12 @@ export default function Sidebar() {
     w.name.toLowerCase().includes(search.toLowerCase()),
   )
 
+  const refreshProjects = () =>
+    listProjects(defaultProjectsPath || undefined).then(setProjects).catch(() => {})
+
   useEffect(() => {
-    listProjects().then(setProjects).catch(() => {})
-  }, [])
+    refreshProjects()
+  }, [defaultProjectsPath])
 
   return (
     <div className="w-full h-full bg-[#0a0a0d] border-r border-white/5 flex flex-col overflow-hidden">
@@ -49,7 +52,7 @@ export default function Sidebar() {
           filtered.map((w) => (
             <WorkflowItem
               key={w.id}
-              name={w.name}
+              workflow={w}
               active={currentWorkflow?.id === w.id}
               onSelect={() => setCurrentWorkflow(w)}
               onDelete={() => deleteWorkflow(w.id)}
@@ -70,7 +73,7 @@ export default function Sidebar() {
           <div className="flex items-center justify-between pr-3">
             <SectionLabel label="My Projects" />
             <button
-              onClick={() => listProjects().then(setProjects).catch(() => {})}
+              onClick={refreshProjects}
               className="text-[10px] text-white/20 hover:text-white/50 transition-colors"
               title="Refresh projects"
             >
@@ -141,19 +144,20 @@ function ProjectItem({ project, onOpen }: { project: ProjectEntry; onOpen: () =>
 }
 
 function WorkflowItem({
-  name,
+  workflow,
   active,
   onSelect,
   onDelete,
   onDuplicate,
 }: {
-  name: string
+  workflow: Workflow
   active: boolean
   onSelect: () => void
   onDelete: () => void
   onDuplicate: () => void
 }) {
   const [hover, setHover] = useState(false)
+  const agentCount = workflow.nodes.filter((n) => n.type === 'agent').length
 
   return (
     <div
@@ -164,7 +168,10 @@ function WorkflowItem({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <span className="text-[11px] truncate flex-1">{name}</span>
+      <span className="text-[11px] truncate flex-1">{workflow.name}</span>
+      {!hover && agentCount > 0 && (
+        <span className="text-[9px] text-white/20 shrink-0">{agentCount} agent{agentCount !== 1 ? 's' : ''}</span>
+      )}
       {hover && (
         <>
           <button

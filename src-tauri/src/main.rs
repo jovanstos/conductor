@@ -966,7 +966,7 @@ async fn exec_loop(
         .await?;
 
         // Check for early exit on reviewer approval
-        let approved = review.to_uppercase().contains("APPROVED");
+        let approved = review.trim().to_uppercase().contains("APPROVED");
         if approved && data.exit_condition == "reviewer_approves" {
             break;
         }
@@ -1158,6 +1158,9 @@ async fn execute_workflow(
                     Err(e) => Err(format!("Gate data: {}", e)),
                 }
             }
+            // Structural bookmarks — pass through the current data unchanged
+            "start" => Ok(ctx.input.clone()),
+            "end" => Ok(ctx.chain.last().map(|(_, o)| o.clone()).unwrap_or_else(|| ctx.input.clone())),
             t => Err(format!("Unknown node type: {}", t)),
         };
 
@@ -1558,6 +1561,118 @@ fn built_in_templates() -> Vec<Template> {
 }
 
 // ─────────────────────────────────────────────
+// API key validation
+// ─────────────────────────────────────────────
+
+#[tauri::command]
+async fn validate_api_key(provider: String, state: State<'_, Arc<AppState>>) -> Result<String, String> {
+    let keys = load_keys(&state.keys_file());
+    let api_key = match provider.as_str() {
+        "anthropic" => keys.get("anthropic").cloned()
+            .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok()),
+        "openai" => keys.get("openai").cloned()
+            .or_else(|| std::env::var("OPENAI_API_KEY").ok()),
+        _ => return Err(format!("Unknown provider: {}", provider)),
+    };
+    let api_key = api_key.ok_or_else(|| "No API key configured.".to_string())?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("HTTP client: {}", e))?;
+
+    match provider.as_str() {
+        "anthropic" => {
+            let body = serde_json::json!({
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}]
+            });
+            let resp = client
+                .post("https://api.anthropic.com/v1/messages")
+                .header("x-api-key", &api_key)
+                .header("anthropic-version", "2023-06-01")
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {}", e))?;
+            let status = resp.status();
+            if status.is_success() || status.as_u16() == 529 {
+                Ok("Key is valid".into())
+            } else {
+                let raw = resp.text().await.unwrap_or_default();
+                if let Ok(err) = serde_json::from_str::<AnthropicError>(&raw) {
+                    Err(format!("{}: {}", err.error.error_type, err.error.message))
+                } else {
+                    Err(format!("Invalid key (HTTP {})", status))
+                }
+            }
+        }
+        "openai" => {
+            let body = serde_json::json!({
+                "model": "gpt-4o-mini",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}]
+            });
+            let resp = client
+                .post("https://api.openai.com/v1/chat/completions")
+                .header("Authorization", format!("Bearer {}", api_key))
+                .header("content-type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| format!("Request failed: {}", e))?;
+            if resp.status().is_success() {
+                Ok("Key is valid".into())
+            } else {
+                Err(format!("Invalid key (HTTP {})", resp.status()))
+            }
+        }
+        _ => Err("Unknown provider".into()),
+    }
+}
+
+// ─────────────────────────────────────────────
+// General file write (for Save As dialogs)
+// ─────────────────────────────────────────────
+
+#[tauri::command]
+fn write_text_file(path: String, content: String) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {}", e))?;
+    }
+    std::fs::write(&path, content).map_err(|e| format!("write: {}", e))
+}
+
+// ─────────────────────────────────────────────
+// App config (persisted settings)
+// ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct AppConfig {
+    default_projects_path: Option<String>,
+}
+
+#[tauri::command]
+fn load_config(state: State<'_, Arc<AppState>>) -> Result<AppConfig, String> {
+    let path = state.data_dir.join("config.json");
+    if !path.exists() {
+        return Ok(AppConfig::default());
+    }
+    let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&raw).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_config(config: AppConfig, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    let path = state.data_dir.join("config.json");
+    let raw = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    std::fs::write(&path, raw).map_err(|e| e.to_string())
+}
+
+// ─────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────
 
@@ -1569,6 +1684,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -1603,6 +1719,7 @@ fn main() {
             delete_template,
             read_text_file,
             get_ollama_models,
+            validate_api_key,
             workspace_fs::create_run_workspace,
             workspace_fs::read_workspace_manifest,
             workspace_fs::write_workspace_files,
@@ -1610,6 +1727,9 @@ fn main() {
             workspace_fs::zip_and_save_workspace,
             workspace_fs::list_projects,
             workspace_fs::open_project,
+            load_config,
+            save_config,
+            write_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

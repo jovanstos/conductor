@@ -10,15 +10,23 @@ interface SettingsStore {
   defaultModel: ModelConfig
   ollamaUrl: string
   isOpen: boolean
+  defaultProjectsPath: string
 
   loadProviderStatuses: () => Promise<void>
+  loadConfig: () => Promise<void>
   saveApiKey: (provider: string, key: string) => Promise<void>
   deleteApiKey: (provider: string) => Promise<void>
   setDefaultModel: (model: ModelConfig) => void
   setOllamaUrl: (url: string) => void
+  setDefaultProjectsPath: (path: string) => Promise<void>
   openSettings: () => void
   closeSettings: () => void
 }
+
+const platformDefaultPath =
+  typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows')
+    ? 'C:/Users/user/conductor_projects'
+    : '~/conductor_projects'
 
 export const useSettingsStore = create<SettingsStore>()((set) => ({
   providerStatuses: [
@@ -29,6 +37,20 @@ export const useSettingsStore = create<SettingsStore>()((set) => ({
   defaultModel: { ...DEFAULT_MODEL },
   ollamaUrl: 'http://localhost:11434',
   isOpen: false,
+  defaultProjectsPath: platformDefaultPath,
+
+  loadConfig: async () => {
+    const cfg = await tauri.loadConfig()
+    if (cfg.defaultProjectsPath) {
+      set({ defaultProjectsPath: cfg.defaultProjectsPath })
+    }
+  },
+
+  setDefaultProjectsPath: async (path: string) => {
+    set({ defaultProjectsPath: path })
+    const current = await tauri.loadConfig().catch(() => ({}))
+    await tauri.saveConfig({ ...current, defaultProjectsPath: path })
+  },
 
   loadProviderStatuses: async () => {
     const [anthropic, openai] = await Promise.all([

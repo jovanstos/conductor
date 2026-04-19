@@ -298,7 +298,15 @@ pub fn create_run_workspace(
     project_name: Option<String>,
     base_path: Option<String>,
 ) -> Result<String, String> {
-    let workspace = if mode == "project" {
+    let workspace = if mode == "existing" {
+        // Use an existing project directory as-is — don't create anything new
+        let path = base_path.ok_or_else(|| "base_path required for existing mode".to_string())?;
+        let p = PathBuf::from(&path);
+        if !p.exists() {
+            return Err(format!("Project path does not exist: {}", path));
+        }
+        p
+    } else if mode == "project" {
         let base = base_path
             .map(PathBuf::from)
             .unwrap_or_else(default_projects_base);

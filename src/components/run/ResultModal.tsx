@@ -1,17 +1,16 @@
 import { useState } from 'react'
+import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { useRunStore } from '../../stores/runStore'
+import { writeTextFile } from '../../lib/tauri'
 import type { RunStep } from '../../types'
 
-function downloadFile(content: string, filename: string) {
-  const blob = new Blob([content], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+async function saveAsFile(content: string, defaultName: string, ext: string) {
+  const path = await saveDialog({
+    defaultPath: defaultName,
+    filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+  })
+  if (!path) return
+  await writeTextFile(path, content)
 }
 
 export default function ResultModal() {
@@ -88,13 +87,13 @@ export default function ResultModal() {
                   {copied ? '✓ Copied!' : '⎘ Copy'}
                 </button>
                 <button
-                  onClick={() => downloadFile(finalOutput, 'output.txt')}
+                  onClick={() => saveAsFile(finalOutput, 'output.txt', 'txt')}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white/80 hover:bg-white/8 transition-colors"
                 >
                   ↓ Save as .txt
                 </button>
                 <button
-                  onClick={() => downloadFile(finalOutput, 'output.md')}
+                  onClick={() => saveAsFile(finalOutput, 'output.md', 'md')}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white/80 hover:bg-white/8 transition-colors"
                 >
                   ↓ Save as .md

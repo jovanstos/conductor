@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { openProject, zipAndSaveWorkspace } from '../../lib/tauri'
 import type { FileEntry, ProjectEntry } from '../../types'
 import { useRunStore } from '../../stores/runStore'
@@ -29,10 +30,14 @@ export default function ProjectView({ project, onClose }: Props) {
   }, [project.path])
 
   async function handleExport() {
+    const dest = await saveDialog({
+      defaultPath: `${project.name}.zip`,
+      filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
+    })
+    if (!dest) return
     setExporting(true)
     setExportMsg(null)
     try {
-      const dest = `${project.path}/../${project.name}.zip`
       await zipAndSaveWorkspace(project.path, dest)
       setExportMsg('Exported!')
     } catch (e) {
@@ -45,7 +50,13 @@ export default function ProjectView({ project, onClose }: Props) {
 
   function handleContinue() {
     if (!currentWorkflow) return
-    setPendingRun({ workflowId: currentWorkflow.id, input: '' })
+    setPendingRun({
+      workflowId: currentWorkflow.id,
+      input: '',
+      presetProjectPath: project.path,
+      presetProjectName: project.name,
+    })
+    onClose()
   }
 
   return (

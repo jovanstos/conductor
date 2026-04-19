@@ -71,8 +71,19 @@ export const zipAndSaveWorkspace = (workspacePath: string, destinationPath: stri
   invoke<void>('zip_and_save_workspace', { workspacePath, destinationPath })
 export const listProjects = (basePath?: string) =>
   invoke<ProjectEntry[]>('list_projects', { basePath })
+export const validateApiKey = (provider: string) =>
+  invoke<string>('validate_api_key', { provider })
 export const openProject = (projectPath: string) =>
   invoke<FileEntry[]>('open_project', { projectPath })
+
+// App config
+export type AppConfig = { defaultProjectsPath?: string }
+export const loadConfig = () => invoke<AppConfig>('load_config')
+export const saveConfig = (config: AppConfig) => invoke<void>('save_config', { config })
+
+// File save
+export const writeTextFile = (path: string, content: string) =>
+  invoke<void>('write_text_file', { path, content })
 
 // Tauri event listeners for run lifecycle
 export type RunEventHandlers = {

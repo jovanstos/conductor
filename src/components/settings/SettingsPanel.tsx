@@ -1,5 +1,42 @@
 import { useState } from 'react'
+import { open as openFolderDialog } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { validateApiKey } from '../../lib/tauri'
+
+function ProjectsFolderSettings() {
+  const { defaultProjectsPath, setDefaultProjectsPath } = useSettingsStore()
+  const [saving, setSaving] = useState(false)
+
+  async function handleBrowse() {
+    const selected = await openFolderDialog({ directory: true, multiple: false, title: 'Choose Projects Folder' })
+    if (!selected) return
+    const path = typeof selected === 'string' ? selected : selected[0]
+    if (!path) return
+    setSaving(true)
+    await setDefaultProjectsPath(path.replace(/\\/g, '/'))
+    setSaving(false)
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-white/35">
+        Where Conductor saves project files. Existing projects in this folder appear in the sidebar.
+      </p>
+      <div className="bg-white/4 rounded-xl px-4 py-3 flex items-center gap-3">
+        <span className="flex-1 text-xs text-white/50 font-mono truncate" title={defaultProjectsPath}>
+          {defaultProjectsPath}
+        </span>
+        <button
+          onClick={handleBrowse}
+          disabled={saving}
+          className="text-xs text-white/40 hover:text-white/70 border border-white/10 px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 shrink-0 flex items-center gap-1.5"
+        >
+          {saving ? '...' : '📁 Browse'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function SettingsPanel() {
   const { closeSettings, providerStatuses, saveApiKey, deleteApiKey } = useSettingsStore()
@@ -45,6 +82,12 @@ export default function SettingsPanel() {
             <h3 className="text-sm font-semibold text-white/70 mb-3">Ollama (Local)</h3>
             <OllamaSettings />
           </section>
+
+          {/* Projects folder */}
+          <section>
+            <h3 className="text-sm font-semibold text-white/70 mb-3">Default Projects Folder</h3>
+            <ProjectsFolderSettings />
+          </section>
         </div>
 
         <div className="px-6 py-4 border-t border-white/8">
@@ -74,6 +117,8 @@ function ApiKeyRow({
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
 
   const providerLabel: Record<string, string> = {
     anthropic: 'Anthropic',
@@ -87,58 +132,88 @@ function ApiKeyRow({
     setSaving(false)
     setValue('')
     setEditing(false)
+    setTestResult(null)
+  }
+
+  async function handleTest() {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const msg = await validateApiKey(provider)
+      setTestResult({ ok: true, msg })
+    } catch (e) {
+      setTestResult({ ok: false, msg: String(e) })
+    } finally {
+      setTesting(false)
+    }
   }
 
   return (
-    <div className="flex items-center gap-3 bg-white/4 rounded-xl px-4 py-3">
-      <div className={`w-2 h-2 rounded-full ${hasKey ? 'bg-green-500' : 'bg-white/20'}`} />
-      <span className="text-sm text-white/70 w-24">{providerLabel[provider] ?? provider}</span>
+    <div className="bg-white/4 rounded-xl px-4 py-3 space-y-2">
+      <div className="flex items-center gap-3">
+        <div className={`w-2 h-2 rounded-full shrink-0 ${hasKey ? 'bg-green-500' : 'bg-white/20'}`} />
+        <span className="text-sm text-white/70 w-24">{providerLabel[provider] ?? provider}</span>
 
-      {editing ? (
-        <>
-          <input
-            type="password"
-            autoFocus
-            placeholder="Paste API key..."
-            className="flex-1 bg-white/5 border border-white/15 rounded-lg px-3 py-1.5 text-sm text-white/80 outline-none focus:border-purple-500/50"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-          />
-          <button
-            onClick={handleSave}
-            disabled={saving || !value.trim()}
-            className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-md transition-colors"
-          >
-            {saving ? '...' : 'Save'}
-          </button>
-          <button
-            onClick={() => setEditing(false)}
-            className="text-white/30 hover:text-white/60 text-xs"
-          >
-            Cancel
-          </button>
-        </>
-      ) : (
-        <>
-          <span className="flex-1 text-xs text-white/30">
-            {hasKey ? '••••••••••••••••' : 'Not configured'}
-          </span>
-          <button
-            onClick={() => setEditing(true)}
-            className="text-xs text-white/40 hover:text-white/70 border border-white/10 px-3 py-1 rounded-md transition-colors"
-          >
-            {hasKey ? 'Update' : 'Add key'}
-          </button>
-          {hasKey && (
+        {editing ? (
+          <>
+            <input
+              type="password"
+              autoFocus
+              placeholder="Paste API key..."
+              className="flex-1 bg-white/5 border border-white/15 rounded-lg px-3 py-1.5 text-sm text-white/80 outline-none focus:border-purple-500/50"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            />
             <button
-              onClick={onDelete}
-              className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+              onClick={handleSave}
+              disabled={saving || !value.trim()}
+              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-md transition-colors"
             >
-              Remove
+              {saving ? '...' : 'Save'}
             </button>
-          )}
-        </>
+            <button
+              onClick={() => setEditing(false)}
+              className="text-white/30 hover:text-white/60 text-xs"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="flex-1 text-xs text-white/30">
+              {hasKey ? '••••••••••••••••' : 'Not configured'}
+            </span>
+            {hasKey && (
+              <button
+                onClick={handleTest}
+                disabled={testing}
+                className="text-xs text-white/35 hover:text-white/60 border border-white/10 hover:border-white/20 px-3 py-1 rounded-md transition-colors disabled:opacity-40"
+              >
+                {testing ? 'Testing...' : 'Test'}
+              </button>
+            )}
+            <button
+              onClick={() => { setEditing(true); setTestResult(null) }}
+              className="text-xs text-white/40 hover:text-white/70 border border-white/10 px-3 py-1 rounded-md transition-colors"
+            >
+              {hasKey ? 'Update' : 'Add key'}
+            </button>
+            {hasKey && (
+              <button
+                onClick={onDelete}
+                className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+              >
+                Remove
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      {testResult && (
+        <p className={`text-[11px] pl-5 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+          {testResult.ok ? '✓ ' : '✕ '}{testResult.msg}
+        </p>
       )}
     </div>
   )

@@ -27,6 +27,7 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
   const isRunning = status === 'running'
   const isDone = status === 'done'
   const isError = status === 'error'
+  const needsSetup = !d.systemPrompt?.trim() && !isRunning && !isDone
 
   const borderColor = isRunning
     ? 'border-purple-500/70'
@@ -36,7 +37,9 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
         ? 'border-red-500/50'
         : isSelected
           ? 'border-purple-400/60'
-          : 'border-white/10'
+          : needsSetup
+            ? 'border-amber-500/30'
+            : 'border-white/10'
 
   const bgColor = isRunning
     ? 'bg-[#1c1626]'
@@ -130,6 +133,12 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
             <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0.15s]" />
             <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0.3s]" />
             <span className="text-[10px] text-purple-300/60 ml-1">Thinking...</span>
+          </div>
+        )}
+
+        {needsSetup && (
+          <div className="mt-2 border-t border-amber-500/10 pt-2">
+            <p className="text-[9px] text-amber-400/50">Click to add instructions</p>
           </div>
         )}
       </div>
