@@ -1,5 +1,5 @@
 import { useWorkflowStore } from '../../stores/workflowStore'
-import { softwareFactoryWorkflow } from '../../lib/defaults'
+import { softwareFactoryWorkflow, contentFactoryWorkflow, researchLabWorkflow } from '../../lib/defaults'
 import * as tauri from '../../lib/tauri'
 
 const STARTERS = [
@@ -11,16 +11,37 @@ const STARTERS = [
     agentCount: 0,
     color: 'border-white/10 hover:border-white/20',
     iconBg: 'bg-white/8',
+    iconColor: 'text-white/50',
   },
   {
     id: 'software-factory',
     icon: '⚙',
     name: 'Software Factory',
-    description:
-      'A complete AI team: planner, reviewer, developer, and tester. Describe what you want to build — they handle the rest.',
+    description: 'Planner, reviewer, developer, and tester. Describe what to build — the team handles the rest.',
     agentCount: 4,
     color: 'border-purple-500/25 hover:border-purple-500/50',
     iconBg: 'bg-purple-500/12',
+    iconColor: 'text-purple-300',
+  },
+  {
+    id: 'content-factory',
+    icon: '✏',
+    name: 'Content Factory',
+    description: 'Writer and editor that iterate until the content is polished and publish-ready.',
+    agentCount: 3,
+    color: 'border-emerald-500/25 hover:border-emerald-500/50',
+    iconBg: 'bg-emerald-500/12',
+    iconColor: 'text-emerald-300',
+  },
+  {
+    id: 'research-lab',
+    icon: '⊕',
+    name: 'Research Lab',
+    description: 'Researcher and fact-checker that dig deep, then produce a verified polished report.',
+    agentCount: 3,
+    color: 'border-blue-500/25 hover:border-blue-500/50',
+    iconBg: 'bg-blue-500/12',
+    iconColor: 'text-blue-300',
   },
 ]
 
@@ -30,8 +51,13 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
   async function handleSelect(id: string) {
     if (id === 'blank') {
       await createWorkflow('New Workflow')
-    } else if (id === 'software-factory') {
-      const wf = softwareFactoryWorkflow()
+    } else {
+      const wf =
+        id === 'software-factory' ? softwareFactoryWorkflow() :
+        id === 'content-factory' ? contentFactoryWorkflow() :
+        id === 'research-lab' ? researchLabWorkflow() :
+        null
+      if (!wf) return
       await tauri.saveWorkflow(wf)
       await loadWorkflows()
       setCurrentWorkflow(wf)
@@ -49,7 +75,7 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
           <div>
             <p className="text-base font-bold text-white/90">New Workflow</p>
-            <p className="text-xs text-white/35 mt-0.5">Choose how you'd like to start</p>
+            <p className="text-xs text-white/35 mt-0.5">Choose a starting template or begin from scratch</p>
           </div>
           <button
             onClick={onClose}
@@ -60,7 +86,7 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Starter cards */}
-        <div className="p-6 space-y-3">
+        <div className="p-6 space-y-2.5">
           {STARTERS.map((s) => (
             <button
               key={s.id}
@@ -68,22 +94,22 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
               className={`w-full flex items-start gap-4 p-4 rounded-xl border bg-white/2 hover:bg-white/5 transition-all text-left ${s.color}`}
             >
               <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 ${s.iconBg}`}
+                className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${s.iconBg} ${s.iconColor}`}
               >
                 {s.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-0.5">
                   <p className="text-sm font-semibold text-white/90">{s.name}</p>
                   {s.agentCount > 0 && (
                     <span className="text-[10px] text-white/30 bg-white/6 px-2 py-0.5 rounded-full">
-                      {s.agentCount} agents included
+                      {s.agentCount} agents
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-white/45 leading-relaxed">{s.description}</p>
               </div>
-              <span className="text-white/20 text-lg shrink-0 mt-1">→</span>
+              <span className="text-white/20 text-lg shrink-0 mt-0.5">→</span>
             </button>
           ))}
         </div>

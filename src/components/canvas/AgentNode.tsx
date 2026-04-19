@@ -91,11 +91,31 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
 
         {/* Status + model */}
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-white/25 bg-white/5 px-2 py-0.5 rounded-full truncate max-w-[80px]">
-            {d.model?.modelId?.split('-').slice(0, 2).join('-') ?? 'model'}
-          </span>
+          <div className="flex items-center gap-1 min-w-0">
+            <div
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{
+                background:
+                  d.model?.provider === 'anthropic' ? '#a78bfa' :
+                  d.model?.provider === 'openai' ? '#34d399' :
+                  d.model?.provider === 'ollama' ? '#fb923c' : '#60a5fa',
+              }}
+            />
+            <span className="text-[10px] text-white/25 truncate max-w-[90px]">
+              {d.model?.modelId?.split('-').slice(0, 2).join('-') ?? 'model'}
+            </span>
+          </div>
           <StatusBadge status={status} />
         </div>
+
+        {/* Token count after completion */}
+        {isDone && step?.tokensUsed && (
+          <div className="mt-1.5 flex justify-end">
+            <span className="text-[9px] text-white/20 tabular-nums">
+              {step.tokensUsed.toLocaleString()} tokens
+            </span>
+          </div>
+        )}
 
         {/* Output preview */}
         {step?.output && (

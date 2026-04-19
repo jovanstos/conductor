@@ -17,6 +17,7 @@ interface WorkflowStore {
   setCurrentWorkflow: (workflow: Workflow | null) => void
   createWorkflow: (name: string) => Promise<Workflow>
   deleteWorkflow: (id: string) => Promise<void>
+  duplicateWorkflow: (id: string) => Promise<void>
   saveCurrentWorkflow: () => Promise<void>
   updateWorkflowMeta: (patch: Partial<Pick<Workflow, 'name' | 'description' | 'settings'>>) => void
 
@@ -66,6 +67,20 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
       workflows: s.workflows.filter((w) => w.id !== id),
       currentWorkflow: s.currentWorkflow?.id === id ? null : s.currentWorkflow,
     }))
+  },
+
+  duplicateWorkflow: async (id) => {
+    const original = get().workflows.find((w) => w.id === id)
+    if (!original) return
+    const copy: Workflow = {
+      ...original,
+      id: crypto.randomUUID(),
+      name: `${original.name} (copy)`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+    await tauri.saveWorkflow(copy)
+    set((s) => ({ workflows: [...s.workflows, copy], currentWorkflow: copy }))
   },
 
   saveCurrentWorkflow: async () => {

@@ -29,6 +29,7 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
   const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT)
   const [drawerHeight, setDrawerHeight] = useState(DRAWER_DEFAULT)
+  const [runError, setRunError] = useState<string | null>(null)
 
   useRun(currentRun?.id)
 
@@ -39,6 +40,23 @@ export default function App() {
 
   async function handleRun() {
     if (!currentWorkflow || !taskInput.trim() || isRunning) return
+
+    // Validate
+    if (currentWorkflow.nodes.filter(n => n.type === 'agent').length === 0) {
+      setRunError('Add at least one Agent node to your workflow before running.')
+      return
+    }
+    const badLoop = currentWorkflow.nodes.find(n => {
+      if (n.type !== 'loop') return false
+      const d = n.data as import('./types').LoopNodeData
+      return !d.targetNodeId || !d.reviewerNodeId
+    })
+    if (badLoop) {
+      setRunError('A Loop node is missing its Worker or Reviewer. Click the loop to configure it.')
+      return
+    }
+
+    setRunError(null)
     await startRun(currentWorkflow.id, taskInput)
   }
 
@@ -57,7 +75,7 @@ export default function App() {
       {/* ── Center column ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Workflow header bar */}
-        <div className="h-11 bg-[#0a0a0d] border-b border-white/5 flex items-center px-4 gap-3 shrink-0">
+        <div className="h-11 bg-[#0a0a0d] border-b border-white/5 flex items-center px-4 gap-3 shrink-0 relative">
           <span className="text-sm font-medium text-white/70 truncate min-w-0">
             {currentWorkflow?.name ?? 'No workflow selected'}
           </span>
@@ -94,6 +112,13 @@ export default function App() {
                   ▶ Run
                 </button>
               )}
+            </div>
+          )}
+          {runError && (
+            <div className="absolute top-full left-0 right-0 mt-1 mx-4 bg-red-500/15 border border-red-500/25 rounded-lg px-3 py-2 text-xs text-red-300 z-20 flex items-center gap-2">
+              <span>⚠</span>
+              <span>{runError}</span>
+              <button onClick={() => setRunError(null)} className="ml-auto text-red-400/50 hover:text-red-400">✕</button>
             </div>
           )}
         </div>

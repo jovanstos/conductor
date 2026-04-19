@@ -468,6 +468,7 @@ async fn llm_call(
     messages: &[ApiMessage],
     keys_file: &PathBuf,
 ) -> Result<(String, Option<u32>), String> {
+    let max_tokens = effective_max_tokens(&model.provider, &model.model_id, model.max_tokens);
     match model.provider.as_str() {
         "anthropic" => {
             let key = model
@@ -476,7 +477,7 @@ async fn llm_call(
                 .and_then(|r| load_keys(keys_file).remove(r))
                 .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
                 .ok_or_else(|| "No Anthropic API key configured".to_string())?;
-            call_anthropic(&model.model_id, &key, system, messages, model.max_tokens, model.temperature).await
+            call_anthropic(&model.model_id, &key, system, messages, max_tokens, model.temperature).await
         }
         "openai" => {
             let key = model
@@ -485,14 +486,35 @@ async fn llm_call(
                 .and_then(|r| load_keys(keys_file).remove(r))
                 .or_else(|| std::env::var("OPENAI_API_KEY").ok())
                 .ok_or_else(|| "No OpenAI API key configured".to_string())?;
-            call_openai(&model.model_id, &key, system, messages, model.max_tokens, model.temperature).await
+            call_openai(&model.model_id, &key, system, messages, max_tokens, model.temperature).await
         }
         "ollama" => {
             let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
-            call_ollama(&model.model_id, base, system, messages, model.max_tokens, model.temperature).await
+            call_ollama(&model.model_id, base, system, messages, max_tokens, model.temperature).await
         }
         p => Err(format!("Unsupported provider: {}", p)),
     }
+}
+
+// Per-model max_tokens caps (avoids API 400 errors when user sets "unlimited")
+fn effective_max_tokens(provider: &str, model_id: &str, requested: u32) -> u32 {
+    let cap: u32 = match provider {
+        "anthropic" => {
+            if model_id.contains("opus") { 32_000 }
+            else if model_id.contains("sonnet") { 64_000 }
+            else if model_id.contains("haiku") { 16_000 }
+            else { 8_192 }
+        }
+        "openai" => {
+            if model_id.contains("gpt-4o") { 16_384 }
+            else { 4_096 }
+        }
+        _ => {
+            // Ollama and custom: only cap absurd sentinel values
+            if requested == 0 || requested >= 100_000 { 32_768 } else { return requested; }
+        }
+    };
+    if requested == 0 || requested >= 100_000 { cap } else { requested.min(cap) }
 }
 
 // ─────────────────────────────────────────────
@@ -706,25 +728,26 @@ async fn llm_call_streaming(
     node_id: &str,
     cancel: &Arc<AtomicBool>,
 ) -> Result<(String, Option<u32>), String> {
+    let max_tokens = effective_max_tokens(&model.provider, &model.model_id, model.max_tokens);
     match model.provider.as_str() {
         "anthropic" => {
             let key = model.api_key_ref.as_deref()
                 .and_then(|r| load_keys(keys_file).remove(r))
                 .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
                 .ok_or_else(|| "No Anthropic API key — open Settings (⚙) to add one.".to_string())?;
-            call_anthropic_stream(&model.model_id, &key, system, messages, model.max_tokens, model.temperature, app, run_id, node_id, cancel).await
+            call_anthropic_stream(&model.model_id, &key, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
         }
         "openai" => {
             let key = model.api_key_ref.as_deref()
                 .and_then(|r| load_keys(keys_file).remove(r))
                 .or_else(|| std::env::var("OPENAI_API_KEY").ok())
                 .ok_or_else(|| "No OpenAI API key — open Settings (⚙) to add one.".to_string())?;
-            call_openai_compat_stream("https://api.openai.com/v1/chat/completions", Some(&key), &model.model_id, system, messages, model.max_tokens, model.temperature, app, run_id, node_id, cancel).await
+            call_openai_compat_stream("https://api.openai.com/v1/chat/completions", Some(&key), &model.model_id, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
         }
         "ollama" => {
             let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
             let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
-            call_openai_compat_stream(&url, None, &model.model_id, system, messages, model.max_tokens, model.temperature, app, run_id, node_id, cancel).await
+            call_openai_compat_stream(&url, None, &model.model_id, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
         }
         p => Err(format!("Unsupported provider: {}", p)),
     }
@@ -1013,6 +1036,9 @@ async fn execute_workflow(
             .map(|h| h.cancel_flag.clone())
             .unwrap_or_else(|| Arc::new(AtomicBool::new(false)))
     };
+
+    // Give the frontend ~200ms to register all event listeners before emitting the first step
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     let mut run: Run = match load_json(&state.runs_dir().join(format!("{}.json", &run_id))) {
         Ok(r) => r,
@@ -1352,6 +1378,30 @@ fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(&path).map_err(|e| format!("Read '{}': {}", path, e))
 }
 
+#[tauri::command]
+async fn get_ollama_models(base_url: Option<String>) -> Vec<String> {
+    let base = base_url.as_deref().unwrap_or("http://localhost:11434");
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build() {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+    let Ok(resp) = client
+        .get(&format!("{}/api/tags", base.trim_end_matches('/')))
+        .send()
+        .await else { return vec![]; };
+    let Ok(data) = resp.json::<serde_json::Value>().await else { return vec![]; };
+    data["models"]
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| m["name"].as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 // ─────────────────────────────────────────────
 // Built-in templates
 // ─────────────────────────────────────────────
@@ -1478,6 +1528,7 @@ fn main() {
             save_template,
             delete_template,
             read_text_file,
+            get_ollama_models,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -4,7 +4,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import NewWorkflowModal from './workflow/NewWorkflowModal'
 
 export default function Sidebar() {
-  const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow } =
+  const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow } =
     useWorkflowStore()
   const { providerStatuses, openSettings } = useSettingsStore()
   const [search, setSearch] = useState('')
@@ -44,6 +44,7 @@ export default function Sidebar() {
               active={currentWorkflow?.id === w.id}
               onSelect={() => setCurrentWorkflow(w)}
               onDelete={() => deleteWorkflow(w.id)}
+              onDuplicate={() => duplicateWorkflow(w.id)}
             />
           ))
         )}
@@ -93,11 +94,13 @@ function WorkflowItem({
   active,
   onSelect,
   onDelete,
+  onDuplicate,
 }: {
   name: string
   active: boolean
   onSelect: () => void
   onDelete: () => void
+  onDuplicate: () => void
 }) {
   const [hover, setHover] = useState(false)
 
@@ -111,13 +114,24 @@ function WorkflowItem({
       onMouseLeave={() => setHover(false)}
     >
       <span className="text-[11px] truncate flex-1">{name}</span>
-      {hover && !active && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete() }}
-          className="text-[10px] text-white/20 hover:text-red-400 transition-colors px-0.5"
-        >
-          ✕
-        </button>
+      {hover && (
+        <>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDuplicate() }}
+            className="text-[10px] text-white/20 hover:text-white/60 transition-colors px-0.5"
+            title="Duplicate"
+          >
+            ⎘
+          </button>
+          {!active && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              className="text-[10px] text-white/20 hover:text-red-400 transition-colors px-0.5"
+            >
+              ✕
+            </button>
+          )}
+        </>
       )}
     </div>
   )

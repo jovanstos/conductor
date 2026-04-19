@@ -9,7 +9,7 @@ import type {
 export const DEFAULT_MODEL: ModelConfig = {
   provider: "anthropic",
   modelId: "claude-sonnet-4-6",
-  maxTokens: 8096,
+  maxTokens: 999999,
   temperature: 1.0,
 };
 
@@ -20,34 +20,21 @@ export const DEFAULT_WORKFLOW_SETTINGS: WorkflowSettings = {
 };
 
 export const ANTHROPIC_MODELS = [
-  {
-    id: "claude-opus-4-7",
-    name: "Claude Opus 4.7",
-    description: "Most capable",
-  },
-  {
-    id: "claude-sonnet-4-6",
-    name: "Claude Sonnet 4.6",
-    description: "Balanced",
-  },
-  {
-    id: "claude-haiku-4-5-20251001",
-    name: "Claude Haiku 4.5",
-    description: "Fast & efficient",
-  },
+  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7' },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
 ];
 
 export const OPENAI_MODELS = [
-  { id: "gpt-4o", name: "GPT-4o", description: "Most capable" },
-  { id: "gpt-4o-mini", name: "GPT-4o mini", description: "Fast & cheap" },
+  { id: 'gpt-4o', name: 'GPT-4o' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
 ];
 
 export const OLLAMA_MODELS = [
-  { id: "gemma4:e4b", name: "Gemma4:e4b", description: "Google" },
-  { id: "llama3.2", name: "Llama 3.2", description: "Meta" },
-  { id: "mistral", name: "Mistral", description: "Fast" },
-  { id: "codellama", name: "Code Llama", description: "Code focused" },
-  { id: "qwen2.5-coder", name: "Qwen 2.5 Coder", description: "Code focused" },
+  { id: 'llama3.2', name: 'Llama 3.2' },
+  { id: 'mistral', name: 'Mistral' },
+  { id: 'codellama', name: 'Code Llama' },
+  { id: 'qwen2.5-coder', name: 'Qwen 2.5 Coder' },
 ];
 
 export function newWorkflow(name: string): Workflow {
@@ -135,6 +122,55 @@ export const BUILT_IN_TEMPLATES = [
     roleDescription: "Analyzes data and produces insights",
     systemPrompt: `## Role\nYou are a research analyst.\n\n## Objective\nAnalyze the given material and produce structured insights.\n\n## Output format\nExecutive Summary · Key Findings (numbered) · Recommendations.\n\n## Constraints\n- Evidence-based conclusions only\n- Highlight uncertainty where it exists`,
   },
+  {
+    id: "fact-checker",
+    name: "Fact Checker",
+    category: "Analysis",
+    roleDescription: "Critically evaluates claims and research",
+    systemPrompt: `## Role\nYou are a meticulous fact-checker and critical reviewer.\n\n## Objective\nCritically evaluate the content for accuracy, logical consistency, and completeness.\n\n## Output format\nYour response MUST end with either:\n- "APPROVED" if the content is accurate and complete\n- "NEEDS REVISION" followed by specific numbered issues\n\n## Constraints\n- Challenge unsupported claims\n- Identify logical gaps or errors\n- Only APPROVED when genuinely satisfied`,
+  },
+  {
+    id: "executive-summarizer",
+    name: "Executive Summarizer",
+    category: "Analysis",
+    roleDescription: "Distills lengthy content into key points",
+    systemPrompt: `## Role\nYou are an expert at condensing complex information.\n\n## Objective\nSummarize the given content into a clear, concise executive summary.\n\n## Output format\nTL;DR (2 sentences) · Key Points (5 bullets max) · Action Items (if any).\n\n## Constraints\n- Keep it under 300 words\n- Preserve all critical information\n- Use plain language`,
+  },
+  {
+    id: "marketing-copywriter",
+    name: "Marketing Copywriter",
+    category: "Marketing",
+    roleDescription: "Writes persuasive marketing copy",
+    systemPrompt: `## Role\nYou are a seasoned marketing copywriter.\n\n## Objective\nWrite compelling, persuasive copy that drives action.\n\n## Output format\nHeadline · Subheadline · Body copy · Call to action.\n\n## Constraints\n- Focus on benefits, not features\n- Speak directly to the target audience\n- Every sentence must earn its place`,
+  },
+  {
+    id: "email-writer",
+    name: "Email Writer",
+    category: "Marketing",
+    roleDescription: "Writes professional and engaging emails",
+    systemPrompt: `## Role\nYou are a professional email copywriter.\n\n## Objective\nWrite clear, engaging emails that get responses.\n\n## Output format\nSubject line · Preview text · Body · Sign-off.\n\n## Constraints\n- Subject line under 50 characters\n- Get to the point quickly\n- One clear call-to-action per email`,
+  },
+  {
+    id: "social-media-manager",
+    name: "Social Media Manager",
+    category: "Marketing",
+    roleDescription: "Creates engaging social media posts",
+    systemPrompt: `## Role\nYou are a social media specialist.\n\n## Objective\nCreate platform-optimized posts that engage the target audience.\n\n## Output format\nFor each platform requested: post copy + relevant hashtags (5 max).\n\n## Constraints\n- Twitter/X: under 280 characters\n- Instagram: visual-first, conversational\n- LinkedIn: professional, value-driven\n- Never use more than 5 hashtags`,
+  },
+  {
+    id: "editor",
+    name: "Editor",
+    category: "Writing",
+    roleDescription: "Refines drafts for clarity and impact",
+    systemPrompt: `## Role\nYou are an experienced editor.\n\n## Objective\nReview the draft and provide clear, actionable feedback to improve it.\n\n## Output format\nYour response MUST end with either:\n- "APPROVED" if the content is ready to publish\n- "NEEDS REVISION" followed by specific numbered feedback\n\n## Constraints\n- Focus on clarity, flow, and impact\n- Be constructive and specific\n- Only APPROVED when genuinely satisfied`,
+  },
+  {
+    id: "sales-pitch-writer",
+    name: "Sales Pitch Writer",
+    category: "Marketing",
+    roleDescription: "Crafts compelling sales pitches",
+    systemPrompt: `## Role\nYou are a top-tier sales pitch writer.\n\n## Objective\nCreate a compelling pitch that clearly communicates value and motivates action.\n\n## Output format\nHook · Problem · Solution · Proof · Offer · Close.\n\n## Constraints\n- Lead with the prospect's pain point\n- Back claims with specifics\n- End with a clear next step`,
+  },
 ];
 
 export function newAgentNodeData(
@@ -147,8 +183,167 @@ export function newAgentNodeData(
       "## Role\nYou are a helpful AI agent.\n\n## Objective\nComplete the given task concisely and accurately.\n\n## Output format\nPlain text response.\n\n## Constraints\n- Be specific and actionable",
     model: { ...DEFAULT_MODEL },
     contextMode: "full_chain",
-    maxTokens: 8096,
+    maxTokens: 999999,
     ...overrides,
+  };
+}
+
+// Content Factory: Writer + Editor loop → Final Polish
+export function contentFactoryWorkflow(): Workflow {
+  const writerId = uuidv4();
+  const editorId = uuidv4();
+  const writerLoopId = uuidv4();
+  const polisherId = uuidv4();
+
+  return {
+    id: uuidv4(),
+    name: "Content Factory",
+    description: "Writes and refines content through a writer-editor loop",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    nodes: [
+      {
+        id: writerId,
+        type: "agent",
+        position: { x: 80, y: 100 },
+        data: {
+          name: "Writer",
+          roleDescription: "Drafts engaging content",
+          systemPrompt: `## Role\nYou are a skilled content writer.\n\n## Objective\nWrite a polished draft based on the task. If given editor feedback, revise accordingly.\n\n## Output format\nComplete draft content, ready for review.\n\n## Constraints\n- Match the tone and audience specified\n- Be clear, concise, and engaging`,
+          model: { ...DEFAULT_MODEL },
+          contextMode: "full_chain",
+          maxTokens: 999999,
+          templateId: "content-writer",
+        } satisfies AgentNodeData,
+      },
+      {
+        id: editorId,
+        type: "agent",
+        position: { x: 80, y: 280 },
+        data: {
+          name: "Editor",
+          roleDescription: "Reviews and improves the draft",
+          systemPrompt: `## Role\nYou are an experienced editor.\n\n## Objective\nReview the writer's draft and provide detailed, constructive feedback.\n\n## Output format\nYour response MUST end with either:\n- "APPROVED" if the content is ready to publish\n- "NEEDS REVISION" followed by specific numbered feedback points\n\n## Constraints\n- Focus on clarity, flow, and impact\n- Be specific and actionable\n- Only APPROVED when genuinely satisfied`,
+          model: { ...DEFAULT_MODEL },
+          contextMode: "full_chain",
+          maxTokens: 999999,
+          templateId: "editor",
+        } satisfies AgentNodeData,
+      },
+      {
+        id: writerLoopId,
+        type: "loop",
+        position: { x: 360, y: 180 },
+        data: {
+          targetNodeId: writerId,
+          reviewerNodeId: editorId,
+          maxRetries: 3,
+          exitCondition: "reviewer_approves",
+        },
+      },
+      {
+        id: polisherId,
+        type: "agent",
+        position: { x: 600, y: 180 },
+        data: {
+          name: "Final Polish",
+          roleDescription: "Applies final polish and formatting",
+          systemPrompt: `## Role\nYou are a professional copyeditor.\n\n## Objective\nGive the approved content its final polish.\n\n## Output format\nThe finalized, publication-ready version of the content.\n\n## Constraints\n- Preserve the original message and voice\n- Fix any remaining grammar, style, or formatting issues`,
+          model: { ...DEFAULT_MODEL },
+          contextMode: "full_chain",
+          maxTokens: 999999,
+        } satisfies AgentNodeData,
+      },
+    ],
+    edges: [
+      {
+        id: uuidv4(),
+        sourceNodeId: writerLoopId,
+        targetNodeId: polisherId,
+        contextMode: "full",
+      },
+    ],
+    settings: DEFAULT_WORKFLOW_SETTINGS,
+  };
+}
+
+// Research Lab: Researcher + Fact Checker loop → Report Writer
+export function researchLabWorkflow(): Workflow {
+  const researcherId = uuidv4();
+  const factCheckerId = uuidv4();
+  const researchLoopId = uuidv4();
+  const reportWriterId = uuidv4();
+
+  return {
+    id: uuidv4(),
+    name: "Research Lab",
+    description: "Researches a topic and produces a fact-checked report",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    nodes: [
+      {
+        id: researcherId,
+        type: "agent",
+        position: { x: 80, y: 100 },
+        data: {
+          name: "Researcher",
+          roleDescription: "Gathers and synthesizes information",
+          systemPrompt: `## Role\nYou are a thorough research analyst.\n\n## Objective\nResearch the topic and synthesize key information. If given feedback, revise your research.\n\n## Output format\nStructured research with: Overview, Key Facts, Supporting Evidence, Open Questions.\n\n## Constraints\n- Evidence-based claims only\n- Acknowledge uncertainty clearly`,
+          model: { ...DEFAULT_MODEL },
+          contextMode: "full_chain",
+          maxTokens: 999999,
+          templateId: "analyst",
+        } satisfies AgentNodeData,
+      },
+      {
+        id: factCheckerId,
+        type: "agent",
+        position: { x: 80, y: 280 },
+        data: {
+          name: "Fact Checker",
+          roleDescription: "Critically evaluates the research",
+          systemPrompt: `## Role\nYou are a critical fact-checker.\n\n## Objective\nCritically evaluate the research for accuracy, completeness, and logical consistency.\n\n## Output format\nYour response MUST end with either:\n- "APPROVED" if the research is solid and complete\n- "NEEDS REVISION" followed by specific numbered issues\n\n## Constraints\n- Challenge unsupported claims\n- Identify gaps in coverage\n- Only APPROVED when genuinely satisfied`,
+          model: { ...DEFAULT_MODEL },
+          contextMode: "full_chain",
+          maxTokens: 999999,
+          templateId: "fact-checker",
+        } satisfies AgentNodeData,
+      },
+      {
+        id: researchLoopId,
+        type: "loop",
+        position: { x: 360, y: 180 },
+        data: {
+          targetNodeId: researcherId,
+          reviewerNodeId: factCheckerId,
+          maxRetries: 2,
+          exitCondition: "reviewer_approves",
+        },
+      },
+      {
+        id: reportWriterId,
+        type: "agent",
+        position: { x: 600, y: 180 },
+        data: {
+          name: "Report Writer",
+          roleDescription: "Turns research into a polished report",
+          systemPrompt: `## Role\nYou are a professional report writer.\n\n## Objective\nTransform the verified research into a polished, readable report.\n\n## Output format\nMarkdown report: Executive Summary · Introduction · Findings · Analysis · Conclusions · Recommendations.\n\n## Constraints\n- Clear, professional tone\n- Accessible to non-experts\n- Actionable conclusions`,
+          model: { ...DEFAULT_MODEL },
+          contextMode: "full_chain",
+          maxTokens: 999999,
+          templateId: "documentation-writer",
+        } satisfies AgentNodeData,
+      },
+    ],
+    edges: [
+      {
+        id: uuidv4(),
+        sourceNodeId: researchLoopId,
+        targetNodeId: reportWriterId,
+        contextMode: "full",
+      },
+    ],
+    settings: DEFAULT_WORKFLOW_SETTINGS,
   };
 }
 
@@ -197,7 +392,7 @@ A structured markdown document with: Executive Summary, Requirements, Architectu
 - Keep responses focused`,
           model: { ...DEFAULT_MODEL },
           contextMode: "full_chain",
-          maxTokens: 2048,
+          maxTokens: 999999,
           templateId: "software-planner",
         } satisfies AgentNodeData,
       },
@@ -229,7 +424,7 @@ Your response MUST end with either:
 - Be constructive and specific`,
           model: { ...DEFAULT_MODEL },
           contextMode: "full_chain",
-          maxTokens: 1024,
+          maxTokens: 999999,
           templateId: "architecture-reviewer",
         } satisfies AgentNodeData,
       },
@@ -282,7 +477,7 @@ Complete, working code files with clear file structure and all imports listed.
 - Do not add features beyond the SDD scope`,
           model: { ...DEFAULT_MODEL },
           contextMode: "full_chain",
-          maxTokens: 4096,
+          maxTokens: 999999,
           templateId: "full-stack-developer",
         } satisfies AgentNodeData,
       },
@@ -315,7 +510,7 @@ Your response MUST end with either:
 - Only say APPROVED when all requirements are met`,
           model: { ...DEFAULT_MODEL },
           contextMode: "full_chain",
-          maxTokens: 1024,
+          maxTokens: 999999,
           templateId: "unit-test-writer",
         } satisfies AgentNodeData,
       },
