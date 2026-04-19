@@ -9,6 +9,7 @@ import WorkflowCanvas from './components/canvas/WorkflowCanvas'
 import WorkflowListView from './components/list/WorkflowListView'
 import Inspector from './components/inspector/Inspector'
 import RunDrawer from './components/run/RunDrawer'
+import RunStartModal from './components/run/RunStartModal'
 import ReviewGateModal from './components/run/ReviewGateModal'
 import ResultModal from './components/run/ResultModal'
 import SettingsPanel from './components/settings/SettingsPanel'
@@ -23,7 +24,7 @@ function clamp(v: number, min: number, max: number) {
 
 export default function App() {
   const { loadWorkflows, currentWorkflow, viewMode, taskInput, setTaskInput } = useWorkflowStore()
-  const { startRun, cancelRun, isRunning, currentRun, gateInfo, showResultModal } = useRunStore()
+  const { cancelRun, isRunning, currentRun, gateInfo, showResultModal, pendingRun, setPendingRun } = useRunStore()
   const { loadProviderStatuses, isOpen: settingsOpen } = useSettingsStore()
 
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
@@ -57,7 +58,8 @@ export default function App() {
     }
 
     setRunError(null)
-    await startRun(currentWorkflow.id, taskInput)
+    // Show the run start modal so user can choose workspace mode
+    setPendingRun({ workflowId: currentWorkflow.id, input: taskInput })
   }
 
   return (
@@ -160,6 +162,7 @@ export default function App() {
         )}
       </div>
 
+      {pendingRun && <RunStartModal />}
       {gateInfo && <ReviewGateModal />}
       {showResultModal && <ResultModal />}
       {settingsOpen && <SettingsPanel />}

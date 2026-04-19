@@ -6,6 +6,8 @@ import type {
   Template,
   ModelConfig,
   LLMMessage,
+  FileEntry,
+  ProjectEntry,
   StepStartedPayload,
   StepDonePayload,
   StepErrorPayload,
@@ -20,8 +22,13 @@ export const saveWorkflow = (workflow: Workflow) => invoke<void>('save_workflow'
 export const deleteWorkflow = (id: string) => invoke<void>('delete_workflow', { id })
 
 // Run management
-export const startRun = (workflowId: string, input: string) =>
-  invoke<string>('start_run', { workflowId, input })
+export const startRun = (
+  workflowId: string,
+  input: string,
+  workspaceMode?: string,
+  projectName?: string,
+  basePath?: string,
+) => invoke<string>('start_run', { workflowId, input, workspaceMode, projectName, basePath })
 export const cancelRun = (runId: string) => invoke<void>('cancel_run', { runId })
 export const getRun = (runId: string) => invoke<Run | null>('get_run', { runId })
 export const getRunsForWorkflow = (workflowId: string) =>
@@ -52,6 +59,20 @@ export const deleteTemplate = (id: string) => invoke<void>('delete_template', { 
 
 // File input
 export const readTextFile = (path: string) => invoke<string>('read_text_file', { path })
+
+// Workspace / filesystem
+export const readWorkspaceManifest = (workspacePath: string) =>
+  invoke<FileEntry[]>('read_workspace_manifest', { workspacePath })
+export const writeWorkspaceFiles = (workspacePath: string, files: FileEntry[]) =>
+  invoke<void>('write_workspace_files', { workspacePath, files })
+export const deleteWorkspace = (workspacePath: string) =>
+  invoke<void>('delete_workspace', { workspacePath })
+export const zipAndSaveWorkspace = (workspacePath: string, destinationPath: string) =>
+  invoke<void>('zip_and_save_workspace', { workspacePath, destinationPath })
+export const listProjects = (basePath?: string) =>
+  invoke<ProjectEntry[]>('list_projects', { basePath })
+export const openProject = (projectPath: string) =>
+  invoke<FileEntry[]>('open_project', { projectPath })
 
 // Tauri event listeners for run lifecycle
 export type RunEventHandlers = {

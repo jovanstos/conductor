@@ -2,6 +2,11 @@ import { create } from 'zustand'
 import type { Run, RunStep, GatePausedPayload } from '../types'
 import * as tauri from '../lib/tauri'
 
+export type PendingRunConfig = {
+  workflowId: string
+  input: string
+}
+
 interface RunStore {
   currentRun: Run | null
   isRunning: boolean
@@ -9,15 +14,22 @@ interface RunStore {
   gateInfo: GatePausedPayload | null
   logLines: string[]
   showResultModal: boolean
+  pendingRun: PendingRunConfig | null
 
-  startRun: (workflowId: string, input: string) => Promise<string>
+  startRun: (
+    workflowId: string,
+    input: string,
+    workspaceMode?: string,
+    projectName?: string,
+    basePath?: string,
+  ) => Promise<string>
   cancelRun: () => Promise<void>
   resumeGate: (action: 'approve' | 'reject' | 'edit', content?: string) => Promise<void>
   clearRun: () => void
   openResultModal: () => void
   dismissResultModal: () => void
+  setPendingRun: (config: PendingRunConfig | null) => void
 
-  // Called by useRun hook to update state from Tauri events
   _setRun: (run: Run) => void
   _addStep: (step: Partial<RunStep> & { nodeId: string }) => void
   _updateStep: (nodeId: string, patch: Partial<RunStep>) => void
@@ -35,9 +47,10 @@ export const useRunStore = create<RunStore>()((set, get) => ({
   gateInfo: null,
   logLines: [],
   showResultModal: false,
+  pendingRun: null,
 
-  startRun: async (workflowId, input) => {
-    const runId = await tauri.startRun(workflowId, input)
+  startRun: async (workflowId, input, workspaceMode, projectName, basePath) => {
+    const runId = await tauri.startRun(workflowId, input, workspaceMode, projectName, basePath)
     const run: Run = {
       id: runId,
       workflowId,
@@ -46,7 +59,7 @@ export const useRunStore = create<RunStore>()((set, get) => ({
       input,
       steps: [],
     }
-    set({ currentRun: run, isRunning: true, isPaused: false, gateInfo: null, logLines: [] })
+    set({ currentRun: run, isRunning: true, isPaused: false, gateInfo: null, logLines: [], pendingRun: null })
     return runId
   },
 
@@ -67,6 +80,7 @@ export const useRunStore = create<RunStore>()((set, get) => ({
   clearRun: () => set({ currentRun: null, isRunning: false, isPaused: false, gateInfo: null, logLines: [], showResultModal: false }),
   openResultModal: () => set({ showResultModal: true }),
   dismissResultModal: () => set({ showResultModal: false }),
+  setPendingRun: (config) => set({ pendingRun: config }),
 
   _setRun: (run) => set({ currentRun: run }),
 
@@ -83,6 +97,7 @@ export const useRunStore = create<RunStore>()((set, get) => ({
         output: partial.output ?? '',
         tokensUsed: partial.tokensUsed,
         error: partial.error,
+        filesWritten: partial.filesWritten ?? [],
       }
       return { currentRun: { ...s.currentRun!, steps: [...s.currentRun!.steps, step] } }
     })

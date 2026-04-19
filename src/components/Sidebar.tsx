@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import NewWorkflowModal from './workflow/NewWorkflowModal'
+import { listProjects } from '../lib/tauri'
+import type { ProjectEntry } from '../types'
+import ProjectView from './projects/ProjectView'
 
 export default function Sidebar() {
   const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow } =
@@ -9,10 +12,16 @@ export default function Sidebar() {
   const { providerStatuses, openSettings } = useSettingsStore()
   const [search, setSearch] = useState('')
   const [showNewModal, setShowNewModal] = useState(false)
+  const [projects, setProjects] = useState<ProjectEntry[]>([])
+  const [selectedProject, setSelectedProject] = useState<ProjectEntry | null>(null)
 
   const filtered = workflows.filter((w) =>
     w.name.toLowerCase().includes(search.toLowerCase()),
   )
+
+  useEffect(() => {
+    listProjects().then(setProjects).catch(() => {})
+  }, [])
 
   return (
     <div className="w-full h-full bg-[#0a0a0d] border-r border-white/5 flex flex-col overflow-hidden">
@@ -55,7 +64,36 @@ export default function Sidebar() {
         >
           + New workflow
         </button>
+
+        {/* Projects section */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between pr-3">
+            <SectionLabel label="My Projects" />
+            <button
+              onClick={() => listProjects().then(setProjects).catch(() => {})}
+              className="text-[10px] text-white/20 hover:text-white/50 transition-colors"
+              title="Refresh projects"
+            >
+              ↻
+            </button>
+          </div>
+          {projects.length === 0 ? (
+            <p className="px-4 py-1 text-[11px] text-white/20">No saved projects</p>
+          ) : (
+            projects.map((p) => (
+              <ProjectItem
+                key={p.path}
+                project={p}
+                onOpen={() => setSelectedProject(p)}
+              />
+            ))
+          )}
+        </div>
       </div>
+
+      {selectedProject && (
+        <ProjectView project={selectedProject} onClose={() => setSelectedProject(null)} />
+      )}
 
       {/* Model status indicators */}
       <div className="px-3 py-2 border-t border-white/5">
@@ -86,6 +124,19 @@ export default function Sidebar() {
 function SectionLabel({ label }: { label: string }) {
   return (
     <p className="px-4 mb-1 text-[10px] text-white/25 uppercase tracking-widest">{label}</p>
+  )
+}
+
+function ProjectItem({ project, onOpen }: { project: ProjectEntry; onOpen: () => void }) {
+  return (
+    <div
+      className="mx-2 flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer mb-0.5 text-white/45 hover:text-white/70 hover:bg-white/5 transition-colors group"
+      onClick={onOpen}
+    >
+      <span className="text-emerald-500/60 text-[10px]">◈</span>
+      <span className="text-[11px] truncate flex-1">{project.name}</span>
+      <span className="text-[10px] text-white/20 group-hover:text-white/40 transition-colors">→</span>
+    </div>
   )
 }
 

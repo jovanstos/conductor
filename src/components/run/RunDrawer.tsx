@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useRunStore } from '../../stores/runStore'
+import * as tauri from '../../lib/tauri'
 import type { RunStep } from '../../types'
 
 export default function RunDrawer({ height }: { height: number }) {
   const { currentRun, isRunning, isPaused, gateInfo, cancelRun, clearRun, openResultModal } =
     useRunStore()
+  const [discardConfirm, setDiscardConfirm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
   if (!currentRun) return null
 
   // Latest step per agent
@@ -19,9 +24,50 @@ export default function RunDrawer({ height }: { height: number }) {
   const isDone = currentRun.status === 'completed'
   const isFailed = currentRun.status === 'failed'
   const isCancelled = currentRun.status === 'cancelled'
+  const isFinished = isDone || isFailed || isCancelled
+
+  const ws = currentRun.workspaceConfig
+  const totalFilesWritten = currentRun.steps.reduce(
+    (n, s) => n + (s.filesWritten?.length ?? 0), 0
+  )
 
   const gridCols =
     agentSteps.length <= 1 ? 'grid-cols-1' : agentSteps.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
+
+  async function handleDiscard() {
+    if (!ws) { clearRun(); return }
+    if (ws.mode === 'temporary') {
+      try {
+        await tauri.deleteWorkspace(ws.workspacePath)
+      } catch { /* ignore */ }
+      clearRun()
+    } else {
+      setDiscardConfirm(true)
+    }
+  }
+
+  async function handleDiscardConfirmed() {
+    if (!ws) return
+    try {
+      await tauri.deleteWorkspace(ws.workspacePath)
+    } catch { /* ignore */ }
+    setDiscardConfirm(false)
+    clearRun()
+  }
+
+  async function handleExportZip() {
+    if (!ws) return
+    setSaving(true)
+    try {
+      const dest = `${ws.workspacePath}.zip`
+      await tauri.zipAndSaveWorkspace(ws.workspacePath, dest)
+      setSaveMsg(`Saved: ${dest}`)
+      setTimeout(() => setSaveMsg(null), 4000)
+    } catch (e) {
+      setSaveMsg(`Error: ${String(e)}`)
+    }
+    setSaving(false)
+  }
 
   return (
     <div
@@ -56,47 +102,101 @@ export default function RunDrawer({ height }: { height: number }) {
           }`}
         />
 
-        <p
-          className={`text-sm font-semibold ${
-            isDone
-              ? 'text-green-400'
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-sm font-semibold ${
+              isDone
+                ? 'text-green-400'
+                : isFailed
+                  ? 'text-red-400'
+                  : isCancelled
+                    ? 'text-white/35'
+                    : isPaused
+                      ? 'text-blue-300'
+                      : 'text-purple-200'
+            }`}
+          >
+            {isDone
+              ? 'All done! Your team finished the job.'
               : isFailed
-                ? 'text-red-400'
+                ? 'Something went wrong.'
                 : isCancelled
-                  ? 'text-white/35'
+                  ? 'Run was cancelled.'
                   : isPaused
-                    ? 'text-blue-300'
-                    : 'text-purple-200'
-          }`}
-        >
-          {isDone
-            ? 'All done! Your team finished the job.'
-            : isFailed
-              ? 'Something went wrong.'
-              : isCancelled
-                ? 'Run was cancelled.'
-                : isPaused
-                  ? 'Workflow paused — your input is needed!'
-                  : activeStep
-                    ? `${activeStep.nodeName} is working...`
-                    : 'Your team is starting up...'}
-        </p>
+                    ? 'Workflow paused — your input is needed!'
+                    : activeStep
+                      ? `${activeStep.nodeName} is working...`
+                      : 'Your team is starting up...'}
+          </p>
+          {ws && (
+            <p className="text-[10px] text-white/25 truncate mt-0.5">
+              {ws.mode === 'project' ? `◈ ${ws.projectName ?? 'project'}` : '◌ temporary'}{' '}
+              · {ws.workspacePath}
+              {totalFilesWritten > 0 && (
+                <span className="ml-1.5 text-emerald-400/60">
+                  · {totalFilesWritten} file{totalFilesWritten !== 1 ? 's' : ''} written
+                </span>
+              )}
+            </p>
+          )}
+        </div>
 
         {agentSteps.length > 0 && !isPaused && (
-          <span className="text-[11px] text-white/25 tabular-nums">
+          <span className="text-[11px] text-white/25 tabular-nums shrink-0">
             {doneCount} / {agentSteps.length} done
           </span>
         )}
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {isDone && currentRun.finalOutput && (
             <button
               onClick={openResultModal}
               className="bg-green-600 hover:bg-green-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
             >
-              See Full Results →
+              See Results →
             </button>
           )}
+
+          {/* Workspace actions when run is finished */}
+          {isFinished && ws && (
+            <>
+              {ws.mode === 'project' ? (
+                <>
+                  <button
+                    onClick={handleExportZip}
+                    disabled={saving}
+                    className="text-xs text-white/40 hover:text-white/70 border border-white/10 hover:border-white/25 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40"
+                    title="Export project as zip"
+                  >
+                    {saving ? '...' : '↓ Export'}
+                  </button>
+                  <button
+                    onClick={clearRun}
+                    className="text-xs text-emerald-400/70 hover:text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/40 px-2.5 py-1 rounded-lg transition-colors"
+                    title={`Files saved to ${ws.workspacePath}`}
+                  >
+                    ◈ Keep Project
+                  </button>
+                  <button
+                    onClick={handleDiscard}
+                    className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+                    title="Delete project files"
+                  >
+                    Discard
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleDiscard}
+                  className="text-xs text-white/30 hover:text-white/60 border border-white/8 hover:border-white/20 px-2.5 py-1 rounded-lg transition-colors"
+                  title="Delete temp files"
+                >
+                  ✕ Discard
+                </button>
+              )}
+            </>
+          )}
+
           {isRunning && (
             <button
               onClick={cancelRun}
@@ -105,15 +205,48 @@ export default function RunDrawer({ height }: { height: number }) {
               ■ Cancel
             </button>
           )}
-          <button
-            onClick={clearRun}
-            className="text-white/20 hover:text-white/50 text-base leading-none transition-colors ml-1"
-            title="Dismiss"
-          >
-            ✕
-          </button>
+          {!ws && (
+            <button
+              onClick={clearRun}
+              className="text-white/20 hover:text-white/50 text-base leading-none transition-colors ml-1"
+              title="Dismiss"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
+
+      {/* ── Save message toast ── */}
+      {saveMsg && (
+        <div className="mx-3 mt-2 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-300">
+          {saveMsg}
+        </div>
+      )}
+
+      {/* ── Discard confirmation (project mode) ── */}
+      {discardConfirm && (
+        <div className="mx-3 mt-2 shrink-0 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-300">Delete project files?</p>
+            <p className="text-xs text-red-300/60 mt-0.5">
+              This will permanently delete all generated files at {ws?.workspacePath}. Cannot be undone.
+            </p>
+          </div>
+          <button
+            onClick={handleDiscardConfirmed}
+            className="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            Delete
+          </button>
+          <button
+            onClick={() => setDiscardConfirm(false)}
+            className="text-xs text-white/40 hover:text-white/70 transition-colors shrink-0"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* ── Review gate notice ── */}
       {isPaused && gateInfo && (
@@ -153,11 +286,13 @@ export default function RunDrawer({ height }: { height: number }) {
 
 function EmployeeCard({ step }: { step: RunStep }) {
   const [expanded, setExpanded] = useState(false)
+  const [showFiles, setShowFiles] = useState(false)
 
   const isRunning = step.status === 'running'
   const isDone = step.status === 'done'
   const isError = step.status === 'error'
   const hasOutput = !isRunning && (step.output || step.error)
+  const hasFiles = (step.filesWritten?.length ?? 0) > 0
 
   return (
     <div
@@ -223,6 +358,27 @@ function EmployeeCard({ step }: { step: RunStep }) {
           </p>
         </div>
       </div>
+
+      {/* Files written badge */}
+      {hasFiles && (
+        <div className="mt-2">
+          <button
+            onClick={() => setShowFiles((v) => !v)}
+            className="flex items-center gap-1 text-[10px] text-emerald-400/70 hover:text-emerald-300 transition-colors"
+          >
+            <span>◈</span>
+            <span>{step.filesWritten!.length} file{step.filesWritten!.length !== 1 ? 's' : ''} written</span>
+            <span className="text-white/20 ml-0.5">{showFiles ? '▲' : '▼'}</span>
+          </button>
+          {showFiles && (
+            <div className="mt-1 bg-black/20 rounded-lg p-2 space-y-0.5">
+              {step.filesWritten!.map((f) => (
+                <p key={f} className="text-[10px] text-emerald-300/60 font-mono truncate">{f}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Live streaming output while running */}
       {isRunning && step.output && (

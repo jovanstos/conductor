@@ -78,6 +78,7 @@ export type RunStep = {
   output: string
   tokensUsed?: number
   error?: string
+  filesWritten?: string[]
 }
 
 export type Run = {
@@ -89,6 +90,7 @@ export type Run = {
   input: string
   steps: RunStep[]
   finalOutput?: string
+  workspaceConfig?: WorkspaceConfig
 }
 
 export type Template = {
@@ -106,9 +108,32 @@ export type LLMMessage = {
   content: string
 }
 
+// ── Workspace / filesystem types ────────────────────
+export type WorkspaceMode = 'temporary' | 'project'
+
+export type FileEntry = {
+  path: string    // relative path within workspace e.g. "src/main.py"
+  content: string
+}
+
+export type WorkspaceConfig = {
+  mode: WorkspaceMode
+  workspacePath: string
+  projectName?: string
+}
+
+export type ProjectEntry = {
+  name: string
+  path: string
+  lastModified: string
+}
+
+// ── Updated run types ────────────────────────────────
+// (re-declare here so RunStep and Run pick up new fields)
+
 // Tauri event payloads
 export type StepStartedPayload = { nodeId: string; nodeName: string; attempt: number }
-export type StepDonePayload = { nodeId: string; output: string; tokensUsed?: number }
+export type StepDonePayload = { nodeId: string; output: string; tokensUsed?: number; filesWritten?: string[] }
 export type StepErrorPayload = { nodeId: string; error: string }
 export type StepChunkPayload = { nodeId: string; chunk: string }
 export type GatePausedPayload = { nodeId: string; output: string; message: string }

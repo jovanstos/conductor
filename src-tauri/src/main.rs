@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod workspace_fs;
+
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -106,6 +108,14 @@ struct ReviewGateData {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct WorkspaceConfig {
+    mode: String,            // "temporary" | "project"
+    workspace_path: String,
+    project_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Run {
     id: String,
     workflow_id: String,
@@ -115,6 +125,7 @@ struct Run {
     input: String,
     steps: Vec<RunStep>,
     final_output: Option<String>,
+    workspace_config: Option<WorkspaceConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +141,7 @@ struct RunStep {
     output: String,
     tokens_used: Option<u32>,
     error: Option<String>,
+    files_written: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -795,6 +807,7 @@ async fn exec_agent(
     app: &AppHandle,
     cancel: &Arc<AtomicBool>,
     extra_context: Option<&str>,
+    workspace_path: Option<&str>,
 ) -> Result<String, String> {
     if cancel.load(Ordering::Relaxed) {
         return Err("__cancelled__".into());
@@ -810,6 +823,18 @@ async fn exec_agent(
         user_msg.push_str(&format!("\n\n{}", extra));
     }
 
+    // Inject workspace manifest if a workspace is active
+    let mut system_prompt = data.system_prompt.clone();
+    if let Some(ws_path) = workspace_path {
+        if let Ok(files) = workspace_fs::read_manifest_internal(ws_path) {
+            if !files.is_empty() {
+                let manifest = workspace_fs::build_workspace_manifest(&files);
+                user_msg = format!("{}\n\n{}", manifest, user_msg);
+            }
+        }
+        system_prompt.push_str(workspace_fs::FILE_OUTPUT_INSTRUCTIONS);
+    }
+
     let messages = vec![ApiMessage { role: "user".into(), content: user_msg.clone() }];
 
     let mut step = RunStep {
@@ -823,20 +848,39 @@ async fn exec_agent(
         output: String::new(),
         tokens_used: None,
         error: None,
+        files_written: vec![],
     };
 
-    match llm_call_streaming(&data.model, &data.system_prompt, &messages, &state.keys_file(), app, run_id, node_id, cancel).await {
+    match llm_call_streaming(&data.model, &system_prompt, &messages, &state.keys_file(), app, run_id, node_id, cancel).await {
         Ok((output, tokens)) => {
+            // Parse and write any file blocks in the response
+            let files_written = if let Some(ws_path) = workspace_path {
+                let blocks = workspace_fs::parse_file_blocks(&output);
+                if !blocks.is_empty() {
+                    workspace_fs::write_files_internal(ws_path, blocks).unwrap_or_default()
+                } else {
+                    vec![]
+                }
+            } else {
+                vec![]
+            };
+
             step.completed_at = Some(now());
             step.status = "done".into();
             step.output = output.clone();
             step.tokens_used = tokens;
+            step.files_written = files_written.clone();
             run.steps.push(step);
             let _ = save_json(&state.runs_dir().join(format!("{}.json", run_id)), run);
 
             let _ = app.emit(
                 &format!("conductor://run/{}/step_done", run_id),
-                serde_json::json!({ "nodeId": node_id, "output": output, "tokensUsed": tokens }),
+                serde_json::json!({
+                    "nodeId": node_id,
+                    "output": output,
+                    "tokensUsed": tokens,
+                    "filesWritten": files_written,
+                }),
             );
 
             ctx.chain.push((data.name.clone(), output.clone()));
@@ -866,6 +910,7 @@ async fn exec_loop(
     state: &Arc<AppState>,
     app: &AppHandle,
     cancel: &Arc<AtomicBool>,
+    workspace_path: Option<&str>,
 ) -> Result<String, String> {
     let target = node_map
         .get(&data.target_node_id)
@@ -900,6 +945,7 @@ async fn exec_loop(
             app,
             cancel,
             extra,
+            workspace_path,
         )
         .await?;
 
@@ -915,6 +961,7 @@ async fn exec_loop(
             app,
             cancel,
             None,
+            workspace_path,
         )
         .await?;
 
@@ -1029,6 +1076,7 @@ async fn execute_workflow(
     run_id: String,
     state: Arc<AppState>,
     app: AppHandle,
+    workspace_config: Option<WorkspaceConfig>,
 ) {
     let cancel = {
         let runs = state.active_runs.lock().unwrap();
@@ -1039,6 +1087,8 @@ async fn execute_workflow(
 
     // Give the frontend ~200ms to register all event listeners before emitting the first step
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    let workspace_path_owned = workspace_config.as_ref().map(|w| w.workspace_path.clone());
 
     let mut run: Run = match load_json(&state.runs_dir().join(format!("{}.json", &run_id))) {
         Ok(r) => r,
@@ -1051,6 +1101,7 @@ async fn execute_workflow(
             input: input.clone(),
             steps: vec![],
             final_output: None,
+            workspace_config,
         },
     };
 
@@ -1061,6 +1112,7 @@ async fn execute_workflow(
 
     let mut ctx = ExecCtx { input, chain: vec![] };
     let mut final_output = String::new();
+    let ws = workspace_path_owned.as_deref();
 
     for node_id in &order {
         if inner.contains(node_id) {
@@ -1085,7 +1137,7 @@ async fn execute_workflow(
             "agent" => {
                 match serde_json::from_value::<AgentNodeData>(node.data.clone()) {
                     Ok(data) => {
-                        exec_agent(&data, &node.id, 1, &mut ctx, &run_id, &mut run, &state, &app, &cancel, None).await
+                        exec_agent(&data, &node.id, 1, &mut ctx, &run_id, &mut run, &state, &app, &cancel, None, ws).await
                     }
                     Err(e) => Err(format!("Agent data: {}", e)),
                 }
@@ -1093,7 +1145,7 @@ async fn execute_workflow(
             "loop" => {
                 match serde_json::from_value::<LoopNodeData>(node.data.clone()) {
                     Ok(data) => {
-                        exec_loop(&data, &node_map, &mut ctx, &run_id, &mut run, &state, &app, &cancel).await
+                        exec_loop(&data, &node_map, &mut ctx, &run_id, &mut run, &state, &app, &cancel, ws).await
                     }
                     Err(e) => Err(format!("Loop data: {}", e)),
                 }
@@ -1195,6 +1247,9 @@ fn delete_workflow(id: String, state: State<'_, Arc<AppState>>) -> Result<(), St
 async fn start_run(
     workflow_id: String,
     input: String,
+    workspace_mode: Option<String>,
+    project_name: Option<String>,
+    base_path: Option<String>,
     state: State<'_, Arc<AppState>>,
     app: AppHandle,
 ) -> Result<String, String> {
@@ -1202,6 +1257,24 @@ async fn start_run(
     let workflow: Workflow = load_json(&wf_path)?;
 
     let run_id = Uuid::new_v4().to_string();
+
+    // Create workspace if a mode was specified
+    let workspace_config = if let Some(ref mode) = workspace_mode {
+        let ws_path = workspace_fs::create_run_workspace(
+            run_id.clone(),
+            mode.clone(),
+            project_name.clone(),
+            base_path.clone(),
+        )?;
+        Some(WorkspaceConfig {
+            mode: mode.clone(),
+            workspace_path: ws_path,
+            project_name,
+        })
+    } else {
+        None
+    };
+
     let run = Run {
         id: run_id.clone(),
         workflow_id,
@@ -1211,6 +1284,7 @@ async fn start_run(
         input: input.clone(),
         steps: vec![],
         final_output: None,
+        workspace_config: workspace_config.clone(),
     };
 
     std::fs::create_dir_all(state.runs_dir()).map_err(|e| format!("Mkdir runs: {}", e))?;
@@ -1231,7 +1305,7 @@ async fn start_run(
     let state_arc = Arc::clone(&*state);
     let run_id_clone = run_id.clone();
     tokio::spawn(async move {
-        execute_workflow(workflow, input, run_id_clone, state_arc, app).await;
+        execute_workflow(workflow, input, run_id_clone, state_arc, app, workspace_config).await;
     });
 
     Ok(run_id)
@@ -1529,6 +1603,13 @@ fn main() {
             delete_template,
             read_text_file,
             get_ollama_models,
+            workspace_fs::create_run_workspace,
+            workspace_fs::read_workspace_manifest,
+            workspace_fs::write_workspace_files,
+            workspace_fs::delete_workspace,
+            workspace_fs::zip_and_save_workspace,
+            workspace_fs::list_projects,
+            workspace_fs::open_project,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

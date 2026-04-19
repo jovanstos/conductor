@@ -25,8 +25,10 @@ export function useRun(runId: string | null | undefined) {
           output: p.output,
           completedAt: new Date().toISOString(),
           tokensUsed: p.tokensUsed,
+          filesWritten: p.filesWritten ?? [],
         })
-        _addLog(`[step] → Done.`)
+        const fileNote = p.filesWritten?.length ? ` (${p.filesWritten.length} file${p.filesWritten.length !== 1 ? 's' : ''} written)` : ''
+        _addLog(`[step] → Done.${fileNote}`)
       },
       onStepError: (p) => {
         _updateStep(p.nodeId, { status: 'error', error: p.error, completedAt: new Date().toISOString() })

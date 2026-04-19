@@ -1,0 +1,135 @@
+import { useEffect, useState } from 'react'
+import { openProject, zipAndSaveWorkspace } from '../../lib/tauri'
+import type { FileEntry, ProjectEntry } from '../../types'
+import { useRunStore } from '../../stores/runStore'
+import { useWorkflowStore } from '../../stores/workflowStore'
+
+interface Props {
+  project: ProjectEntry
+  onClose: () => void
+}
+
+export default function ProjectView({ project, onClose }: Props) {
+  const [files, setFiles] = useState<FileEntry[]>([])
+  const [selected, setSelected] = useState<FileEntry | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [exportMsg, setExportMsg] = useState<string | null>(null)
+  const { setPendingRun } = useRunStore()
+  const { currentWorkflow } = useWorkflowStore()
+
+  useEffect(() => {
+    setLoading(true)
+    openProject(project.path)
+      .then((f) => {
+        setFiles(f)
+        setSelected(f[0] ?? null)
+      })
+      .finally(() => setLoading(false))
+  }, [project.path])
+
+  async function handleExport() {
+    setExporting(true)
+    setExportMsg(null)
+    try {
+      const dest = `${project.path}/../${project.name}.zip`
+      await zipAndSaveWorkspace(project.path, dest)
+      setExportMsg('Exported!')
+    } catch (e) {
+      setExportMsg(`Error: ${e}`)
+    } finally {
+      setExporting(false)
+      setTimeout(() => setExportMsg(null), 3000)
+    }
+  }
+
+  function handleContinue() {
+    if (!currentWorkflow) return
+    setPendingRun({ workflowId: currentWorkflow.id, input: '' })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-4xl h-[80vh] bg-[#0e0e13] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-white/8 flex items-center gap-3 shrink-0">
+          <span className="text-lg text-emerald-400">◈</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white/90 truncate">{project.name}</p>
+            <p className="text-[11px] text-white/30 font-mono truncate">{project.path}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {exportMsg && (
+              <span className="text-xs text-emerald-300">{exportMsg}</span>
+            )}
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="text-xs text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+            >
+              {exporting ? 'Exporting...' : '⬇ Export zip'}
+            </button>
+            {currentWorkflow && (
+              <button
+                onClick={handleContinue}
+                className="text-xs text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                ▶ Continue in new run
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-white/30 hover:text-white/60 px-2 py-1.5 rounded-lg transition-colors text-sm"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center text-white/25 text-sm">Loading files...</div>
+        ) : files.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-white/25 text-sm">No files in this project yet.</div>
+        ) : (
+          <div className="flex-1 flex overflow-hidden">
+            {/* File tree */}
+            <div className="w-52 shrink-0 border-r border-white/8 overflow-y-auto py-2">
+              <p className="px-4 mb-1 text-[10px] text-white/25 uppercase tracking-widest">Files ({files.length})</p>
+              {files.map((f) => (
+                <button
+                  key={f.path}
+                  onClick={() => setSelected(f)}
+                  className={`w-full text-left px-4 py-1.5 text-[11px] font-mono truncate transition-colors ${
+                    selected?.path === f.path
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : 'text-white/45 hover:text-white/70 hover:bg-white/5'
+                  }`}
+                  title={f.path}
+                >
+                  {f.path}
+                </button>
+              ))}
+            </div>
+
+            {/* File preview */}
+            <div className="flex-1 overflow-auto p-4">
+              {selected ? (
+                <>
+                  <p className="text-[11px] text-white/30 font-mono mb-3">{selected.path}</p>
+                  <pre className="text-xs text-white/70 whitespace-pre-wrap font-mono leading-relaxed">
+                    {selected.content}
+                  </pre>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-white/20 text-sm">
+                  Select a file to preview
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
