@@ -16,8 +16,9 @@ export default function ProjectView({ project, onClose }: Props) {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [exportMsg, setExportMsg] = useState<string | null>(null)
+  const [showWorkflowPicker, setShowWorkflowPicker] = useState(false)
   const { setPendingRun } = useRunStore()
-  const { currentWorkflow } = useWorkflowStore()
+  const { workflows, currentWorkflow, setCurrentWorkflow } = useWorkflowStore()
 
   useEffect(() => {
     setLoading(true)
@@ -48,10 +49,9 @@ export default function ProjectView({ project, onClose }: Props) {
     }
   }
 
-  function handleContinue() {
-    if (!currentWorkflow) return
+  function launchRun(workflowId: string) {
     setPendingRun({
-      workflowId: currentWorkflow.id,
+      workflowId,
       input: '',
       presetProjectPath: project.path,
       presetProjectName: project.name,
@@ -59,9 +59,21 @@ export default function ProjectView({ project, onClose }: Props) {
     onClose()
   }
 
+  function handleContinue() {
+    if (currentWorkflow) {
+      launchRun(currentWorkflow.id)
+    } else if (workflows.length === 1) {
+      setCurrentWorkflow(workflows[0])
+      launchRun(workflows[0].id)
+    } else {
+      setShowWorkflowPicker(true)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-4xl h-[80vh] bg-[#0e0e13] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/8 flex items-center gap-3 shrink-0">
           <span className="text-lg text-emerald-400">◈</span>
@@ -69,10 +81,8 @@ export default function ProjectView({ project, onClose }: Props) {
             <p className="text-sm font-bold text-white/90 truncate">{project.name}</p>
             <p className="text-[11px] text-white/30 font-mono truncate">{project.path}</p>
           </div>
-          <div className="flex items-center gap-2">
-            {exportMsg && (
-              <span className="text-xs text-emerald-300">{exportMsg}</span>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
+            {exportMsg && <span className="text-xs text-emerald-300">{exportMsg}</span>}
             <button
               onClick={handleExport}
               disabled={exporting}
@@ -80,14 +90,12 @@ export default function ProjectView({ project, onClose }: Props) {
             >
               {exporting ? 'Exporting...' : '⬇ Export zip'}
             </button>
-            {currentWorkflow && (
-              <button
-                onClick={handleContinue}
-                className="text-xs text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-1.5 rounded-lg transition-colors"
-              >
-                ▶ Continue in new run
-              </button>
-            )}
+            <button
+              onClick={handleContinue}
+              className="text-xs text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              ▶ Run with agents
+            </button>
             <button
               onClick={onClose}
               className="text-white/30 hover:text-white/60 px-2 py-1.5 rounded-lg transition-colors text-sm"
@@ -96,6 +104,37 @@ export default function ProjectView({ project, onClose }: Props) {
             </button>
           </div>
         </div>
+
+        {/* Workflow picker banner — shown when no workflow is active */}
+        {showWorkflowPicker && (
+          <div className="px-5 py-3 bg-emerald-500/5 border-b border-emerald-500/15 shrink-0">
+            <p className="text-xs text-white/60 mb-2">Pick a workflow to run this project with:</p>
+            <div className="flex flex-wrap gap-2">
+              {workflows.length === 0 ? (
+                <p className="text-xs text-white/30">No workflows yet — create one first.</p>
+              ) : (
+                workflows.map((w) => (
+                  <button
+                    key={w.id}
+                    onClick={() => { setCurrentWorkflow(w); launchRun(w.id) }}
+                    className="text-xs text-white/70 bg-white/8 hover:bg-emerald-500/15 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/30 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    {w.name}
+                    <span className="ml-1.5 text-white/25">
+                      ({w.nodes.filter(n => n.type === 'agent').length} agents)
+                    </span>
+                  </button>
+                ))
+              )}
+              <button
+                onClick={() => setShowWorkflowPicker(false)}
+                className="text-xs text-white/25 hover:text-white/50 px-2 py-1.5 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Body */}
         {loading ? (
@@ -106,7 +145,9 @@ export default function ProjectView({ project, onClose }: Props) {
           <div className="flex-1 flex overflow-hidden">
             {/* File tree */}
             <div className="w-52 shrink-0 border-r border-white/8 overflow-y-auto py-2">
-              <p className="px-4 mb-1 text-[10px] text-white/25 uppercase tracking-widest">Files ({files.length})</p>
+              <p className="px-4 mb-1 text-[10px] text-white/25 uppercase tracking-widest">
+                Files ({files.length})
+              </p>
               {files.map((f) => (
                 <button
                   key={f.path}
