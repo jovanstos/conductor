@@ -48,8 +48,10 @@ function toRFEdge(e: WorkflowEdge): RFEdge {
 }
 
 export default function WorkflowCanvas() {
-  const { currentWorkflow, updateNode, addNode, removeNode, addEdge: storeAddEdge, removeEdge, setSelectedNode } =
-    useWorkflowStore()
+  const {
+    currentWorkflow, updateNode, addNode, removeNode, addEdge: storeAddEdge, removeEdge, setSelectedNode,
+    undo, redo, canUndo, canRedo, copySelectedNode, pasteNode,
+  } = useWorkflowStore()
 
   const [rfNodes, setRfNodes, onRFNodesChange] = useNodesState<RFNode>(
     currentWorkflow?.nodes.map(toRFNode) ?? [],
@@ -63,6 +65,22 @@ export default function WorkflowCanvas() {
     setRfNodes(currentWorkflow?.nodes.map(toRFNode) ?? [])
     setRfEdges(currentWorkflow?.edges.map(toRFEdge) ?? [])
   }, [currentWorkflow?.nodes, currentWorkflow?.edges, setRfNodes, setRfEdges])
+
+  // Keyboard shortcuts: Ctrl+Z undo, Ctrl+Y/Ctrl+Shift+Z redo, Ctrl+C copy, Ctrl+V paste
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+        else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
+        else if (e.key === 'c') { e.preventDefault(); copySelectedNode() }
+        else if (e.key === 'v') { e.preventDefault(); pasteNode() }
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [undo, redo, copySelectedNode, pasteNode])
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<RFNode>[]) => {
@@ -163,6 +181,9 @@ export default function WorkflowCanvas() {
         <ToolbarBtn onClick={addLoopNode} title="Add Loop" icon="↻" label="Loop" color="amber" />
         <ToolbarBtn onClick={addReviewGate} title="Add Review Gate" icon="◉" label="Gate" color="blue" />
         <ToolbarBtn onClick={addEndNode} title="Add End node" icon="■" label="End" color="indigo" />
+        <div className="w-px bg-white/10 mx-0.5 self-stretch" />
+        <ToolbarBtn onClick={undo} title="Undo (Ctrl+Z)" icon="↩" label="Undo" color="gray" disabled={!canUndo} />
+        <ToolbarBtn onClick={redo} title="Redo (Ctrl+Y)" icon="↪" label="Redo" color="gray" disabled={!canRedo} />
       </div>
 
       <div className="absolute top-3 right-3 z-10">
@@ -214,12 +235,14 @@ function ToolbarBtn({
   icon,
   label,
   color,
+  disabled,
 }: {
   onClick: () => void
   title: string
   icon: string
   label: string
-  color: 'purple' | 'amber' | 'blue' | 'emerald' | 'indigo'
+  color: 'purple' | 'amber' | 'blue' | 'emerald' | 'indigo' | 'gray'
+  disabled?: boolean
 }) {
   const colors = {
     purple: 'border-purple-500/30 hover:border-purple-500/60 text-purple-300/70 hover:text-purple-300',
@@ -227,12 +250,14 @@ function ToolbarBtn({
     blue: 'border-blue-500/30 hover:border-blue-500/60 text-blue-300/70 hover:text-blue-300',
     emerald: 'border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300/70 hover:text-emerald-300',
     indigo: 'border-indigo-500/30 hover:border-indigo-500/60 text-indigo-300/70 hover:text-indigo-300',
+    gray: 'border-white/10 hover:border-white/25 text-white/30 hover:text-white/60',
   }
   return (
     <button
       onClick={onClick}
       title={title}
-      className={`bg-[#1a1a22] border ${colors[color]} text-[11px] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5`}
+      disabled={disabled}
+      className={`bg-[#1a1a22] border ${colors[color]} text-[11px] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed`}
     >
       <span>{icon}</span>
       <span>{label}</span>

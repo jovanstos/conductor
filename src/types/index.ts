@@ -112,7 +112,7 @@ export type LLMMessage = {
 }
 
 // ── Workspace / filesystem types ────────────────────
-export type WorkspaceMode = 'temporary' | 'project'
+export type WorkspaceMode = 'temporary' | 'project' | 'existing'
 
 export type FileEntry = {
   path: string    // relative path within workspace e.g. "src/main.py"

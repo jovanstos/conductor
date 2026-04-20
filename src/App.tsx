@@ -9,6 +9,7 @@ import WorkflowCanvas from './components/canvas/WorkflowCanvas'
 import Inspector from './components/inspector/Inspector'
 import RunDrawer from './components/run/RunDrawer'
 import RunStartModal from './components/run/RunStartModal'
+import RunHistoryDrawer from './components/run/RunHistoryDrawer'
 import ReviewGateModal from './components/run/ReviewGateModal'
 import ResultModal from './components/run/ResultModal'
 import SettingsPanel from './components/settings/SettingsPanel'
@@ -30,6 +31,7 @@ export default function App() {
   const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT)
   const [drawerHeight, setDrawerHeight] = useState(DRAWER_DEFAULT)
   const [runError, setRunError] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
 
   useRun(currentRun?.id)
 
@@ -93,6 +95,13 @@ export default function App() {
 
           {currentWorkflow && (
             <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowHistory((v) => !v)}
+                title="View run history"
+                className="text-xs text-white/30 hover:text-white/60 hover:bg-white/5 px-2 py-1 rounded-md transition-colors"
+              >
+                ↻ History
+              </button>
               <input
                 className="w-64 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 outline-none focus:border-purple-500/50 placeholder:text-white/25"
                 placeholder="Describe your task..."
@@ -164,6 +173,9 @@ export default function App() {
         )}
       </div>
 
+      {showHistory && currentWorkflow && (
+        <RunHistoryDrawer workflowId={currentWorkflow.id} onClose={() => setShowHistory(false)} />
+      )}
       {pendingRun && <RunStartModal />}
       {gateInfo && <ReviewGateModal />}
       {showResultModal && <ResultModal />}

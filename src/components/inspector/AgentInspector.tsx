@@ -4,6 +4,7 @@ import { useWorkflowStore } from '../../stores/workflowStore'
 import { BUILT_IN_TEMPLATES } from '../../lib/defaults'
 import { getTemplates, saveTemplate, deleteTemplate } from '../../lib/tauri'
 import ModelPicker from '../shared/ModelPicker'
+import AgentTestModal from './AgentTestModal'
 
 const CONTEXT_MODE_HELP: Record<string, string> = {
   full_chain: 'Sees everything every prior agent wrote — great for a final editor or report writer.',
@@ -22,6 +23,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
   const [maxTokens, setMaxTokens] = useState(d.maxTokens)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showTestModal, setShowTestModal] = useState(false)
 
   // Custom template save state
   const [showSaveForm, setShowSaveForm] = useState(false)
@@ -289,6 +291,20 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
             </p>
           </Field>
         </div>
+      )}
+
+      {/* Test agent button */}
+      <div className="pt-2 border-t border-white/5">
+        <button
+          onClick={() => setShowTestModal(true)}
+          className="w-full text-xs text-purple-400/60 hover:text-purple-400/90 hover:bg-purple-500/8 border border-purple-500/15 hover:border-purple-500/30 rounded-lg py-2 transition-colors"
+        >
+          ▶ Test this agent
+        </button>
+      </div>
+
+      {showTestModal && (
+        <AgentTestModal data={d} onClose={() => setShowTestModal(false)} />
       )}
     </div>
   )

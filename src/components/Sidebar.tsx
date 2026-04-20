@@ -7,7 +7,7 @@ import { listProjects } from '../lib/tauri'
 import ProjectView from './projects/ProjectView'
 
 export default function Sidebar() {
-  const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow } =
+  const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow, importWorkflow } =
     useWorkflowStore()
   const { providerStatuses, openSettings, defaultProjectsPath } = useSettingsStore()
   const [search, setSearch] = useState('')
@@ -57,16 +57,26 @@ export default function Sidebar() {
               onSelect={() => setCurrentWorkflow(w)}
               onDelete={() => deleteWorkflow(w.id)}
               onDuplicate={() => duplicateWorkflow(w.id)}
+              onExport={() => useWorkflowStore.getState().exportWorkflow(w.id)}
             />
           ))
         )}
 
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="mx-3 mt-1 w-[calc(100%-24px)] text-left px-2 py-1.5 rounded-md text-[11px] text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
-        >
-          + New workflow
-        </button>
+        <div className="mx-3 mt-1 flex gap-1">
+          <button
+            onClick={() => setShowNewModal(true)}
+            className="flex-1 text-left px-2 py-1.5 rounded-md text-[11px] text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+          >
+            + New
+          </button>
+          <button
+            onClick={() => importWorkflow()}
+            className="px-2 py-1.5 rounded-md text-[11px] text-white/25 hover:text-white/55 hover:bg-white/5 transition-colors"
+            title="Import workflow from JSON file"
+          >
+            ⬆ Import
+          </button>
+        </div>
 
         {/* Projects section */}
         <div className="mt-4">
@@ -149,12 +159,14 @@ function WorkflowItem({
   onSelect,
   onDelete,
   onDuplicate,
+  onExport,
 }: {
   workflow: Workflow
   active: boolean
   onSelect: () => void
   onDelete: () => void
   onDuplicate: () => void
+  onExport: () => void
 }) {
   const [hover, setHover] = useState(false)
   const agentCount = workflow.nodes.filter((n) => n.type === 'agent').length
@@ -174,6 +186,13 @@ function WorkflowItem({
       )}
       {hover && (
         <>
+          <button
+            onClick={(e) => { e.stopPropagation(); onExport() }}
+            className="text-[10px] text-white/20 hover:text-white/60 transition-colors px-0.5"
+            title="Export as JSON"
+          >
+            ⬇
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDuplicate() }}
             className="text-[10px] text-white/20 hover:text-white/60 transition-colors px-0.5"

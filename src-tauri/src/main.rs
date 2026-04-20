@@ -1638,6 +1638,18 @@ async fn validate_api_key(provider: String, state: State<'_, Arc<AppState>>) -> 
 // ─────────────────────────────────────────────
 
 #[tauri::command]
+fn import_workflow(json: String, state: State<'_, Arc<AppState>>) -> Result<Workflow, String> {
+    let mut wf: Workflow = serde_json::from_str(&json)
+        .map_err(|e| format!("Invalid workflow JSON: {}", e))?;
+    wf.id = Uuid::new_v4().to_string();
+    wf.name = format!("{} (imported)", wf.name);
+    wf.created_at = now();
+    wf.updated_at = now();
+    save_json(&state.workflows_dir().join(format!("{}.json", wf.id)), &wf)?;
+    Ok(wf)
+}
+
+#[tauri::command]
 fn write_text_file(path: String, content: String) -> Result<(), String> {
     if let Some(parent) = std::path::Path::new(&path).parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {}", e))?;
@@ -1730,6 +1742,7 @@ fn main() {
             load_config,
             save_config,
             write_text_file,
+            import_workflow,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

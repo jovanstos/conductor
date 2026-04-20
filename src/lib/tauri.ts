@@ -84,6 +84,8 @@ export const saveConfig = (config: AppConfig) => invoke<void>('save_config', { c
 // File save
 export const writeTextFile = (path: string, content: string) =>
   invoke<void>('write_text_file', { path, content })
+export const importWorkflow = (json: string) =>
+  invoke<Workflow>('import_workflow', { json })
 
 // Tauri event listeners for run lifecycle
 export type RunEventHandlers = {
