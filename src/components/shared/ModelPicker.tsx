@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { ModelConfig, ModelProvider } from '../../types'
 import { ANTHROPIC_MODELS, OPENAI_MODELS } from '../../lib/defaults'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -43,7 +44,7 @@ export default function ModelPicker({
       >
         <ProviderDot provider={value.provider} hasKey={providerStatus?.hasKey ?? value.provider === 'ollama'} />
         <span className="flex-1 truncate">{value.modelId}</span>
-        <span className="text-white/25 text-xs">{open ? '▲' : '▼'}</span>
+        {open ? <ChevronUp size={12} className="text-white/25" /> : <ChevronDown size={12} className="text-white/25" />}
       </button>
 
       {open && (

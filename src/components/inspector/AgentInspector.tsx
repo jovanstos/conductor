@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { X, Zap, ChevronDown, ChevronRight, Plus, Play } from 'lucide-react'
 import type { WorkflowNode, AgentNodeData, Template } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { BUILT_IN_TEMPLATES } from '../../lib/defaults'
@@ -104,8 +105,8 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
           onClick={() => setShowTemplates((v) => !v)}
           className="w-full flex items-center justify-between bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 text-purple-300/80 text-xs px-3 py-2 rounded-lg transition-colors"
         >
-          <span>⚡ Load a template</span>
-          <span className="text-white/30">{showTemplates ? '▲' : '▼'}</span>
+          <span className="flex items-center gap-1.5"><Zap size={12} /> Load a template</span>
+          {showTemplates ? <ChevronDown size={12} className="text-white/30" /> : <ChevronRight size={12} className="text-white/30" />}
         </button>
 
         {showTemplates && (
@@ -130,10 +131,10 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
                     </button>
                     <button
                       onClick={() => handleDeleteUserTemplate(t.id)}
-                      className="px-2 text-white/20 hover:text-red-400 text-[10px] transition-colors shrink-0"
+                      className="px-1 text-white/20 hover:text-red-400 transition-colors shrink-0"
                       title="Delete template"
                     >
-                      ✕
+                      <X size={10} />
                     </button>
                   </div>
                 ))}
@@ -207,7 +208,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
           onClick={() => { setSaveName(name); setShowSaveForm(true) }}
           className="w-full text-left text-[10px] text-white/30 hover:text-white/55 flex items-center gap-1.5 transition-colors"
         >
-          <span>＋</span> Save as template
+          <Plus size={11} className="inline mr-1" /> Save as template
         </button>
       )}
 
@@ -251,7 +252,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
         onClick={() => setShowAdvanced((v) => !v)}
         className="w-full text-left text-[10px] text-white/30 hover:text-white/50 flex items-center gap-1.5 transition-colors"
       >
-        <span>{showAdvanced ? '▼' : '▶'}</span>
+        {showAdvanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         Advanced settings
       </button>
 
@@ -299,7 +300,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
           onClick={() => setShowTestModal(true)}
           className="w-full text-xs text-purple-400/60 hover:text-purple-400/90 hover:bg-purple-500/8 border border-purple-500/15 hover:border-purple-500/30 rounded-lg py-2 transition-colors"
         >
-          ▶ Test this agent
+          <Play size={11} className="inline mr-1.5" fill="currentColor" />Test this agent
         </button>
       </div>
 

@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { X, Zap, Check, Sparkles, RefreshCw } from 'lucide-react'
 import type { AgentNodeData, LoopNodeData } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
@@ -12,7 +13,6 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
   const step = currentRun?.steps.filter((s) => s.nodeId === id).at(-1)
   const status = step?.status ?? 'idle'
 
-  // Find which loop this agent belongs to (if any)
   const loopMembership = currentWorkflow?.nodes.find(
     (n) => n.type === 'loop' && ((n.data as LoopNodeData).targetNodeId === id || (n.data as LoopNodeData).reviewerNodeId === id),
   )
@@ -54,19 +54,18 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
       className={`w-48 rounded-xl border-2 ${borderColor} ${bgColor} cursor-pointer transition-all shadow-lg group relative`}
       onClick={() => setSelectedNode(id)}
     >
-      {/* Delete button */}
       <button
-        className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-[#1a1a22] border border-white/15 text-white/30 hover:text-red-400 hover:border-red-500/40 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-[#1a1a22] border border-white/15 text-white/30 hover:text-red-400 hover:border-red-500/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
         onClick={(e) => { e.stopPropagation(); removeNode(id) }}
         title="Delete node"
       >
-        ✕
+        <X size={10} />
       </button>
 
-      {/* Loop membership badge */}
       {loopRole && (
-        <div className="absolute -top-2.5 left-2 bg-amber-500/20 border border-amber-500/30 text-amber-400/80 text-[9px] px-1.5 py-0.5 rounded-full">
-          {loopRole === 'worker' ? '↻ works in loop' : '↻ reviews in loop'}
+        <div className="absolute -top-2.5 left-2 bg-amber-500/20 border border-amber-500/30 text-amber-400/80 text-[9px] px-1.5 py-0.5 rounded-full flex items-center gap-1">
+          <RefreshCw size={8} />
+          {loopRole === 'worker' ? 'works in loop' : 'reviews in loop'}
         </div>
       )}
 
@@ -77,14 +76,18 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
       />
 
       <div className="p-3.5">
-        {/* Header */}
         <div className="flex items-start gap-2.5 mb-3">
           <div
-            className={`w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 ${
+            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
               isRunning ? 'bg-purple-500/25 animate-pulse' : isDone ? 'bg-green-500/15' : 'bg-purple-500/12'
             }`}
           >
-            {isRunning ? '⚡' : isDone ? '✓' : '✦'}
+            {isRunning
+              ? <Zap size={14} className="text-purple-300" />
+              : isDone
+              ? <Check size={14} className="text-green-400" />
+              : <Sparkles size={14} className="text-purple-400/70" />
+            }
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white/90 truncate">{d.name}</p>
@@ -92,7 +95,6 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
           </div>
         </div>
 
-        {/* Status + model */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1 min-w-0">
             <div
@@ -111,7 +113,6 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
           <StatusBadge status={status} />
         </div>
 
-        {/* Token count after completion */}
         {isDone && step?.tokensUsed && (
           <div className="mt-1.5 flex justify-end">
             <span className="text-[9px] text-white/20 tabular-nums">
@@ -120,7 +121,6 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
           </div>
         )}
 
-        {/* Output preview */}
         {step?.output && (
           <div className="mt-2.5 border-t border-white/6 pt-2">
             <p className="text-[10px] text-white/45 line-clamp-3 leading-relaxed">{step.output}</p>
@@ -154,7 +154,11 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
 
 function StatusBadge({ status }: { status: string }) {
   if (status === 'done')
-    return <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 font-medium">✓ done</span>
+    return (
+      <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 font-medium flex items-center gap-1">
+        <Check size={8} /> done
+      </span>
+    )
   if (status === 'running')
     return <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 animate-pulse">working</span>
   if (status === 'error')

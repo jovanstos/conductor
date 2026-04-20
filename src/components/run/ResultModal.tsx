@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Sparkles, X, Copy, Check, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { useRunStore } from '../../stores/runStore'
 import { writeTextFile } from '../../lib/tauri'
@@ -39,8 +40,8 @@ export default function ResultModal() {
       <div className="w-full max-w-4xl max-h-[88vh] bg-[#0e0e13] border border-white/10 rounded-2xl flex flex-col shadow-2xl overflow-hidden">
         {/* ── Header ── */}
         <div className="flex items-start gap-4 px-6 py-5 border-b border-white/8 shrink-0 bg-green-500/5">
-          <div className="w-11 h-11 rounded-xl bg-green-500/15 flex items-center justify-center text-xl shrink-0">
-            ✦
+          <div className="w-11 h-11 rounded-xl bg-green-500/15 flex items-center justify-center shrink-0">
+            <Sparkles size={20} className="text-green-400/70" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-lg font-bold text-white/90">Workflow Complete</p>
@@ -53,10 +54,10 @@ export default function ResultModal() {
           </div>
           <button
             onClick={dismissResultModal}
-            className="text-white/25 hover:text-white/60 text-xl leading-none transition-colors shrink-0 mt-0.5"
+            className="text-white/25 hover:text-white/60 transition-colors shrink-0 mt-0.5"
             title="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -84,19 +85,22 @@ export default function ResultModal() {
                       : 'bg-white/5 border-white/10 text-white/50 hover:text-white/80 hover:bg-white/8'
                   }`}
                 >
-                  {copied ? '✓ Copied!' : '⎘ Copy'}
+                  {copied
+                    ? <><Check size={12} className="inline mr-1" />Copied!</>
+                    : <><Copy size={12} className="inline mr-1" />Copy</>
+                  }
                 </button>
                 <button
                   onClick={() => saveAsFile(finalOutput, 'output.txt', 'txt')}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white/80 hover:bg-white/8 transition-colors"
                 >
-                  ↓ Save as .txt
+                  <Download size={12} className="inline mr-1" />Save as .txt
                 </button>
                 <button
                   onClick={() => saveAsFile(finalOutput, 'output.md', 'md')}
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 hover:text-white/80 hover:bg-white/8 transition-colors"
                 >
-                  ↓ Save as .md
+                  <Download size={12} className="inline mr-1" />Save as .md
                 </button>
               </div>
 
@@ -193,7 +197,7 @@ function StepAccordion({
             isDone ? 'bg-green-500/15 text-green-400' : isError ? 'bg-red-500/15 text-red-400' : 'bg-white/8 text-white/40'
           }`}
         >
-          {isDone ? '✓' : isError ? '✗' : index}
+          {isDone ? <Check size={11} /> : isError ? <X size={11} /> : index}
         </span>
         <div className="flex-1 min-w-0">
           <span className="text-sm text-white/80 font-medium">{step.nodeName}</span>
@@ -206,7 +210,7 @@ function StepAccordion({
         {step.tokensUsed && (
           <span className="text-[10px] text-white/20 shrink-0">{step.tokensUsed.toLocaleString()} tokens</span>
         )}
-        <span className="text-white/25 text-sm shrink-0">{isExpanded ? '▲' : '▼'}</span>
+        {isExpanded ? <ChevronUp size={14} className="text-white/25 shrink-0" /> : <ChevronDown size={14} className="text-white/25 shrink-0" />}
       </button>
 
       {isExpanded && (

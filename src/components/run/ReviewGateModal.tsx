@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { GitPullRequest, X, Pencil, Check } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 
 export default function ReviewGateModal() {
@@ -15,8 +16,8 @@ export default function ReviewGateModal() {
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/8">
           <div className="flex items-center gap-3 mb-1">
-            <span className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center text-sm">
-              ◉
+            <span className="w-7 h-7 rounded-lg bg-blue-500/15 flex items-center justify-center text-blue-400">
+              <GitPullRequest size={14} />
             </span>
             <h2 className="text-base font-semibold text-white/85">Review Gate</h2>
           </div>
@@ -67,21 +68,21 @@ export default function ReviewGateModal() {
             onClick={() => resumeGate('reject', feedback)}
             className="bg-white/6 hover:bg-white/10 border border-white/10 text-white/60 text-sm px-4 py-2 rounded-lg transition-colors"
           >
-            ✕ Reject
+            <X size={13} className="inline mr-1" />Reject
           </button>
           {tab === 'edit' && (
             <button
               onClick={() => resumeGate('edit', editContent)}
               className="bg-blue-600/80 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded-lg transition-colors"
             >
-              ✎ Use edited output
+              <Pencil size={13} className="inline mr-1" />Use edited output
             </button>
           )}
           <button
             onClick={() => resumeGate('approve')}
             className="bg-green-600/80 hover:bg-green-500 text-white text-sm px-5 py-2 rounded-lg transition-colors font-medium"
           >
-            ✓ Approve & Continue
+            <Check size={13} className="inline mr-1" />Approve & Continue
           </button>
         </div>
       </div>

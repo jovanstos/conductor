@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Play } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 
 export default memo(function StartNode({ id }: NodeProps) {
@@ -10,8 +11,8 @@ export default memo(function StartNode({ id }: NodeProps) {
     <div className="w-44 rounded-xl border-2 border-emerald-500/50 bg-[#0f1a14] shadow-lg">
       <div className="p-3.5">
         <div className="flex items-center gap-2.5 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-base shrink-0 text-emerald-400">
-            ▶
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0 text-emerald-400">
+            <Play size={14} fill="currentColor" />
           </div>
           <div>
             <p className="text-sm font-semibold text-white/85">Start</p>
@@ -25,7 +26,6 @@ export default memo(function StartNode({ id }: NodeProps) {
         )}
       </div>
 
-      {/* Output only — right side */}
       <Handle
         type="source"
         position={Position.Right}

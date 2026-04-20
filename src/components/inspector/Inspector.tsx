@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import type { WorkflowNode, AgentNodeData, LoopNodeData, ReviewGateData } from '../../types'
 import AgentInspector from './AgentInspector'
@@ -16,9 +17,9 @@ export default function Inspector() {
         {selectedNode && (
           <button
             onClick={() => setSelectedNode(null)}
-            className="text-white/20 hover:text-white/50 text-xs"
+            className="text-white/20 hover:text-white/50"
           >
-            ✕
+            <X size={13} />
           </button>
         )}
       </div>

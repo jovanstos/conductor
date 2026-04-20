@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FolderOpen, Clock, Play } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 
@@ -112,7 +113,7 @@ export default function RunStartModal() {
           {/* Existing project badge */}
           {isExistingProject && (
             <div className="flex items-center gap-3 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-base shrink-0">◈</div>
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0"><FolderOpen size={15} /></div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-emerald-300">{pendingRun.presetProjectName}</p>
                 <p className="text-[10px] text-white/30 font-mono truncate">{pendingRun.presetProjectPath}</p>
@@ -136,7 +137,7 @@ export default function RunStartModal() {
                     : 'border-white/10 bg-white/2 hover:bg-white/5 hover:border-white/20'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 ${mode === 'temporary' ? 'bg-purple-500/20 text-purple-300' : 'bg-white/8 text-white/40'}`}>◌</div>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${mode === 'temporary' ? 'bg-purple-500/20 text-purple-300' : 'bg-white/8 text-white/40'}`}><Clock size={15} /></div>
                 <div>
                   <p className="text-sm font-semibold text-white/85">Temporary</p>
                   <p className="text-xs text-white/40 leading-relaxed">Files are discarded when you close the run. Good for experiments.</p>
@@ -151,7 +152,7 @@ export default function RunStartModal() {
                     : 'border-white/10 bg-white/2 hover:bg-white/5 hover:border-white/20'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 ${mode === 'project' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/8 text-white/40'}`}>◈</div>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${mode === 'project' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/8 text-white/40'}`}><FolderOpen size={15} /></div>
                 <div>
                   <p className="text-sm font-semibold text-white/85">Save as Project</p>
                   <p className="text-xs text-white/40 leading-relaxed">Files are saved permanently so you can continue later.</p>
@@ -213,7 +214,10 @@ export default function RunStartModal() {
             disabled={!canStart || starting}
             className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
           >
-            {starting ? 'Starting...' : isExistingProject ? '▶ Continue Run' : '▶ Start Run'}
+            {starting
+              ? 'Starting...'
+              : <><Play size={12} className="inline mr-1.5" fill="currentColor" />{isExistingProject ? 'Continue Run' : 'Start Run'}</>
+            }
           </button>
         </div>
       </div>

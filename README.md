@@ -16,7 +16,7 @@ I kindly ask that you respect the integrity of this work. If you find the code h
 
 ---
 
-# ✦ Conductor
+# Conductor
 
 **Build your AI workforce. Chain agents together. Run any task, start to finish.**
 
@@ -48,6 +48,7 @@ Built with Tauri 2, React 19, and Rust — fully local, no cloud dependency, no 
 | Frontend | React 19 + TypeScript |
 | Styling | Tailwind CSS v4 |
 | Canvas | [@xyflow/react](https://reactflow.dev) |
+| Icons | [Lucide React](https://lucide.dev) |
 | State management | Zustand v5 |
 | Build tool | Vite 7 |
 | HTTP (AI calls) | reqwest (Rust, streaming) |

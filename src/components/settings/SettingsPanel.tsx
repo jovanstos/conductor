@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X, FolderOpen, Check } from 'lucide-react'
 import { open as openFolderDialog } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { validateApiKey } from '../../lib/tauri'
@@ -31,7 +32,7 @@ function ProjectsFolderSettings() {
           disabled={saving}
           className="text-xs text-white/40 hover:text-white/70 border border-white/10 px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 shrink-0 flex items-center gap-1.5"
         >
-          {saving ? '...' : '📁 Browse'}
+          {saving ? '...' : <><FolderOpen size={12} className="inline mr-1" />Browse</>}
         </button>
       </div>
     </div>
@@ -49,9 +50,9 @@ export default function SettingsPanel() {
           <h2 className="text-base font-semibold text-white/85">Settings</h2>
           <button
             onClick={closeSettings}
-            className="text-white/30 hover:text-white/60 transition-colors text-lg leading-none"
+            className="text-white/30 hover:text-white/60 transition-colors"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -212,7 +213,7 @@ function ApiKeyRow({
       </div>
       {testResult && (
         <p className={`text-[11px] pl-5 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-          {testResult.ok ? '✓ ' : '✕ '}{testResult.msg}
+          {testResult.ok ? <Check size={11} className="inline mr-1" /> : <X size={11} className="inline mr-1" />}{testResult.msg}
         </p>
       )}
     </div>

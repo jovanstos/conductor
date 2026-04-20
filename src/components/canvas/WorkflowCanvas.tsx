@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, type ReactNode } from 'react'
 import {
   ReactFlow,
   Background,
@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { v4 as uuidv4 } from 'uuid'
+import { Play, Sparkles, RefreshCw, GitPullRequest, StopCircle, Undo2, Redo2 } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import type { WorkflowNode, WorkflowEdge, LoopNodeData, ReviewGateData, StartNodeData, EndNodeData } from '../../types'
 import { newAgentNodeData } from '../../lib/defaults'
@@ -176,14 +177,14 @@ export default function WorkflowCanvas() {
     <div className="w-full h-full relative">
       {/* Toolbar */}
       <div className="absolute top-3 left-3 z-10 flex gap-1.5 flex-wrap">
-        <ToolbarBtn onClick={addStartNode} title="Add Start node" icon="▶" label="Start" color="emerald" />
-        <ToolbarBtn onClick={addAgentNode} title="Add Agent" icon="✦" label="Agent" color="purple" />
-        <ToolbarBtn onClick={addLoopNode} title="Add Loop" icon="↻" label="Loop" color="amber" />
-        <ToolbarBtn onClick={addReviewGate} title="Add Review Gate" icon="◉" label="Gate" color="blue" />
-        <ToolbarBtn onClick={addEndNode} title="Add End node" icon="■" label="End" color="indigo" />
+        <ToolbarBtn onClick={addStartNode} title="Add Start node" icon={<Play size={11} fill="currentColor" />} label="Start" color="emerald" />
+        <ToolbarBtn onClick={addAgentNode} title="Add Agent" icon={<Sparkles size={11} />} label="Agent" color="purple" />
+        <ToolbarBtn onClick={addLoopNode} title="Add Loop" icon={<RefreshCw size={11} />} label="Loop" color="amber" />
+        <ToolbarBtn onClick={addReviewGate} title="Add Review Gate" icon={<GitPullRequest size={11} />} label="Gate" color="blue" />
+        <ToolbarBtn onClick={addEndNode} title="Add End node" icon={<StopCircle size={11} />} label="End" color="indigo" />
         <div className="w-px bg-white/10 mx-0.5 self-stretch" />
-        <ToolbarBtn onClick={undo} title="Undo (Ctrl+Z)" icon="↩" label="Undo" color="gray" disabled={!canUndo} />
-        <ToolbarBtn onClick={redo} title="Redo (Ctrl+Y)" icon="↪" label="Redo" color="gray" disabled={!canRedo} />
+        <ToolbarBtn onClick={undo} title="Undo (Ctrl+Z)" icon={<Undo2 size={11} />} label="Undo" color="gray" disabled={!canUndo} />
+        <ToolbarBtn onClick={redo} title="Redo (Ctrl+Y)" icon={<Redo2 size={11} />} label="Redo" color="gray" disabled={!canRedo} />
       </div>
 
       <div className="absolute top-3 right-3 z-10">
@@ -239,7 +240,7 @@ function ToolbarBtn({
 }: {
   onClick: () => void
   title: string
-  icon: string
+  icon: ReactNode
   label: string
   color: 'purple' | 'amber' | 'blue' | 'emerald' | 'indigo' | 'gray'
   disabled?: boolean

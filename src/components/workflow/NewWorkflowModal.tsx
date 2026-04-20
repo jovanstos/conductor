@@ -1,49 +1,52 @@
+import type { ReactNode } from 'react'
+import { Sparkles, Settings, PenLine, FlaskConical, X, ArrowRight } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { softwareFactoryWorkflow, contentFactoryWorkflow, researchLabWorkflow } from '../../lib/defaults'
 import * as tauri from '../../lib/tauri'
 
-const STARTERS = [
+type StarterIcon = 'blank' | 'software' | 'content' | 'research'
+
+const STARTERS: { id: string; iconKey: StarterIcon; name: string; description: string; agentCount: number; color: string; iconBg: string; iconColor: string }[] = [
   {
-    id: 'blank',
-    icon: '✦',
+    id: 'blank', iconKey: 'blank',
     name: 'Blank Canvas',
     description: 'Start with an empty workflow. Add AI agents and connect them however you like.',
     agentCount: 0,
     color: 'border-white/10 hover:border-white/20',
-    iconBg: 'bg-white/8',
-    iconColor: 'text-white/50',
+    iconBg: 'bg-white/8', iconColor: 'text-white/50',
   },
   {
-    id: 'software-factory',
-    icon: '⚙',
+    id: 'software-factory', iconKey: 'software',
     name: 'Software Factory',
     description: 'Planner, reviewer, developer, and tester. Describe what to build — the team handles the rest.',
     agentCount: 4,
     color: 'border-purple-500/25 hover:border-purple-500/50',
-    iconBg: 'bg-purple-500/12',
-    iconColor: 'text-purple-300',
+    iconBg: 'bg-purple-500/12', iconColor: 'text-purple-300',
   },
   {
-    id: 'content-factory',
-    icon: '✏',
+    id: 'content-factory', iconKey: 'content',
     name: 'Content Factory',
     description: 'Writer and editor that iterate until the content is polished and publish-ready.',
     agentCount: 3,
     color: 'border-emerald-500/25 hover:border-emerald-500/50',
-    iconBg: 'bg-emerald-500/12',
-    iconColor: 'text-emerald-300',
+    iconBg: 'bg-emerald-500/12', iconColor: 'text-emerald-300',
   },
   {
-    id: 'research-lab',
-    icon: '⊕',
+    id: 'research-lab', iconKey: 'research',
     name: 'Research Lab',
     description: 'Researcher and fact-checker that dig deep, then produce a verified polished report.',
     agentCount: 3,
     color: 'border-blue-500/25 hover:border-blue-500/50',
-    iconBg: 'bg-blue-500/12',
-    iconColor: 'text-blue-300',
+    iconBg: 'bg-blue-500/12', iconColor: 'text-blue-300',
   },
 ]
+
+const STARTER_ICON: Record<StarterIcon, ReactNode> = {
+  blank: <Sparkles size={18} />,
+  software: <Settings size={18} />,
+  content: <PenLine size={18} />,
+  research: <FlaskConical size={18} />,
+}
 
 export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
   const { createWorkflow, loadWorkflows, setCurrentWorkflow } = useWorkflowStore()
@@ -79,9 +82,9 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
           </div>
           <button
             onClick={onClose}
-            className="text-white/25 hover:text-white/60 text-xl leading-none transition-colors"
+            className="text-white/25 hover:text-white/60 transition-colors"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
@@ -94,9 +97,9 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
               className={`w-full flex items-start gap-4 p-4 rounded-xl border bg-white/2 hover:bg-white/5 transition-all text-left ${s.color}`}
             >
               <div
-                className={`w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0 ${s.iconBg} ${s.iconColor}`}
+                className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${s.iconBg} ${s.iconColor}`}
               >
-                {s.icon}
+                {STARTER_ICON[s.iconKey]}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
@@ -109,7 +112,7 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
                 </div>
                 <p className="text-xs text-white/45 leading-relaxed">{s.description}</p>
               </div>
-              <span className="text-white/20 text-lg shrink-0 mt-0.5">→</span>
+              <ArrowRight size={16} className="text-white/20 shrink-0 mt-0.5" />
             </button>
           ))}
         </div>

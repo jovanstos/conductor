@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { X, ChevronDown, ChevronUp, Play, Loader2 } from 'lucide-react'
 import type { AgentNodeData } from '../../types'
 import { callLlm } from '../../lib/tauri'
 
@@ -63,9 +64,9 @@ export default function AgentTestModal({
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-white/35 hover:text-white/70 hover:bg-white/6 transition-colors text-lg"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-white/35 hover:text-white/70 hover:bg-white/6 transition-colors"
           >
-            ✕
+            <X size={15} />
           </button>
         </div>
 
@@ -77,7 +78,10 @@ export default function AgentTestModal({
               onClick={() => setShowPrompt((v) => !v)}
               className="text-[11px] text-purple-400/60 hover:text-purple-400/90 transition-colors"
             >
-              {showPrompt ? '▴ Hide system prompt' : '▾ Preview system prompt'}
+              {showPrompt
+                ? <><ChevronUp size={11} className="inline mr-1" />Hide system prompt</>
+                : <><ChevronDown size={11} className="inline mr-1" />Preview system prompt</>
+              }
             </button>
             {showPrompt && (
               <pre className="mt-2 text-[11px] text-white/35 whitespace-pre-wrap break-words leading-relaxed max-h-36 overflow-y-auto rounded-lg bg-purple-500/5 border border-purple-500/10 px-3 py-2">
@@ -106,7 +110,7 @@ export default function AgentTestModal({
           {/* Output */}
           {loading && (
             <div className="flex items-center gap-2 text-[11px] text-white/35 animate-pulse">
-              <span>●</span>
+              <Loader2 size={12} className="animate-spin" />
               <span>Thinking{elapsedMs != null ? ` · ${fmtMs(elapsedMs)}` : '...'}</span>
             </div>
           )}
@@ -139,7 +143,10 @@ export default function AgentTestModal({
             disabled={!testInput.trim() || loading}
             className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold px-5 py-2 rounded-lg transition-colors"
           >
-            {loading ? 'Testing...' : '▶ Test'}
+            {loading
+              ? <><Loader2 size={12} className="inline mr-1.5 animate-spin" />Testing...</>
+              : <><Play size={12} className="inline mr-1.5" fill="currentColor" />Test</>
+            }
           </button>
         </div>
       </div>

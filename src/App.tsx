@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { History, Play, Square, AlertTriangle, X, Sparkles } from 'lucide-react'
 import { useWorkflowStore } from './stores/workflowStore'
 import { useRunStore } from './stores/runStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -98,9 +99,9 @@ export default function App() {
               <button
                 onClick={() => setShowHistory((v) => !v)}
                 title="View run history"
-                className="text-xs text-white/30 hover:text-white/60 hover:bg-white/5 px-2 py-1 rounded-md transition-colors"
+                className="text-xs text-white/30 hover:text-white/60 hover:bg-white/5 px-2 py-1 rounded-md transition-colors flex items-center gap-1.5"
               >
-                ↻ History
+                <History size={12} /> History
               </button>
               <input
                 className="w-64 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 outline-none focus:border-purple-500/50 placeholder:text-white/25"
@@ -116,7 +117,7 @@ export default function App() {
                   onClick={cancelRun}
                   className="bg-red-700/80 hover:bg-red-600 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
                 >
-                  ■ Cancel
+                  <Square size={12} className="inline mr-1" fill="currentColor" />Cancel
                 </button>
               ) : (
                 <button
@@ -124,16 +125,16 @@ export default function App() {
                   disabled={!taskInput.trim()}
                   className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
                 >
-                  ▶ Run
+                  <Play size={12} className="inline mr-1" fill="currentColor" />Run
                 </button>
               )}
             </div>
           )}
           {runError && (
             <div className="absolute top-full left-0 right-0 mt-1 mx-4 bg-red-500/15 border border-red-500/25 rounded-lg px-3 py-2 text-xs text-red-300 z-20 flex items-center gap-2">
-              <span>⚠</span>
+              <AlertTriangle size={13} className="shrink-0" />
               <span>{runError}</span>
-              <button onClick={() => setRunError(null)} className="ml-auto text-red-400/50 hover:text-red-400">✕</button>
+              <button onClick={() => setRunError(null)} className="ml-auto text-red-400/50 hover:text-red-400"><X size={13} /></button>
             </div>
           )}
         </div>
@@ -234,7 +235,7 @@ function EmptyState() {
   return (
     <div className="flex-1 h-full flex flex-col items-center justify-center gap-6 text-center p-8">
       <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center text-3xl">
-        ✦
+        <Sparkles size={28} className="text-purple-400/60" />
       </div>
       <div className="max-w-sm">
         <p className="text-lg font-semibold text-white/80 mb-2">Build your AI workforce</p>

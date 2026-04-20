@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { X, ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { getRunsForWorkflow } from '../../lib/tauri'
 import type { Run, RunStep } from '../../types'
 
@@ -39,7 +40,7 @@ function StepRow({ step }: { step: RunStep }) {
         {step.tokensUsed != null && (
           <span className="text-[10px] text-white/20">{step.tokensUsed.toLocaleString()} tok</span>
         )}
-        <span className="text-[10px] text-white/25 group-hover:text-white/50">{open ? '▴' : '▾'}</span>
+        {open ? <ChevronUp size={10} className="text-white/25 group-hover:text-white/50" /> : <ChevronDown size={10} className="text-white/25 group-hover:text-white/50" />}
       </button>
 
       {open && (
@@ -55,7 +56,10 @@ function StepRow({ step }: { step: RunStep }) {
                 onClick={() => setShowPrompt((v) => !v)}
                 className="text-[10px] text-purple-400/50 hover:text-purple-400/80 transition-colors"
               >
-                {showPrompt ? '▴ Hide prompt' : '▾ View prompt'}
+                {showPrompt
+                  ? <><ChevronUp size={10} className="inline mr-1" />Hide prompt</>
+                  : <><ChevronDown size={10} className="inline mr-1" />View prompt</>
+                }
               </button>
               {showPrompt && (
                 <pre className="mt-1 text-[10px] text-white/30 whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto rounded bg-purple-500/5 border border-purple-500/10 px-2 py-1.5">
@@ -106,7 +110,7 @@ function RunRow({ run }: { run: Run }) {
             <span className="text-[10px] text-white/20 block">{doneSteps} step{doneSteps !== 1 ? 's' : ''}</span>
           )}
         </div>
-        <span className="text-[10px] text-white/20 ml-1">{expanded ? '▴' : '▾'}</span>
+        {expanded ? <ChevronUp size={10} className="text-white/20 ml-1" /> : <ChevronDown size={10} className="text-white/20 ml-1" />}
       </button>
 
       {expanded && (
@@ -117,7 +121,10 @@ function RunRow({ run }: { run: Run }) {
                 onClick={() => setShowOutput((v) => !v)}
                 className="text-[11px] text-emerald-400/60 hover:text-emerald-400/90 transition-colors"
               >
-                {showOutput ? '▴ Hide final output' : '▾ Final output'}
+                {showOutput
+                  ? <><ChevronUp size={10} className="inline mr-1" />Hide final output</>
+                  : <><ChevronDown size={10} className="inline mr-1" />Final output</>
+                }
               </button>
               {showOutput && (
                 <pre className="mt-1.5 text-[11px] text-white/50 whitespace-pre-wrap break-words leading-relaxed max-h-52 overflow-y-auto rounded bg-white/3 px-2.5 py-2">
@@ -170,9 +177,9 @@ export default function RunHistoryDrawer({
         </div>
         <button
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-white/35 hover:text-white/70 hover:bg-white/6 transition-colors text-lg"
+          className="w-7 h-7 flex items-center justify-center rounded-md text-white/35 hover:text-white/70 hover:bg-white/6 transition-colors"
         >
-          ✕
+          <X size={15} />
         </button>
       </div>
 
@@ -184,7 +191,7 @@ export default function RunHistoryDrawer({
           </div>
         ) : runs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 gap-2">
-            <span className="text-2xl opacity-20">◌</span>
+            <Clock size={24} className="opacity-20" />
             <p className="text-[11px] text-white/25">No runs yet for this workflow</p>
           </div>
         ) : (

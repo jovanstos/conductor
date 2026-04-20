@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Sparkles, Settings, Upload, Download, Copy, Trash2, RefreshCw, FolderOpen, ArrowRight } from 'lucide-react'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { Workflow, ProjectEntry } from '../types'
@@ -30,7 +31,9 @@ export default function Sidebar() {
     <div className="w-full h-full bg-[#0a0a0d] border-r border-white/5 flex flex-col overflow-hidden">
       {/* Logo */}
       <div className="px-4 py-3 border-b border-white/5">
-        <p className="text-sm font-semibold text-white/80 tracking-tight">✦ Conductor</p>
+        <p className="text-sm font-semibold text-white/80 tracking-tight flex items-center gap-1.5">
+          <Sparkles size={14} className="text-purple-400" /> Conductor
+        </p>
       </div>
 
       {/* Search */}
@@ -71,10 +74,10 @@ export default function Sidebar() {
           </button>
           <button
             onClick={() => importWorkflow()}
-            className="px-2 py-1.5 rounded-md text-[11px] text-white/25 hover:text-white/55 hover:bg-white/5 transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] text-white/25 hover:text-white/55 hover:bg-white/5 transition-colors"
             title="Import workflow from JSON file"
           >
-            ⬆ Import
+            <Upload size={11} /> Import
           </button>
         </div>
 
@@ -84,10 +87,10 @@ export default function Sidebar() {
             <SectionLabel label="My Projects" />
             <button
               onClick={refreshProjects}
-              className="text-[10px] text-white/20 hover:text-white/50 transition-colors"
+              className="text-white/20 hover:text-white/50 transition-colors"
               title="Refresh projects"
             >
-              ↻
+              <RefreshCw size={11} />
             </button>
           </div>
           {projects.length === 0 ? (
@@ -124,9 +127,9 @@ export default function Sidebar() {
       {/* Settings */}
       <button
         onClick={openSettings}
-        className="px-4 py-2.5 border-t border-white/5 text-left text-xs text-white/35 hover:text-white/60 hover:bg-white/4 transition-colors"
+        className="px-4 py-2.5 border-t border-white/5 text-left text-xs text-white/35 hover:text-white/60 hover:bg-white/4 transition-colors flex items-center gap-2"
       >
-        ⚙ Settings
+        <Settings size={13} /> Settings
       </button>
 
       {showNewModal && <NewWorkflowModal onClose={() => setShowNewModal(false)} />}
@@ -146,9 +149,9 @@ function ProjectItem({ project, onOpen }: { project: ProjectEntry; onOpen: () =>
       className="mx-2 flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer mb-0.5 text-white/45 hover:text-white/70 hover:bg-white/5 transition-colors group"
       onClick={onOpen}
     >
-      <span className="text-emerald-500/60 text-[10px]">◈</span>
+      <FolderOpen size={11} className="text-emerald-500/60 shrink-0" />
       <span className="text-[11px] truncate flex-1">{project.name}</span>
-      <span className="text-[10px] text-white/20 group-hover:text-white/40 transition-colors">→</span>
+      <ArrowRight size={10} className="text-white/20 group-hover:text-white/40 transition-colors" />
     </div>
   )
 }
@@ -188,24 +191,25 @@ function WorkflowItem({
         <>
           <button
             onClick={(e) => { e.stopPropagation(); onExport() }}
-            className="text-[10px] text-white/20 hover:text-white/60 transition-colors px-0.5"
+            className="text-white/20 hover:text-white/60 transition-colors p-0.5"
             title="Export as JSON"
           >
-            ⬇
+            <Download size={11} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDuplicate() }}
-            className="text-[10px] text-white/20 hover:text-white/60 transition-colors px-0.5"
+            className="text-white/20 hover:text-white/60 transition-colors p-0.5"
             title="Duplicate"
           >
-            ⎘
+            <Copy size={11} />
           </button>
           {!active && (
             <button
               onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="text-[10px] text-white/20 hover:text-red-400 transition-colors px-0.5"
+              className="text-white/20 hover:text-red-400 transition-colors p-0.5"
+              title="Delete"
             >
-              ✕
+              <Trash2 size={11} />
             </button>
           )}
         </>

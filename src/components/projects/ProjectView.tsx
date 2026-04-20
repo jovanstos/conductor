@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FolderOpen, Download, Play, X } from 'lucide-react'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { openProject, zipAndSaveWorkspace } from '../../lib/tauri'
 import type { FileEntry, ProjectEntry } from '../../types'
@@ -76,7 +77,7 @@ export default function ProjectView({ project, onClose }: Props) {
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/8 flex items-center gap-3 shrink-0">
-          <span className="text-lg text-emerald-400">◈</span>
+          <FolderOpen size={18} className="text-emerald-400 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white/90 truncate">{project.name}</p>
             <p className="text-[11px] text-white/30 font-mono truncate">{project.path}</p>
@@ -88,19 +89,19 @@ export default function ProjectView({ project, onClose }: Props) {
               disabled={exporting}
               className="text-xs text-white/40 hover:text-white/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
             >
-              {exporting ? 'Exporting...' : '⬇ Export zip'}
+              {exporting ? 'Exporting...' : <><Download size={12} className="inline mr-1" />Export zip</>}
             </button>
             <button
               onClick={handleContinue}
               className="text-xs text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-3 py-1.5 rounded-lg transition-colors"
             >
-              ▶ Run with agents
+              <Play size={12} className="inline mr-1.5" fill="currentColor" />Run with agents
             </button>
             <button
               onClick={onClose}
-              className="text-white/30 hover:text-white/60 px-2 py-1.5 rounded-lg transition-colors text-sm"
+              className="text-white/30 hover:text-white/60 px-2 py-1.5 rounded-lg transition-colors"
             >
-              ✕
+              <X size={15} />
             </button>
           </div>
         </div>

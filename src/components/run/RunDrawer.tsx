@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FolderOpen, Clock, Download, X, ChevronDown, ChevronUp, ChevronRight, Pause, ArrowRight, Square } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 import * as tauri from '../../lib/tauri'
 import type { RunStep } from '../../types'
@@ -105,7 +106,8 @@ export default function RunDrawer({ height }: { height: number }) {
           {ws && (
             <p className="text-[10px] text-white/25 truncate mt-0.5">
               {ws.mode === 'project' || ws.mode === 'existing'
-                ? `◈ ${ws.projectName ?? 'project'}` : '◌ temporary'}{' '}
+                ? <><FolderOpen size={10} className="inline mr-0.5" />{ws.projectName ?? 'project'}</>
+                : <><Clock size={10} className="inline mr-0.5" />temporary</>}{' '}
               · {ws.workspacePath}
               {totalFilesWritten > 0 && (
                 <span className="ml-1.5 text-emerald-400/60">
@@ -128,7 +130,7 @@ export default function RunDrawer({ height }: { height: number }) {
               onClick={openResultModal}
               className="bg-green-600 hover:bg-green-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
             >
-              See Results →
+              See Results <ArrowRight size={12} className="inline ml-0.5" />
             </button>
           )}
           {isFinished && ws && (
@@ -139,11 +141,11 @@ export default function RunDrawer({ height }: { height: number }) {
                     className="text-xs text-white/40 hover:text-white/70 border border-white/10 hover:border-white/25 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40"
                     title="Export project as zip"
                   >
-                    {saving ? '...' : '↓ Export'}
+                    {saving ? '...' : <><Download size={11} className="inline mr-1" />Export</>}
                   </button>
                   <button onClick={clearRun}
                     className="text-xs text-emerald-400/70 hover:text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/40 px-2.5 py-1 rounded-lg transition-colors"
-                  >◈ Keep Project</button>
+                  ><FolderOpen size={11} className="inline mr-1" />Keep Project</button>
                   <button onClick={handleDiscard}
                     className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
                   >Discard</button>
@@ -151,20 +153,20 @@ export default function RunDrawer({ height }: { height: number }) {
               ) : (
                 <button onClick={handleDiscard}
                   className="text-xs text-white/30 hover:text-white/60 border border-white/8 hover:border-white/20 px-2.5 py-1 rounded-lg transition-colors"
-                >✕ Discard</button>
+                ><X size={11} className="inline mr-1" />Discard</button>
               )}
             </>
           )}
           {isRunning && (
             <button onClick={cancelRun}
               className="text-xs text-red-400/70 hover:text-red-400 border border-red-500/20 hover:border-red-500/40 px-2.5 py-1 rounded-lg transition-colors"
-            >■ Cancel</button>
+            ><Square size={11} className="inline mr-1" fill="currentColor" />Cancel</button>
           )}
           {!ws && (
             <button onClick={clearRun}
-              className="text-white/20 hover:text-white/50 text-base leading-none transition-colors ml-1"
+              className="text-white/20 hover:text-white/50 transition-colors ml-1"
               title="Dismiss"
-            >✕</button>
+            ><X size={14} /></button>
           )}
         </div>
       </div>
@@ -197,7 +199,7 @@ export default function RunDrawer({ height }: { height: number }) {
       {/* ── Gate notice ── */}
       {isPaused && gateInfo && (
         <div className="mx-3 mt-2.5 shrink-0 bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-base animate-pulse shrink-0">⏸</div>
+          <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center animate-pulse shrink-0 text-blue-400"><Pause size={16} /></div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-blue-300">Review panel is open</p>
             <p className="text-xs text-blue-300/55 mt-0.5 line-clamp-1">
@@ -311,9 +313,9 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
             <button onClick={() => setShowFiles(v => !v)}
               className="flex items-center gap-1 text-[10px] text-emerald-400/70 hover:text-emerald-300 transition-colors"
             >
-              <span>◈</span>
+              <FolderOpen size={11} />
               <span>{step.filesWritten!.length} file{step.filesWritten!.length !== 1 ? 's' : ''} written</span>
-              <span className="text-white/20 ml-0.5">{showFiles ? '▲' : '▼'}</span>
+              {showFiles ? <ChevronUp size={10} className="text-white/20 ml-0.5" /> : <ChevronDown size={10} className="text-white/20 ml-0.5" />}
             </button>
             {showFiles && (
               <div className="mt-1 bg-black/20 rounded-lg p-2 space-y-0.5">
@@ -339,7 +341,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
                 </div>
                 <button onClick={() => setShowOutput(false)}
                   className="text-[10px] text-white/30 hover:text-white/60 transition-colors"
-                >▲ Collapse output</button>
+                ><ChevronUp size={10} className="inline mr-0.5" />Collapse output</button>
               </>
             ) : (
               <>
@@ -349,7 +351,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
                 {((step.output?.length ?? 0) > 80 || isError) && (
                   <button onClick={() => setShowOutput(true)}
                     className="text-[10px] text-purple-400/60 hover:text-purple-300 transition-colors mt-0.5"
-                  >▼ Read full response</button>
+                  ><ChevronDown size={10} className="inline mr-0.5" />Read full response</button>
                 )}
               </>
             )}
@@ -362,7 +364,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
             <button onClick={() => setShowPrompt(v => !v)}
               className="text-[10px] text-white/20 hover:text-white/45 transition-colors flex items-center gap-1"
             >
-              <span>{showPrompt ? '▲' : '▶'}</span>
+              {showPrompt ? <ChevronUp size={10} /> : <ChevronRight size={10} />}
               <span>View prompt ({promptChars.toLocaleString()} chars)</span>
             </button>
             {showPrompt && (

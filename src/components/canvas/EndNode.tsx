@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { StopCircle } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 
 export default memo(function EndNode({ id }: NodeProps) {
@@ -8,7 +9,6 @@ export default memo(function EndNode({ id }: NodeProps) {
 
   return (
     <div className="w-44 rounded-xl border-2 border-indigo-500/40 bg-[#10101a] shadow-lg">
-      {/* Input only — left side */}
       <Handle
         type="target"
         position={Position.Left}
@@ -18,8 +18,8 @@ export default memo(function EndNode({ id }: NodeProps) {
 
       <div className="p-3.5">
         <div className="flex items-center gap-2.5 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center text-base shrink-0 text-indigo-400">
-            ■
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/15 flex items-center justify-center shrink-0 text-indigo-400">
+            <StopCircle size={14} />
           </div>
           <div>
             <p className="text-sm font-semibold text-white/85">End</p>
