@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import {
   ReactFlow,
   Background,
@@ -16,15 +16,32 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { v4 as uuidv4 } from 'uuid'
-import { Play, Sparkles, RefreshCw, GitPullRequest, StopCircle, Undo2, Redo2 } from 'lucide-react'
+import { Play, Sparkles, RefreshCw, GitPullRequest, StopCircle, Undo2, Redo2, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Zap, Users } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
+import { useRunStore } from '../../stores/runStore'
 import type { WorkflowNode, WorkflowEdge, LoopNodeData, ReviewGateData, StartNodeData, EndNodeData } from '../../types'
-import { newAgentNodeData } from '../../lib/defaults'
+import type { AgentNodeData } from '../../types'
+import { newAgentNodeData, getRoleInfo, type RoleCategory } from '../../lib/defaults'
+
+function RoleIcon({ category, size = 12, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
+  const props = { size, className }
+  switch (category) {
+    case 'developer': return <Code2 {...props} />
+    case 'reviewer': return <Search {...props} />
+    case 'writer': return <PenLine {...props} />
+    case 'researcher': return <BookOpen {...props} />
+    case 'planner': return <ClipboardList {...props} />
+    case 'tester': return <TestTube2 {...props} />
+    case 'marketer': return <Megaphone {...props} />
+    default: return <Zap {...props} />
+  }
+}
 import AgentNode from './AgentNode'
 import LoopNode from './LoopNode'
 import ReviewGateNode from './ReviewGateNode'
 import StartNode from './StartNode'
 import EndNode from './EndNode'
+import ButtonEdge from './ButtonEdge'
 
 const NODE_TYPES = {
   agent: AgentNode,
@@ -32,6 +49,10 @@ const NODE_TYPES = {
   review_gate: ReviewGateNode,
   start: StartNode,
   end: EndNode,
+}
+
+const EDGE_TYPES = {
+  default: ButtonEdge,
 }
 
 function toRFNode(n: WorkflowNode): RFNode {
@@ -53,6 +74,7 @@ export default function WorkflowCanvas() {
     currentWorkflow, updateNode, addNode, removeNode, addEdge: storeAddEdge, removeEdge, setSelectedNode,
     undo, redo, canUndo, canRedo, copySelectedNode, pasteNode,
   } = useWorkflowStore()
+  const { isRunning } = useRunStore()
 
   const [rfNodes, setRfNodes, onRFNodesChange] = useNodesState<RFNode>(
     currentWorkflow?.nodes.map(toRFNode) ?? [],
@@ -188,7 +210,7 @@ export default function WorkflowCanvas() {
       </div>
 
       <div className="absolute top-3 right-3 z-10">
-        <p className="text-[10px] text-white/20">
+        <p className="text-xs text-white/25">
           Left = input · Right = output · Drag right handle → left handle to connect
         </p>
       </div>
@@ -202,12 +224,14 @@ export default function WorkflowCanvas() {
         onNodeClick={(_, node) => setSelectedNode(node.id)}
         onPaneClick={() => setSelectedNode(null)}
         nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
         fitView
         fitViewOptions={{ padding: 0.25 }}
         style={{ background: '#0f0f12' }}
         deleteKeyCode={['Backspace', 'Delete']}
         minZoom={0.3}
         maxZoom={2}
+        elevateEdgesOnSelect
       >
         <Background color="rgba(255,255,255,0.03)" variant={BackgroundVariant.Dots} gap={24} />
         <Controls
@@ -226,6 +250,76 @@ export default function WorkflowCanvas() {
           maskColor="rgba(0,0,0,0.6)"
         />
       </ReactFlow>
+
+      {/* Team Overview Strip — shown when not running and workflow has agents */}
+      {!isRunning && currentWorkflow && (() => {
+        const agentNodes = currentWorkflow.nodes.filter((n) => n.type === 'agent')
+        if (agentNodes.length === 0) return null
+        return <TeamBar agentNodes={agentNodes} onSelect={setSelectedNode} />
+      })()}
+    </div>
+  )
+}
+
+function TeamBar({ agentNodes, onSelect }: { agentNodes: WorkflowNode[]; onSelect: (id: string) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
+  const startX = useRef(0)
+  const scrollLeft = useRef(0)
+
+  function onMouseDown(e: React.MouseEvent) {
+    if (!scrollRef.current) return
+    isDragging.current = true
+    startX.current = e.pageX - scrollRef.current.offsetLeft
+    scrollLeft.current = scrollRef.current.scrollLeft
+  }
+  function onMouseMove(e: React.MouseEvent) {
+    if (!isDragging.current || !scrollRef.current) return
+    e.preventDefault()
+    const x = e.pageX - scrollRef.current.offsetLeft
+    scrollRef.current.scrollLeft = scrollLeft.current - (x - startX.current)
+  }
+  function onMouseUp() { isDragging.current = false }
+
+  return (
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
+      <div className="bg-[#0e0e13]/90 border border-white/10 rounded-2xl px-4 py-2.5 backdrop-blur-sm shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Users size={12} className="text-white/30" />
+            <span className="text-xs text-white/30 uppercase tracking-widest">Your Team</span>
+          </div>
+          <div className="w-px h-4 bg-white/8" />
+          <div
+            ref={scrollRef}
+            className="flex items-center gap-2 overflow-x-auto max-w-[580px] scrollbar-hide cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
+            onMouseUp={onMouseUp}
+            onMouseLeave={onMouseUp}
+          >
+            {agentNodes.map((n) => {
+              const d = n.data as AgentNodeData
+              const role = getRoleInfo(d.name, d.roleDescription || '')
+              const modelShort = d.model?.modelId?.split('-').slice(0, 2).join('-') ?? 'model'
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => onSelect(n.id)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${role.borderColor} bg-white/2 hover:bg-white/6 transition-colors shrink-0`}
+                >
+                  <div className={`w-5 h-5 rounded-md flex items-center justify-center ${role.bgColor}`}>
+                    <RoleIcon category={role.category} size={10} className={role.textColor} />
+                  </div>
+                  <span className="text-xs text-white/70 font-medium">{d.name}</span>
+                  <span className="text-[10px] text-white/25 font-mono">{modelShort}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -258,7 +352,7 @@ function ToolbarBtn({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`bg-[#1a1a22] border ${colors[color]} text-[11px] px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed`}
+      className={`bg-[#1a1a22] border ${colors[color]} text-xs px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed`}
     >
       <span>{icon}</span>
       <span>{label}</span>

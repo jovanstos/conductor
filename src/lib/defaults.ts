@@ -178,6 +178,36 @@ export const BUILT_IN_TEMPLATES = [
   },
 ];
 
+export type RoleCategory = 'developer' | 'reviewer' | 'writer' | 'researcher' | 'planner' | 'tester' | 'marketer' | 'default'
+
+export interface RoleInfo {
+  category: RoleCategory
+  label: string
+  borderColor: string
+  bgColor: string
+  textColor: string
+  dotColor: string
+}
+
+export function getRoleInfo(name: string, roleDescription: string): RoleInfo {
+  const text = `${name} ${roleDescription}`.toLowerCase()
+  if (/develop|engineer|cod|implement|build|program/.test(text))
+    return { category: 'developer', label: 'Developer', borderColor: 'border-blue-500/40', bgColor: 'bg-blue-500/15', textColor: 'text-blue-400', dotColor: 'bg-blue-400' }
+  if (/review|check|critic|audit|verif/.test(text))
+    return { category: 'reviewer', label: 'Reviewer', borderColor: 'border-amber-500/40', bgColor: 'bg-amber-500/15', textColor: 'text-amber-400', dotColor: 'bg-amber-400' }
+  if (/writ|edit|content|copy|draft|author|document/.test(text))
+    return { category: 'writer', label: 'Writer', borderColor: 'border-emerald-500/40', bgColor: 'bg-emerald-500/15', textColor: 'text-emerald-400', dotColor: 'bg-emerald-400' }
+  if (/research|analys|fact|data|investigat/.test(text))
+    return { category: 'researcher', label: 'Researcher', borderColor: 'border-cyan-500/40', bgColor: 'bg-cyan-500/15', textColor: 'text-cyan-400', dotColor: 'bg-cyan-400' }
+  if (/plan|architect|design|strateg|roadmap|product|manag/.test(text))
+    return { category: 'planner', label: 'Planner', borderColor: 'border-purple-500/40', bgColor: 'bg-purple-500/15', textColor: 'text-purple-400', dotColor: 'bg-purple-400' }
+  if (/test|qa|quality|bug|debug/.test(text))
+    return { category: 'tester', label: 'Tester', borderColor: 'border-rose-500/40', bgColor: 'bg-rose-500/15', textColor: 'text-rose-400', dotColor: 'bg-rose-400' }
+  if (/market|sales|social|campaign|promot/.test(text))
+    return { category: 'marketer', label: 'Marketer', borderColor: 'border-orange-500/40', bgColor: 'bg-orange-500/15', textColor: 'text-orange-400', dotColor: 'bg-orange-400' }
+  return { category: 'default', label: 'Agent', borderColor: 'border-purple-500/30', bgColor: 'bg-purple-500/12', textColor: 'text-purple-400', dotColor: 'bg-purple-400' }
+}
+
 export function newAgentNodeData(
   overrides?: Partial<AgentNodeData>,
 ): AgentNodeData {

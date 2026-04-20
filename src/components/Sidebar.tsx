@@ -3,6 +3,8 @@ import { Sparkles, Settings, Upload, Download, Copy, Trash2, RefreshCw, FolderOp
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { Workflow, ProjectEntry } from '../types'
+import type { AgentNodeData } from '../types'
+import { getRoleInfo } from '../lib/defaults'
 import NewWorkflowModal from './workflow/NewWorkflowModal'
 import { listProjects } from '../lib/tauri'
 import ProjectView from './projects/ProjectView'
@@ -31,8 +33,8 @@ export default function Sidebar() {
     <div className="w-full h-full bg-[#0a0a0d] border-r border-white/5 flex flex-col overflow-hidden">
       {/* Logo */}
       <div className="px-4 py-3 border-b border-white/5">
-        <p className="text-sm font-semibold text-white/80 tracking-tight flex items-center gap-1.5">
-          <Sparkles size={14} className="text-purple-400" /> Conductor
+        <p className="text-base font-semibold text-white/90 tracking-tight flex items-center gap-2">
+          <Sparkles size={16} className="text-purple-400" /> Conductor
         </p>
       </div>
 
@@ -42,7 +44,7 @@ export default function Sidebar() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search..."
-          className="w-full bg-white/5 rounded-md px-2.5 py-1.5 text-xs text-white/60 outline-none focus:bg-white/8 placeholder:text-white/25"
+          className="w-full bg-white/5 rounded-md px-2.5 py-1.5 text-sm text-white/60 outline-none focus:bg-white/8 placeholder:text-white/25"
         />
       </div>
 
@@ -68,13 +70,13 @@ export default function Sidebar() {
         <div className="mx-3 mt-1 flex gap-1">
           <button
             onClick={() => setShowNewModal(true)}
-            className="flex-1 text-left px-2 py-1.5 rounded-md text-[11px] text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+            className="flex-1 text-left px-2 py-1.5 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
           >
             + New
           </button>
           <button
             onClick={() => importWorkflow()}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] text-white/25 hover:text-white/55 hover:bg-white/5 transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-white/35 hover:text-white/65 hover:bg-white/5 transition-colors"
             title="Import workflow from JSON file"
           >
             <Upload size={11} /> Import
@@ -119,7 +121,7 @@ export default function Sidebar() {
             <div
               className={`w-1.5 h-1.5 rounded-full ${p.hasKey ? 'bg-green-500' : 'bg-white/15'}`}
             />
-            <span className="text-[11px] text-white/40 capitalize">{p.provider}</span>
+            <span className="text-xs text-white/45 capitalize">{p.provider}</span>
           </div>
         ))}
       </div>
@@ -127,9 +129,9 @@ export default function Sidebar() {
       {/* Settings */}
       <button
         onClick={openSettings}
-        className="px-4 py-2.5 border-t border-white/5 text-left text-xs text-white/35 hover:text-white/60 hover:bg-white/4 transition-colors flex items-center gap-2"
+        className="px-4 py-3 border-t border-white/5 text-left text-sm text-white/45 hover:text-white/70 hover:bg-white/4 transition-colors flex items-center gap-2"
       >
-        <Settings size={13} /> Settings
+        <Settings size={15} /> Settings
       </button>
 
       {showNewModal && <NewWorkflowModal onClose={() => setShowNewModal(false)} />}
@@ -139,7 +141,7 @@ export default function Sidebar() {
 
 function SectionLabel({ label }: { label: string }) {
   return (
-    <p className="px-4 mb-1 text-[10px] text-white/25 uppercase tracking-widest">{label}</p>
+    <p className="px-4 mb-1.5 text-[11px] text-white/30 uppercase tracking-widest font-medium">{label}</p>
   )
 }
 
@@ -150,8 +152,8 @@ function ProjectItem({ project, onOpen }: { project: ProjectEntry; onOpen: () =>
       onClick={onOpen}
     >
       <FolderOpen size={11} className="text-emerald-500/60 shrink-0" />
-      <span className="text-[11px] truncate flex-1">{project.name}</span>
-      <ArrowRight size={10} className="text-white/20 group-hover:text-white/40 transition-colors" />
+      <span className="text-xs truncate flex-1">{project.name}</span>
+      <ArrowRight size={11} className="text-white/20 group-hover:text-white/40 transition-colors" />
     </div>
   )
 }
@@ -172,7 +174,8 @@ function WorkflowItem({
   onExport: () => void
 }) {
   const [hover, setHover] = useState(false)
-  const agentCount = workflow.nodes.filter((n) => n.type === 'agent').length
+  const agentNodes = workflow.nodes.filter((n) => n.type === 'agent')
+  const rosterDots = agentNodes.slice(0, 5).map((n) => getRoleInfo((n.data as AgentNodeData).name || '', (n.data as AgentNodeData).roleDescription || ''))
 
   return (
     <div
@@ -183,9 +186,14 @@ function WorkflowItem({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <span className="text-[11px] truncate flex-1">{workflow.name}</span>
-      {!hover && agentCount > 0 && (
-        <span className="text-[9px] text-white/20 shrink-0">{agentCount} agent{agentCount !== 1 ? 's' : ''}</span>
+      <span className="text-xs truncate flex-1">{workflow.name}</span>
+      {!hover && rosterDots.length > 0 && (
+        <div className="flex items-center gap-0.5 shrink-0">
+          {rosterDots.map((r, i) => (
+            <div key={i} className={`w-1.5 h-1.5 rounded-full ${r.dotColor} opacity-60`} title={r.label} />
+          ))}
+          {agentNodes.length > 5 && <span className="text-[9px] text-white/20 ml-0.5">+{agentNodes.length - 5}</span>}
+        </div>
       )}
       {hover && (
         <>

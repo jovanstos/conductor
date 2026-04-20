@@ -1,11 +1,26 @@
 import { useState, useEffect } from 'react'
-import { X, Zap, ChevronDown, ChevronRight, Plus, Play } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { X, Zap, ChevronDown, ChevronRight, Plus, Play, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone } from 'lucide-react'
 import type { WorkflowNode, AgentNodeData, Template } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
-import { BUILT_IN_TEMPLATES } from '../../lib/defaults'
+import { BUILT_IN_TEMPLATES, getRoleInfo, type RoleCategory } from '../../lib/defaults'
 import { getTemplates, saveTemplate, deleteTemplate } from '../../lib/tauri'
 import ModelPicker from '../shared/ModelPicker'
 import AgentTestModal from './AgentTestModal'
+
+function RoleIcon({ category, size = 16, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
+  const props = { size, className }
+  switch (category) {
+    case 'developer': return <Code2 {...props} />
+    case 'reviewer': return <Search {...props} />
+    case 'writer': return <PenLine {...props} />
+    case 'researcher': return <BookOpen {...props} />
+    case 'planner': return <ClipboardList {...props} />
+    case 'tester': return <TestTube2 {...props} />
+    case 'marketer': return <Megaphone {...props} />
+    default: return <Zap {...props} />
+  }
+}
 
 const CONTEXT_MODE_HELP: Record<string, string> = {
   full_chain: 'Sees everything every prior agent wrote — great for a final editor or report writer.',
@@ -88,9 +103,23 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
 
   const hasPrompt = prompt.trim().length > 0
   const categories = [...new Set(BUILT_IN_TEMPLATES.map((t) => t.category))]
+  const roleInfo = getRoleInfo(name, role)
 
   return (
     <div className="space-y-4">
+      {/* Persona header */}
+      <div className={`flex items-center gap-3 p-3 rounded-xl border ${roleInfo.borderColor} ${roleInfo.bgColor}/30`}>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${roleInfo.bgColor}`}>
+          <RoleIcon category={roleInfo.category} size={18} className={roleInfo.textColor} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-white/85 truncate">{name || 'New Agent'}</p>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${roleInfo.bgColor} ${roleInfo.textColor} font-medium`}>
+            {roleInfo.label}
+          </span>
+        </div>
+      </div>
+
       {!hasPrompt && (
         <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2.5">
           <p className="text-[11px] text-amber-300/80 leading-relaxed">

@@ -1,8 +1,24 @@
-import { useState } from 'react'
-import { FolderOpen, Clock, Download, X, ChevronDown, ChevronUp, ChevronRight, Pause, ArrowRight, Square } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
+import { FolderOpen, Clock, Download, X, ChevronDown, ChevronUp, ChevronRight, Pause, ArrowRight, Square, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Zap } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 import * as tauri from '../../lib/tauri'
 import type { RunStep } from '../../types'
+import { getRoleInfo, type RoleCategory } from '../../lib/defaults'
+
+function RoleIcon({ category, size = 12, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
+  const props = { size, className }
+  switch (category) {
+    case 'developer': return <Code2 {...props} />
+    case 'reviewer': return <Search {...props} />
+    case 'writer': return <PenLine {...props} />
+    case 'researcher': return <BookOpen {...props} />
+    case 'planner': return <ClipboardList {...props} />
+    case 'tester': return <TestTube2 {...props} />
+    case 'marketer': return <Megaphone {...props} />
+    default: return <Zap {...props} />
+  }
+}
 
 function stepDurationMs(step: RunStep): number | null {
   if (!step.completedAt) return null
@@ -20,6 +36,15 @@ export default function RunDrawer({ height }: { height: number }) {
   const [discardConfirm, setDiscardConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
+
+  const timelineRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll timeline to bottom while running
+  useEffect(() => {
+    if (isRunning && timelineRef.current) {
+      timelineRef.current.scrollTop = timelineRef.current.scrollHeight
+    }
+  }, [currentRun?.steps.length, currentRun?.steps.at(-1)?.output, isRunning])
 
   if (!currentRun) return null
 
@@ -210,7 +235,7 @@ export default function RunDrawer({ height }: { height: number }) {
       )}
 
       {/* ── Timeline ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-0">
+      <div ref={timelineRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-0">
         {steps.length === 0 ? (
           <div className="flex items-center gap-2 h-full justify-center">
             <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" />
@@ -243,14 +268,23 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
   const [showPrompt, setShowPrompt] = useState(false)
   const [showOutput, setShowOutput] = useState(false)
   const [showFiles, setShowFiles] = useState(false)
+  const streamRef = useRef<HTMLDivElement>(null)
 
   const isRunning = step.status === 'running'
+
+  // Auto-scroll live streaming output
+  useEffect(() => {
+    if (isRunning && streamRef.current) {
+      streamRef.current.scrollTop = streamRef.current.scrollHeight
+    }
+  }, [step.output, isRunning])
   const isDone = step.status === 'done'
   const isError = step.status === 'error'
   const durationMs = stepDurationMs(step)
   const hasFiles = (step.filesWritten?.length ?? 0) > 0
   const hasOutput = !isRunning && (step.output || step.error)
   const promptChars = step.input?.length ?? 0
+  const role = getRoleInfo(step.nodeName, '')
 
   return (
     <div className="flex gap-3">
@@ -269,10 +303,20 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
       <div className="flex-1 min-w-0 pb-3">
         {/* Header row */}
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-white/85">{step.nodeName}</span>
+          <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+            isRunning ? 'bg-purple-500/20' : isDone ? 'bg-green-500/15' : role.bgColor
+          }`}>
+            <RoleIcon category={role.category} size={11} className={isRunning ? 'text-purple-300' : isDone ? 'text-green-400' : role.textColor} />
+          </div>
+          <span className="text-xs font-semibold text-white/85">
+            {isRunning ? `${step.nodeName} is working on this…`
+              : isDone ? step.nodeName
+              : isError ? `${step.nodeName} ran into a problem`
+              : step.nodeName}
+          </span>
           {step.attempt > 1 && (
             <span className="text-[9px] text-amber-400/70 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full">
-              retry {step.attempt}
+              revision {step.attempt}
             </span>
           )}
           {isRunning && (
@@ -288,19 +332,11 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
           {step.tokensUsed != null && (
             <span className="text-[10px] text-white/20 tabular-nums">{step.tokensUsed.toLocaleString()} tok</span>
           )}
-          <span className={`text-[10px] font-medium ml-auto ${
-            isRunning ? 'text-purple-300/70'
-              : isDone ? 'text-green-400/60'
-              : isError ? 'text-red-400/70'
-              : 'text-white/25'
-          }`}>
-            {isRunning ? 'running' : isDone ? 'done' : isError ? 'error' : 'pending'}
-          </span>
         </div>
 
         {/* Live streaming output */}
         {isRunning && step.output && (
-          <div className="mt-1.5 max-h-28 overflow-y-auto rounded-lg bg-black/20 px-2.5 py-2 border border-purple-500/10">
+          <div ref={streamRef} className="mt-1.5 max-h-28 overflow-y-auto rounded-lg bg-black/20 px-2.5 py-2 border border-purple-500/10">
             <pre className="text-[10px] text-purple-200/60 whitespace-pre-wrap leading-relaxed font-mono">
               {step.output}
             </pre>
@@ -314,7 +350,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
               className="flex items-center gap-1 text-[10px] text-emerald-400/70 hover:text-emerald-300 transition-colors"
             >
               <FolderOpen size={11} />
-              <span>{step.filesWritten!.length} file{step.filesWritten!.length !== 1 ? 's' : ''} written</span>
+              <span>{step.nodeName} created {step.filesWritten!.length} file{step.filesWritten!.length !== 1 ? 's' : ''}</span>
               {showFiles ? <ChevronUp size={10} className="text-white/20 ml-0.5" /> : <ChevronDown size={10} className="text-white/20 ml-0.5" />}
             </button>
             {showFiles && (
@@ -351,7 +387,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
                 {((step.output?.length ?? 0) > 80 || isError) && (
                   <button onClick={() => setShowOutput(true)}
                     className="text-[10px] text-purple-400/60 hover:text-purple-300 transition-colors mt-0.5"
-                  ><ChevronDown size={10} className="inline mr-0.5" />Read full response</button>
+                  ><ChevronDown size={10} className="inline mr-0.5" />View what they wrote →</button>
                 )}
               </>
             )}
