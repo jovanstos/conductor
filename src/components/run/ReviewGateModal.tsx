@@ -48,10 +48,10 @@ export default function ReviewGateModal() {
             />
           )}
 
-          {/* Feedback field (for reject) */}
+          {/* Feedback field (required when rejecting) */}
           <div className="mt-4">
             <p className="text-[10px] text-white/30 uppercase tracking-wider mb-2">
-              Feedback (optional — used when rejecting)
+              Feedback <span className="text-red-400/60 normal-case">— required to reject</span>
             </p>
             <textarea
               className="w-full h-20 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white/70 outline-none focus:border-purple-500/40 resize-none placeholder:text-white/20"
@@ -66,7 +66,9 @@ export default function ReviewGateModal() {
         <div className="px-6 py-4 border-t border-white/8 flex items-center gap-3 justify-end">
           <button
             onClick={() => resumeGate('reject', feedback)}
-            className="bg-white/6 hover:bg-white/10 border border-white/10 text-white/60 text-sm px-4 py-2 rounded-lg transition-colors"
+            disabled={!feedback.trim()}
+            title={!feedback.trim() ? 'Add feedback so the workflow knows what to fix' : undefined}
+            className="bg-white/6 hover:bg-white/10 border border-white/10 text-white/60 text-sm px-4 py-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white/6"
           >
             <X size={13} className="inline mr-1" />Reject
           </button>

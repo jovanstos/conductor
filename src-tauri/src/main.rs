@@ -901,6 +901,12 @@ async fn exec_agent(
     }
 }
 
+fn is_approved(review: &str) -> bool {
+    let upper = review.to_uppercase();
+    // "NOT APPROVED" must not match — check exclusion before inclusion
+    upper.contains("APPROVED") && !upper.contains("NOT APPROVED")
+}
+
 async fn exec_loop(
     data: &LoopNodeData,
     node_map: &HashMap<String, WorkflowNode>,
@@ -924,6 +930,9 @@ async fn exec_loop(
     let reviewer_data: AgentNodeData = serde_json::from_value(reviewer.data.clone())
         .map_err(|e| format!("Loop reviewer data: {}", e))?;
 
+    // Snapshot the chain length before the loop so we can restore it cleanly
+    // at the start of each retry and prevent stale attempts from polluting context
+    let chain_len_before = ctx.chain.len();
     let mut last_output = String::new();
     let mut extra_ctx: Option<String> = None;
 
@@ -931,6 +940,10 @@ async fn exec_loop(
         if cancel.load(Ordering::Relaxed) {
             return Err("__cancelled__".into());
         }
+
+        // Reset to pre-loop baseline — each iteration gets a clean slate so
+        // a previous rejected attempt never bleeds into the next worker prompt
+        ctx.chain.truncate(chain_len_before);
 
         // Run target (inject feedback from previous iteration if any)
         let extra = extra_ctx.as_deref();
@@ -948,8 +961,11 @@ async fn exec_loop(
             workspace_path,
         )
         .await?;
+        // ctx.chain = [...prior_nodes, Worker(this attempt)]
 
-        // Run reviewer
+        let chain_len_after_worker = ctx.chain.len();
+
+        // Run reviewer — it sees the worker's freshly appended output in the chain
         let review = exec_agent(
             &reviewer_data,
             &reviewer.id,
@@ -965,15 +981,26 @@ async fn exec_loop(
         )
         .await?;
 
+        // Strip the reviewer's chain entry — the reviewer is internal to the loop.
+        // Downstream nodes must only see the worker's approved output, never the
+        // reviewer's critique text.
+        ctx.chain.truncate(chain_len_after_worker);
+        // ctx.chain = [...prior_nodes, Worker(this attempt)]  ← clean
+
         // Check for early exit on reviewer approval
-        let approved = review.trim().to_uppercase().contains("APPROVED");
+        let approved = is_approved(&review);
         if approved && data.exit_condition == "reviewer_approves" {
             break;
         }
 
-        // Prepare feedback for next iteration
-        extra_ctx = Some(format!("Feedback from {}:\n{}", reviewer_data.name, review));
+        // Include the worker's previous output so it can revise rather than rewrite
+        extra_ctx = Some(format!(
+            "Your previous output:\n{}\n\nFeedback from {}:\n{}",
+            last_output, reviewer_data.name, review
+        ));
     }
+    // ctx.chain is now [...prior_nodes, Worker(final approved)]
+    // reviewer output was never permanently added to the chain
 
     Ok(last_output)
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, type ReactNode } from "react";
 import {
   ReactFlow,
   Background,
@@ -7,41 +7,41 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
+  MarkerType,
   type Connection,
   type NodeChange,
   type EdgeChange,
   type Node as RFNode,
   type Edge as RFEdge,
   BackgroundVariant,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
-import { v4 as uuidv4 } from 'uuid'
-import { Play, Sparkles, RefreshCw, GitPullRequest, StopCircle, Undo2, Redo2, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Zap, Users } from 'lucide-react'
-import { useWorkflowStore } from '../../stores/workflowStore'
-import { useRunStore } from '../../stores/runStore'
-import type { WorkflowNode, WorkflowEdge, LoopNodeData, ReviewGateData, StartNodeData, EndNodeData } from '../../types'
-import type { AgentNodeData } from '../../types'
-import { newAgentNodeData, getRoleInfo, type RoleCategory } from '../../lib/defaults'
-
-function RoleIcon({ category, size = 12, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
-  const props = { size, className }
-  switch (category) {
-    case 'developer': return <Code2 {...props} />
-    case 'reviewer': return <Search {...props} />
-    case 'writer': return <PenLine {...props} />
-    case 'researcher': return <BookOpen {...props} />
-    case 'planner': return <ClipboardList {...props} />
-    case 'tester': return <TestTube2 {...props} />
-    case 'marketer': return <Megaphone {...props} />
-    default: return <Zap {...props} />
-  }
-}
-import AgentNode from './AgentNode'
-import LoopNode from './LoopNode'
-import ReviewGateNode from './ReviewGateNode'
-import StartNode from './StartNode'
-import EndNode from './EndNode'
-import ButtonEdge from './ButtonEdge'
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { v4 as uuidv4 } from "uuid";
+import {
+  Play,
+  Sparkles,
+  RefreshCw,
+  GitPullRequest,
+  StopCircle,
+  Undo2,
+  Redo2,
+} from "lucide-react";
+import { useWorkflowStore } from "../../stores/workflowStore";
+import type {
+  WorkflowNode,
+  WorkflowEdge,
+  LoopNodeData,
+  ReviewGateData,
+  StartNodeData,
+  EndNodeData,
+} from "../../types";
+import { newAgentNodeData } from "../../lib/defaults";
+import AgentNode from "./AgentNode";
+import LoopNode from "./LoopNode";
+import ReviewGateNode from "./ReviewGateNode";
+import StartNode from "./StartNode";
+import EndNode from "./EndNode";
+import ButtonEdge from "./ButtonEdge";
 
 const NODE_TYPES = {
   agent: AgentNode,
@@ -49,86 +49,123 @@ const NODE_TYPES = {
   review_gate: ReviewGateNode,
   start: StartNode,
   end: EndNode,
-}
+};
 
 const EDGE_TYPES = {
   default: ButtonEdge,
-}
+};
 
 function toRFNode(n: WorkflowNode): RFNode {
-  return { id: n.id, type: n.type, position: n.position, data: n.data as Record<string, unknown> }
+  return {
+    id: n.id,
+    type: n.type,
+    position: n.position,
+    data: n.data as Record<string, unknown>,
+  };
 }
+
+const EDGE_STYLE = {
+  stroke: "rgba(139,92,246,0.45)",
+  strokeWidth: 2,
+} as const;
+
+const EDGE_MARKER = {
+  type: MarkerType.ArrowClosed,
+  color: "rgba(139,92,246,0.6)",
+  width: 14,
+  height: 14,
+} as const;
 
 function toRFEdge(e: WorkflowEdge): RFEdge {
   return {
     id: e.id,
     source: e.sourceNodeId,
     target: e.targetNodeId,
-    style: { stroke: 'rgba(139,92,246,0.5)', strokeWidth: 2 },
+    style: EDGE_STYLE,
+    markerEnd: EDGE_MARKER,
     animated: false,
-  }
+  };
 }
 
 export default function WorkflowCanvas() {
   const {
-    currentWorkflow, updateNode, addNode, removeNode, addEdge: storeAddEdge, removeEdge, setSelectedNode,
-    undo, redo, canUndo, canRedo, copySelectedNode, pasteNode,
-  } = useWorkflowStore()
-  const { isRunning } = useRunStore()
+    currentWorkflow,
+    updateNode,
+    addNode,
+    removeNode,
+    addEdge: storeAddEdge,
+    removeEdge,
+    setSelectedNode,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    copySelectedNode,
+    pasteNode,
+  } = useWorkflowStore();
 
   const [rfNodes, setRfNodes, onRFNodesChange] = useNodesState<RFNode>(
     currentWorkflow?.nodes.map(toRFNode) ?? [],
-  )
+  );
   const [rfEdges, setRfEdges, onRFEdgesChange] = useEdgesState<RFEdge>(
     currentWorkflow?.edges.map(toRFEdge) ?? [],
-  )
+  );
 
   // Sync store → RF when any node data or edge changes
   useEffect(() => {
-    setRfNodes(currentWorkflow?.nodes.map(toRFNode) ?? [])
-    setRfEdges(currentWorkflow?.edges.map(toRFEdge) ?? [])
-  }, [currentWorkflow?.nodes, currentWorkflow?.edges, setRfNodes, setRfEdges])
+    setRfNodes(currentWorkflow?.nodes.map(toRFNode) ?? []);
+    setRfEdges(currentWorkflow?.edges.map(toRFEdge) ?? []);
+  }, [currentWorkflow?.nodes, currentWorkflow?.edges, setRfNodes, setRfEdges]);
 
   // Keyboard shortcuts: Ctrl+Z undo, Ctrl+Y/Ctrl+Shift+Z redo, Ctrl+C copy, Ctrl+V paste
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
-        else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
-        else if (e.key === 'c') { e.preventDefault(); copySelectedNode() }
-        else if (e.key === 'v') { e.preventDefault(); pasteNode() }
+        if (e.key === "z" && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+        } else if (e.key === "y" || (e.key === "z" && e.shiftKey)) {
+          e.preventDefault();
+          redo();
+        } else if (e.key === "c") {
+          e.preventDefault();
+          copySelectedNode();
+        } else if (e.key === "v") {
+          e.preventDefault();
+          pasteNode();
+        }
       }
     }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [undo, redo, copySelectedNode, pasteNode])
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [undo, redo, copySelectedNode, pasteNode]);
 
   const handleNodesChange = useCallback(
     (changes: NodeChange<RFNode>[]) => {
-      onRFNodesChange(changes)
+      onRFNodesChange(changes);
       changes.forEach((c) => {
-        if (c.type === 'position' && c.position) {
-          updateNode(c.id, { position: c.position })
+        if (c.type === "position" && c.position) {
+          updateNode(c.id, { position: c.position });
         }
-        if (c.type === 'remove') {
-          removeNode(c.id)
+        if (c.type === "remove") {
+          removeNode(c.id);
         }
-      })
+      });
     },
     [onRFNodesChange, updateNode, removeNode],
-  )
+  );
 
   const handleEdgesChange = useCallback(
     (changes: EdgeChange<RFEdge>[]) => {
-      onRFEdgesChange(changes)
+      onRFEdgesChange(changes);
       changes.forEach((c) => {
-        if (c.type === 'remove') removeEdge(c.id)
-      })
+        if (c.type === "remove") removeEdge(c.id);
+      });
     },
     [onRFEdgesChange, removeEdge],
-  )
+  );
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -136,82 +173,154 @@ export default function WorkflowCanvas() {
         id: uuidv4(),
         sourceNodeId: connection.source,
         targetNodeId: connection.target,
-        contextMode: 'full',
-      }
-      storeAddEdge(newEdge)
+        contextMode: "full",
+      };
+      storeAddEdge(newEdge);
       setRfEdges((eds) =>
         addEdge(
-          { ...connection, id: newEdge.id, style: { stroke: 'rgba(139,92,246,0.5)', strokeWidth: 2 } },
+          {
+            ...connection,
+            id: newEdge.id,
+            style: EDGE_STYLE,
+            markerEnd: EDGE_MARKER,
+          },
           eds,
         ),
-      )
+      );
     },
     [storeAddEdge, setRfEdges],
-  )
+  );
 
   function addAgentNode() {
-    const id = uuidv4()
+    const id = uuidv4();
     addNode({
       id,
-      type: 'agent',
-      position: { x: 300 + (rfNodes.length % 3) * 240, y: 160 + Math.floor(rfNodes.length / 3) * 200 },
+      type: "agent",
+      position: {
+        x: 300 + (rfNodes.length % 3) * 240,
+        y: 160 + Math.floor(rfNodes.length / 3) * 200,
+      },
       data: newAgentNodeData(),
-    })
+    });
   }
 
   function addLoopNode() {
     addNode({
       id: uuidv4(),
-      type: 'loop',
-      position: { x: 300 + (rfNodes.length % 3) * 240, y: 160 + Math.floor(rfNodes.length / 3) * 200 },
-      data: { targetNodeId: '', reviewerNodeId: '', maxRetries: 3, exitCondition: 'reviewer_approves' } satisfies LoopNodeData,
-    })
+      type: "loop",
+      position: {
+        x: 300 + (rfNodes.length % 3) * 240,
+        y: 160 + Math.floor(rfNodes.length / 3) * 200,
+      },
+      data: {
+        targetNodeId: "",
+        reviewerNodeId: "",
+        maxRetries: 3,
+        exitCondition: "reviewer_approves",
+      } satisfies LoopNodeData,
+    });
   }
 
   function addReviewGate() {
     addNode({
       id: uuidv4(),
-      type: 'review_gate',
-      position: { x: 300 + (rfNodes.length % 3) * 240, y: 160 + Math.floor(rfNodes.length / 3) * 200 },
-      data: { message: 'Review the output and decide how to proceed.', allowEdit: true } satisfies ReviewGateData,
-    })
+      type: "review_gate",
+      position: {
+        x: 300 + (rfNodes.length % 3) * 240,
+        y: 160 + Math.floor(rfNodes.length / 3) * 200,
+      },
+      data: {
+        message: "Review the output and decide how to proceed.",
+        allowEdit: true,
+      } satisfies ReviewGateData,
+    });
   }
 
   function addStartNode() {
     addNode({
       id: uuidv4(),
-      type: 'start',
+      type: "start",
       position: { x: 60, y: 200 },
       data: {} satisfies StartNodeData,
-    })
+    });
   }
 
   function addEndNode() {
     addNode({
       id: uuidv4(),
-      type: 'end',
-      position: { x: rfNodes.length > 0 ? Math.max(...rfNodes.map(n => n.position.x)) + 240 : 700, y: 200 },
+      type: "end",
+      position: {
+        x:
+          rfNodes.length > 0
+            ? Math.max(...rfNodes.map((n) => n.position.x)) + 240
+            : 700,
+        y: 200,
+      },
       data: {} satisfies EndNodeData,
-    })
+    });
   }
 
   return (
     <div className="w-full h-full relative">
       {/* Toolbar */}
       <div className="absolute top-3 left-3 z-10 flex gap-1.5 flex-wrap">
-        <ToolbarBtn onClick={addStartNode} title="Add Start node" icon={<Play size={11} fill="currentColor" />} label="Start" color="emerald" />
-        <ToolbarBtn onClick={addAgentNode} title="Add Agent" icon={<Sparkles size={11} />} label="Agent" color="purple" />
-        <ToolbarBtn onClick={addLoopNode} title="Add Loop" icon={<RefreshCw size={11} />} label="Loop" color="amber" />
-        <ToolbarBtn onClick={addReviewGate} title="Add Review Gate" icon={<GitPullRequest size={11} />} label="Gate" color="blue" />
-        <ToolbarBtn onClick={addEndNode} title="Add End node" icon={<StopCircle size={11} />} label="End" color="indigo" />
+        <ToolbarBtn
+          onClick={addStartNode}
+          title="Add Start node"
+          icon={<Play size={11} fill="currentColor" />}
+          label="Start"
+          color="emerald"
+        />
+        <ToolbarBtn
+          onClick={addAgentNode}
+          title="Add Agent"
+          icon={<Sparkles size={11} />}
+          label="Agent"
+          color="purple"
+        />
+        <ToolbarBtn
+          onClick={addLoopNode}
+          title="Add Loop"
+          icon={<RefreshCw size={11} />}
+          label="Loop"
+          color="amber"
+        />
+        <ToolbarBtn
+          onClick={addReviewGate}
+          title="Add Review Gate"
+          icon={<GitPullRequest size={11} />}
+          label="Gate"
+          color="blue"
+        />
+        <ToolbarBtn
+          onClick={addEndNode}
+          title="Add End node"
+          icon={<StopCircle size={11} />}
+          label="End"
+          color="indigo"
+        />
         <div className="w-px bg-white/10 mx-0.5 self-stretch" />
-        <ToolbarBtn onClick={undo} title="Undo (Ctrl+Z)" icon={<Undo2 size={11} />} label="Undo" color="gray" disabled={!canUndo} />
-        <ToolbarBtn onClick={redo} title="Redo (Ctrl+Y)" icon={<Redo2 size={11} />} label="Redo" color="gray" disabled={!canRedo} />
+        <ToolbarBtn
+          onClick={undo}
+          title="Undo (Ctrl+Z)"
+          icon={<Undo2 size={11} />}
+          label="Undo"
+          color="gray"
+          disabled={!canUndo}
+        />
+        <ToolbarBtn
+          onClick={redo}
+          title="Redo (Ctrl+Y)"
+          icon={<Redo2 size={11} />}
+          label="Redo"
+          color="gray"
+          disabled={!canRedo}
+        />
       </div>
 
       <div className="absolute top-3 right-3 z-10">
         <p className="text-xs text-white/25">
-          Left = input · Right = output · Drag right handle → left handle to connect
+          IN ● = receives data &nbsp;·&nbsp; ● OUT = sends data &nbsp;·&nbsp; drag OUT → IN to connect
         </p>
       </div>
 
@@ -227,13 +336,17 @@ export default function WorkflowCanvas() {
         edgeTypes={EDGE_TYPES}
         fitView
         fitViewOptions={{ padding: 0.25 }}
-        style={{ background: '#0f0f12' }}
-        deleteKeyCode={['Backspace', 'Delete']}
+        style={{ background: "#0f0f12" }}
+        deleteKeyCode={["Backspace", "Delete"]}
         minZoom={0.3}
         maxZoom={2}
         elevateEdgesOnSelect
       >
-        <Background color="rgba(255,255,255,0.03)" variant={BackgroundVariant.Dots} gap={24} />
+        <Background
+          color="rgba(255,255,255,0.03)"
+          variant={BackgroundVariant.Dots}
+          gap={24}
+        />
         <Controls
           className="!bg-[#1a1a22] !border-white/10 [&>button]:!bg-[#1a1a22] [&>button]:!border-white/10 [&>button]:!text-white/50"
           showInteractive={false}
@@ -241,87 +354,21 @@ export default function WorkflowCanvas() {
         <MiniMap
           className="!bg-[#0a0a0d] !border-white/5"
           nodeColor={(n) =>
-            n.type === 'start' ? 'rgba(52,211,153,0.5)' :
-            n.type === 'end' ? 'rgba(99,102,241,0.5)' :
-            n.type === 'loop' ? 'rgba(245,158,11,0.4)' :
-            n.type === 'review_gate' ? 'rgba(96,165,250,0.4)' :
-            'rgba(168,85,247,0.4)'
+            n.type === "start"
+              ? "rgba(52,211,153,0.5)"
+              : n.type === "end"
+                ? "rgba(99,102,241,0.5)"
+                : n.type === "loop"
+                  ? "rgba(245,158,11,0.4)"
+                  : n.type === "review_gate"
+                    ? "rgba(96,165,250,0.4)"
+                    : "rgba(168,85,247,0.4)"
           }
           maskColor="rgba(0,0,0,0.6)"
         />
       </ReactFlow>
-
-      {/* Team Overview Strip — shown when not running and workflow has agents */}
-      {!isRunning && currentWorkflow && (() => {
-        const agentNodes = currentWorkflow.nodes.filter((n) => n.type === 'agent')
-        if (agentNodes.length === 0) return null
-        return <TeamBar agentNodes={agentNodes} onSelect={setSelectedNode} />
-      })()}
     </div>
-  )
-}
-
-function TeamBar({ agentNodes, onSelect }: { agentNodes: WorkflowNode[]; onSelect: (id: string) => void }) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const isDragging = useRef(false)
-  const startX = useRef(0)
-  const scrollLeft = useRef(0)
-
-  function onMouseDown(e: React.MouseEvent) {
-    if (!scrollRef.current) return
-    isDragging.current = true
-    startX.current = e.pageX - scrollRef.current.offsetLeft
-    scrollLeft.current = scrollRef.current.scrollLeft
-  }
-  function onMouseMove(e: React.MouseEvent) {
-    if (!isDragging.current || !scrollRef.current) return
-    e.preventDefault()
-    const x = e.pageX - scrollRef.current.offsetLeft
-    scrollRef.current.scrollLeft = scrollLeft.current - (x - startX.current)
-  }
-  function onMouseUp() { isDragging.current = false }
-
-  return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-auto">
-      <div className="bg-[#0e0e13]/90 border border-white/10 rounded-2xl px-4 py-2.5 backdrop-blur-sm shadow-2xl">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Users size={12} className="text-white/30" />
-            <span className="text-xs text-white/30 uppercase tracking-widest">Your Team</span>
-          </div>
-          <div className="w-px h-4 bg-white/8" />
-          <div
-            ref={scrollRef}
-            className="flex items-center gap-2 overflow-x-auto max-w-[580px] scrollbar-hide cursor-grab active:cursor-grabbing select-none"
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
-            onMouseLeave={onMouseUp}
-          >
-            {agentNodes.map((n) => {
-              const d = n.data as AgentNodeData
-              const role = getRoleInfo(d.name, d.roleDescription || '')
-              const modelShort = d.model?.modelId?.split('-').slice(0, 2).join('-') ?? 'model'
-              return (
-                <button
-                  key={n.id}
-                  onClick={() => onSelect(n.id)}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${role.borderColor} bg-white/2 hover:bg-white/6 transition-colors shrink-0`}
-                >
-                  <div className={`w-5 h-5 rounded-md flex items-center justify-center ${role.bgColor}`}>
-                    <RoleIcon category={role.category} size={10} className={role.textColor} />
-                  </div>
-                  <span className="text-xs text-white/70 font-medium">{d.name}</span>
-                  <span className="text-[10px] text-white/25 font-mono">{modelShort}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  );
 }
 
 function ToolbarBtn({
@@ -332,21 +379,25 @@ function ToolbarBtn({
   color,
   disabled,
 }: {
-  onClick: () => void
-  title: string
-  icon: ReactNode
-  label: string
-  color: 'purple' | 'amber' | 'blue' | 'emerald' | 'indigo' | 'gray'
-  disabled?: boolean
+  onClick: () => void;
+  title: string;
+  icon: ReactNode;
+  label: string;
+  color: "purple" | "amber" | "blue" | "emerald" | "indigo" | "gray";
+  disabled?: boolean;
 }) {
   const colors = {
-    purple: 'border-purple-500/30 hover:border-purple-500/60 text-purple-300/70 hover:text-purple-300',
-    amber: 'border-amber-500/30 hover:border-amber-500/60 text-amber-300/70 hover:text-amber-300',
-    blue: 'border-blue-500/30 hover:border-blue-500/60 text-blue-300/70 hover:text-blue-300',
-    emerald: 'border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300/70 hover:text-emerald-300',
-    indigo: 'border-indigo-500/30 hover:border-indigo-500/60 text-indigo-300/70 hover:text-indigo-300',
-    gray: 'border-white/10 hover:border-white/25 text-white/30 hover:text-white/60',
-  }
+    purple:
+      "border-purple-500/30 hover:border-purple-500/60 text-purple-300/70 hover:text-purple-300",
+    amber:
+      "border-amber-500/30 hover:border-amber-500/60 text-amber-300/70 hover:text-amber-300",
+    blue: "border-blue-500/30 hover:border-blue-500/60 text-blue-300/70 hover:text-blue-300",
+    emerald:
+      "border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300/70 hover:text-emerald-300",
+    indigo:
+      "border-indigo-500/30 hover:border-indigo-500/60 text-indigo-300/70 hover:text-indigo-300",
+    gray: "border-white/10 hover:border-white/25 text-white/30 hover:text-white/60",
+  };
   return (
     <button
       onClick={onClick}
@@ -357,5 +408,5 @@ function ToolbarBtn({
       <span>{icon}</span>
       <span>{label}</span>
     </button>
-  )
+  );
 }
