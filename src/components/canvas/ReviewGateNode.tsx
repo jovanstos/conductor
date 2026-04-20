@@ -35,6 +35,7 @@ export default memo(function ReviewGateNode({ id, data }: NodeProps) {
       <Handle
         type="target"
         position={Position.Left}
+        id="input"
         className="!bg-blue-500/40 !border-blue-500/20 !w-2.5 !h-2.5"
       />
 
@@ -72,6 +73,7 @@ export default memo(function ReviewGateNode({ id, data }: NodeProps) {
       <Handle
         type="source"
         position={Position.Right}
+        id="output"
         className="!bg-blue-500/40 !border-blue-500/20 !w-2.5 !h-2.5"
       />
     </div>

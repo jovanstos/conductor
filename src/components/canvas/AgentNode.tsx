@@ -2,10 +2,10 @@ import { memo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import {
-  X, Zap, Check, RefreshCw, Code2, Search, PenLine, BookOpen,
+  X, Zap, Check, Code2, Search, PenLine, BookOpen,
   ClipboardList, TestTube2, Megaphone, ChevronDown, ChevronRight,
 } from 'lucide-react'
-import type { AgentNodeData, LoopNodeData } from '../../types'
+import type { AgentNodeData } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
 import { getRoleInfo, getProviderColor, type RoleCategory } from '../../lib/defaults'
@@ -24,9 +24,9 @@ function RoleIcon({ category, size = 13, className = '' }: { category: RoleCateg
   }
 }
 
-export default memo(function AgentNode({ id, data }: NodeProps) {
+export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
   const d = data as unknown as AgentNodeData
-  const { selectedNodeId, setSelectedNode, removeNode, currentWorkflow } = useWorkflowStore()
+  const { selectedNodeId, setSelectedNode, removeNode } = useWorkflowStore()
   const { currentRun } = useRunStore()
   const [inputExpanded, setInputExpanded] = useState(false)
 
@@ -34,14 +34,7 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
   const status = step?.status ?? 'idle'
   const role = getRoleInfo(d.name, d.roleDescription || '')
 
-  const loopMembership = currentWorkflow?.nodes.find(
-    (n) => n.type === 'loop' &&
-      ((n.data as LoopNodeData).targetNodeId === id || (n.data as LoopNodeData).reviewerNodeId === id),
-  )
-  const loopRole = loopMembership
-    ? (loopMembership.data as LoopNodeData).targetNodeId === id ? 'worker' : 'reviewer'
-    : null
-
+  const isChild = !!parentId
   const isSelected = selectedNodeId === id
   const isRunning  = status === 'running'
   const isDone     = status === 'done'
@@ -71,36 +64,26 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
       {/* Role accent strip */}
       <div className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl ${role.dotColor} opacity-50`} />
 
-      {/* Delete button */}
-      <button
-        className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-[#1a1a22] border border-white/15 text-white/30 hover:text-red-400 hover:border-red-500/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
-        onClick={(e) => { e.stopPropagation(); removeNode(id) }}
-        title="Delete node"
-      >
-        <X size={10} />
-      </button>
-
-      {/* Loop role badge */}
-      {loopRole && (
-        <div className={`absolute -top-3 left-3 border text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap z-10 ${
-          loopRole === 'worker'
-            ? 'bg-purple-500/15 border-purple-500/30 text-purple-300/80'
-            : 'bg-sky-500/15 border-sky-500/30 text-sky-300/80'
-        }`}>
-          <RefreshCw size={9} />
-          {loopRole === 'worker' ? 'Worker' : 'Reviewer'}
-        </div>
+      {/* Delete button — hidden for child nodes inside a loop group */}
+      {!isChild && (
+        <button
+          className="absolute -top-2.5 -right-2.5 w-5 h-5 rounded-full bg-[#1a1a22] border border-white/15 text-white/30 hover:text-red-400 hover:border-red-500/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+          onClick={(e) => { e.stopPropagation(); removeNode(id) }}
+          title="Delete node"
+        >
+          <X size={10} />
+        </button>
       )}
 
-      {/* IN label (inside, near left handle) */}
+      {/* context label near left handle */}
       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-purple-400/25 pointer-events-none select-none">
-        IN
+        ctx
       </span>
 
-      {/* Target / input handle */}
       <Handle
         type="target"
         position={Position.Left}
+        id="context"
         className="!bg-purple-500/60 !border-purple-400/30 !w-3 !h-3"
       />
 
@@ -140,7 +123,7 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
           )}
         </div>
 
-        {/* INPUT section — collapsible, shows what context this agent received */}
+        {/* INPUT section */}
         {step?.input && (
           <div className="mt-2">
             <button
@@ -158,7 +141,7 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
           </div>
         )}
 
-        {/* OUTPUT section — always visible when data exists */}
+        {/* OUTPUT section */}
         {step?.output ? (
           <div className={`mt-1.5 ${step.input ? 'border-t border-white/5 pt-1.5' : ''}`}>
             <span className="font-mono text-[9px] tracking-wide text-emerald-400/40 block mb-1">OUTPUT</span>
@@ -178,15 +161,15 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
         ) : null}
       </div>
 
-      {/* OUT label (inside, near right handle) */}
+      {/* response label near right handle */}
       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-emerald-400/25 pointer-events-none select-none">
-        OUT
+        out
       </span>
 
-      {/* Source / output handle */}
       <Handle
         type="source"
         position={Position.Right}
+        id="response"
         className="!bg-emerald-500/60 !border-emerald-400/30 !w-3 !h-3"
       />
     </div>

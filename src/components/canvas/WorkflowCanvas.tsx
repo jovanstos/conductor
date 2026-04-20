@@ -7,7 +7,6 @@ import {
   useNodesState,
   useEdgesState,
   addEdge,
-  MarkerType,
   type Connection,
   type NodeChange,
   type EdgeChange,
@@ -27,65 +26,70 @@ import {
   Redo2,
 } from "lucide-react";
 import { useWorkflowStore } from "../../stores/workflowStore";
-import { useDragStore } from "../../stores/dragStore";
 import type {
   WorkflowNode,
   WorkflowEdge,
-  LoopNodeData,
   ReviewGateData,
   StartNodeData,
   EndNodeData,
+  EdgeContextMode,
 } from "../../types";
 import { newAgentNodeData } from "../../lib/defaults";
 import AgentNode from "./AgentNode";
-import LoopNode from "./LoopNode";
+import LoopGroupNode, { LOOP_GROUP_W, LOOP_GROUP_H } from "./LoopGroupNode";
 import ReviewGateNode from "./ReviewGateNode";
 import StartNode from "./StartNode";
 import EndNode from "./EndNode";
-import ButtonEdge from "./ButtonEdge";
+import DataEdge from "./DataEdge";
 
 const NODE_TYPES = {
   agent: AgentNode,
-  loop: LoopNode,
+  loop_group: LoopGroupNode,
   review_gate: ReviewGateNode,
   start: StartNode,
   end: EndNode,
 };
 
 const EDGE_TYPES = {
-  default: ButtonEdge,
+  data: DataEdge,
 };
 
-function toRFNode(n: WorkflowNode): RFNode {
-  return {
-    id: n.id,
-    type: n.type,
-    position: n.position,
-    data: n.data as Record<string, unknown>,
-  };
+function getModeStyle(mode: EdgeContextMode) {
+  if (mode === 'previous') return { stroke: 'rgba(245,158,11,0.55)', strokeDasharray: '6 3', strokeWidth: 1.8 }
+  if (mode === 'none')     return { stroke: 'rgba(148,163,184,0.28)', strokeDasharray: '2 5', strokeWidth: 1.5 }
+  return { stroke: 'rgba(139,92,246,0.55)', strokeWidth: 1.8 }
 }
 
-const EDGE_STYLE = {
-  stroke: "rgba(139,92,246,0.45)",
-  strokeWidth: 2,
-} as const;
-
-const EDGE_MARKER = {
-  type: MarkerType.ArrowClosed,
-  color: "rgba(139,92,246,0.6)",
-  width: 14,
-  height: 14,
-} as const;
+function toRFNode(n: WorkflowNode): RFNode {
+  const base: RFNode = {
+    id: n.id,
+    type: n.type === 'loop' ? 'loop_group' : n.type,
+    position: n.position,
+    data: n.data as Record<string, unknown>,
+  }
+  if (n.parentId) {
+    base.parentId = n.parentId
+    base.extent = 'parent'
+  }
+  if (n.type === 'loop') {
+    base.style = { width: LOOP_GROUP_W, height: LOOP_GROUP_H }
+  }
+  return base
+}
 
 function toRFEdge(e: WorkflowEdge): RFEdge {
+  const mode: EdgeContextMode = (e.contextMode as EdgeContextMode) ?? 'full'
   return {
     id: e.id,
     source: e.sourceNodeId,
     target: e.targetNodeId,
-    style: EDGE_STYLE,
-    markerEnd: EDGE_MARKER,
+    sourceHandle: e.sourceHandle,
+    targetHandle: e.targetHandle,
+    type: 'data',
+    data: { contextMode: mode },
+    style: getModeStyle(mode),
     animated: false,
-  };
+  }
 }
 
 export default function WorkflowCanvas() {
@@ -93,6 +97,7 @@ export default function WorkflowCanvas() {
     currentWorkflow,
     updateNode,
     addNode,
+    addLoopGroup,
     removeNode,
     addEdge: storeAddEdge,
     removeEdge,
@@ -105,8 +110,6 @@ export default function WorkflowCanvas() {
     pasteNode,
   } = useWorkflowStore();
 
-  const { setDropTarget } = useDragStore();
-
   const [rfNodes, setRfNodes, onRFNodesChange] = useNodesState<RFNode>(
     currentWorkflow?.nodes.map(toRFNode) ?? [],
   );
@@ -114,13 +117,13 @@ export default function WorkflowCanvas() {
     currentWorkflow?.edges.map(toRFEdge) ?? [],
   );
 
-  // Sync store → RF when any node data or edge changes
+  // Sync store → RF on workflow change
   useEffect(() => {
     setRfNodes(currentWorkflow?.nodes.map(toRFNode) ?? []);
     setRfEdges(currentWorkflow?.edges.map(toRFEdge) ?? []);
   }, [currentWorkflow?.nodes, currentWorkflow?.edges, setRfNodes, setRfEdges]);
 
-  // Keyboard shortcuts: Ctrl+Z undo, Ctrl+Y/Ctrl+Shift+Z redo, Ctrl+C copy, Ctrl+V paste
+  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
@@ -176,6 +179,8 @@ export default function WorkflowCanvas() {
         id: uuidv4(),
         sourceNodeId: connection.source,
         targetNodeId: connection.target,
+        sourceHandle: connection.sourceHandle ?? undefined,
+        targetHandle: connection.targetHandle ?? undefined,
         contextMode: "full",
       };
       storeAddEdge(newEdge);
@@ -184,8 +189,9 @@ export default function WorkflowCanvas() {
           {
             ...connection,
             id: newEdge.id,
-            style: EDGE_STYLE,
-            markerEnd: EDGE_MARKER,
+            type: 'data',
+            data: { contextMode: 'full' },
+            style: getModeStyle('full'),
           },
           eds,
         ),
@@ -194,48 +200,21 @@ export default function WorkflowCanvas() {
     [storeAddEdge, setRfEdges],
   );
 
-  // Approximate rendered dimensions used for hit-testing
-  const AGENT_W = 256; // w-64
-  const AGENT_H = 160;
-  const LOOP_W  = 320; // w-80
-  const LOOP_H  = 220;
-
-  const handleNodeDrag = useCallback(
-    (_: React.MouseEvent, node: RFNode) => {
-      if (node.type !== "agent") { setDropTarget(null); return; }
-      const cx = node.position.x + AGENT_W / 2;
-      const cy = node.position.y + AGENT_H / 2;
-      let found: { loopId: string; slot: "worker" | "reviewer" } | null = null;
-      for (const n of rfNodes) {
-        if (n.type !== "loop") continue;
-        const lx = n.position.x, ly = n.position.y;
-        if (cx >= lx && cx <= lx + LOOP_W && cy >= ly && cy <= ly + LOOP_H) {
-          found = { loopId: n.id, slot: cx < lx + LOOP_W / 2 ? "worker" : "reviewer" };
-          break;
-        }
-      }
-      setDropTarget(found);
+  // Prevent connecting to/from child nodes of loop groups, self-loops, and End→Start
+  const isValidConnection = useCallback(
+    (connection: Connection | RFEdge): boolean => {
+      if (connection.source === connection.target) return false
+      const nodes = currentWorkflow?.nodes ?? []
+      const sourceNode = nodes.find((n) => n.id === connection.source)
+      const targetNode = nodes.find((n) => n.id === connection.target)
+      // Child nodes (inside a loop group) cannot have external connections
+      if (sourceNode?.parentId || targetNode?.parentId) return false
+      // Prevent obvious End→Start cycle
+      if (sourceNode?.type === 'end' && targetNode?.type === 'start') return false
+      return true
     },
-    [rfNodes, setDropTarget],
-  );
-
-  const handleNodeDragStop = useCallback(
-    (_: React.MouseEvent, node: RFNode) => {
-      const { dropTarget } = useDragStore.getState();
-      if (node.type === "agent" && dropTarget) {
-        const loopRFNode = rfNodes.find((n) => n.id === dropTarget.loopId);
-        if (loopRFNode) {
-          const cur = loopRFNode.data as LoopNodeData;
-          const patch = dropTarget.slot === "worker"
-            ? { ...cur, targetNodeId: node.id }
-            : { ...cur, reviewerNodeId: node.id };
-          updateNode(dropTarget.loopId, { data: patch });
-        }
-      }
-      setDropTarget(null);
-    },
-    [rfNodes, updateNode, setDropTarget],
-  );
+    [currentWorkflow?.nodes],
+  )
 
   function addAgentNode() {
     const id = uuidv4();
@@ -243,27 +222,25 @@ export default function WorkflowCanvas() {
       id,
       type: "agent",
       position: {
-        x: 300 + (rfNodes.length % 3) * 240,
-        y: 160 + Math.floor(rfNodes.length / 3) * 200,
+        x: 300 + (rfNodes.length % 3) * 300,
+        y: 160 + Math.floor(rfNodes.length / 3) * 220,
       },
       data: newAgentNodeData(),
     });
   }
 
   function addLoopNode() {
-    addNode({
-      id: uuidv4(),
-      type: "loop",
+    const groupId = uuidv4();
+    const workerId = uuidv4();
+    const reviewerId = uuidv4();
+    addLoopGroup({
+      groupId,
+      workerId,
+      reviewerId,
       position: {
-        x: 300 + (rfNodes.length % 3) * 240,
-        y: 160 + Math.floor(rfNodes.length / 3) * 200,
+        x: 300 + (rfNodes.length % 3) * 300,
+        y: 160 + Math.floor(rfNodes.length / 3) * 300,
       },
-      data: {
-        targetNodeId: "",
-        reviewerNodeId: "",
-        maxRetries: 3,
-        exitCondition: "reviewer_approves",
-      } satisfies LoopNodeData,
     });
   }
 
@@ -272,8 +249,8 @@ export default function WorkflowCanvas() {
       id: uuidv4(),
       type: "review_gate",
       position: {
-        x: 300 + (rfNodes.length % 3) * 240,
-        y: 160 + Math.floor(rfNodes.length / 3) * 200,
+        x: 300 + (rfNodes.length % 3) * 300,
+        y: 160 + Math.floor(rfNodes.length / 3) * 220,
       },
       data: {
         message: "Review the output and decide how to proceed.",
@@ -298,7 +275,7 @@ export default function WorkflowCanvas() {
       position: {
         x:
           rfNodes.length > 0
-            ? Math.max(...rfNodes.map((n) => n.position.x)) + 240
+            ? Math.max(...rfNodes.map((n) => n.position.x)) + 280
             : 700,
         y: 200,
       },
@@ -326,7 +303,7 @@ export default function WorkflowCanvas() {
         />
         <ToolbarBtn
           onClick={addLoopNode}
-          title="Add Loop"
+          title="Add Loop (creates worker + reviewer inside)"
           icon={<RefreshCw size={11} />}
           label="Loop"
           color="amber"
@@ -365,8 +342,8 @@ export default function WorkflowCanvas() {
       </div>
 
       <div className="absolute top-3 right-3 z-10">
-        <p className="text-xs text-white/25">
-          IN ● = receives data &nbsp;·&nbsp; ● OUT = sends data &nbsp;·&nbsp; drag OUT → IN to connect
+        <p className="text-xs text-white/20">
+          right-click edge to change context mode · drag <span className="font-mono">ctx →</span> to connect
         </p>
       </div>
 
@@ -376,8 +353,7 @@ export default function WorkflowCanvas() {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
-        onNodeDrag={handleNodeDrag}
-        onNodeDragStop={handleNodeDragStop}
+        isValidConnection={isValidConnection}
         onNodeClick={(_, node) => setSelectedNode(node.id)}
         onPaneClick={() => setSelectedNode(null)}
         nodeTypes={NODE_TYPES}
@@ -386,9 +362,10 @@ export default function WorkflowCanvas() {
         fitViewOptions={{ padding: 0.25 }}
         style={{ background: "#0f0f12" }}
         deleteKeyCode={["Backspace", "Delete"]}
-        minZoom={0.3}
+        minZoom={0.2}
         maxZoom={2}
         elevateEdgesOnSelect
+        elevateNodesOnSelect={false}
       >
         <Background
           color="rgba(255,255,255,0.03)"
@@ -406,8 +383,8 @@ export default function WorkflowCanvas() {
               ? "rgba(52,211,153,0.5)"
               : n.type === "end"
                 ? "rgba(99,102,241,0.5)"
-                : n.type === "loop"
-                  ? "rgba(245,158,11,0.4)"
+                : n.type === "loop_group"
+                  ? "rgba(245,158,11,0.35)"
                   : n.type === "review_gate"
                     ? "rgba(96,165,250,0.4)"
                     : "rgba(168,85,247,0.4)"

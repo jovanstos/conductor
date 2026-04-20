@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { StopCircle, Check } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 
-export default memo(function EndNode({ id }: NodeProps) {
+export default memo(function EndNode(_: NodeProps) {
   const { currentRun } = useRunStore()
   const finalOutput = currentRun?.finalOutput
   const isDone = currentRun?.status === 'completed'
@@ -12,15 +12,14 @@ export default memo(function EndNode({ id }: NodeProps) {
     <div className={`w-48 rounded-xl border shadow-lg transition-colors ${
       isDone ? 'border-indigo-400/60 bg-[#10101f]' : 'border-indigo-500/30 bg-[#10101a]'
     }`}>
-      {/* IN label */}
       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-indigo-400/30 pointer-events-none select-none">
-        IN
+        result
       </span>
 
       <Handle
         type="target"
         position={Position.Left}
-        id={`${id}-target`}
+        id="result"
         className="!bg-indigo-500/70 !border-indigo-500/40 !w-3 !h-3"
       />
 

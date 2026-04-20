@@ -234,7 +234,7 @@ export function newAgentNodeData(
   };
 }
 
-// Content Factory: Start → Writer + Editor loop → Final Polish → End
+// Content Factory: Start → [Loop: Writer + Editor] → Final Polish → End
 export function contentFactoryWorkflow(): Workflow {
   const startId = uuidv4();
   const writerId = uuidv4();
@@ -250,11 +250,24 @@ export function contentFactoryWorkflow(): Workflow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
+      { id: startId, type: 'start', position: { x: 60, y: 230 }, data: {} },
+      {
+        id: writerLoopId,
+        type: "loop",
+        position: { x: 260, y: 100 },
+        data: {
+          targetNodeId: writerId,
+          reviewerNodeId: editorId,
+          maxRetries: 3,
+          exitCondition: "reviewer_approves",
+        },
+      },
       {
         id: writerId,
         type: "agent",
-        position: { x: 300, y: 80 },
+        position: { x: 30, y: 70 },
+        parentId: writerLoopId,
+        extent: "parent" as const,
         data: {
           name: "Writer",
           roleDescription: "Drafts engaging content",
@@ -268,7 +281,9 @@ export function contentFactoryWorkflow(): Workflow {
       {
         id: editorId,
         type: "agent",
-        position: { x: 300, y: 280 },
+        position: { x: 274, y: 70 },
+        parentId: writerLoopId,
+        extent: "parent" as const,
         data: {
           name: "Editor",
           roleDescription: "Reviews and improves the draft",
@@ -280,20 +295,9 @@ export function contentFactoryWorkflow(): Workflow {
         } satisfies AgentNodeData,
       },
       {
-        id: writerLoopId,
-        type: "loop",
-        position: { x: 560, y: 180 },
-        data: {
-          targetNodeId: writerId,
-          reviewerNodeId: editorId,
-          maxRetries: 3,
-          exitCondition: "reviewer_approves",
-        },
-      },
-      {
         id: polisherId,
         type: "agent",
-        position: { x: 820, y: 180 },
+        position: { x: 880, y: 210 },
         data: {
           name: "Final Polish",
           roleDescription: "Applies final polish and formatting",
@@ -303,7 +307,7 @@ export function contentFactoryWorkflow(): Workflow {
           maxTokens: 999999,
         } satisfies AgentNodeData,
       },
-      { id: endId, type: 'end', position: { x: 1060, y: 180 }, data: {} },
+      { id: endId, type: 'end', position: { x: 1140, y: 210 }, data: {} },
     ],
     edges: [
       { id: uuidv4(), sourceNodeId: startId, targetNodeId: writerLoopId, contextMode: "full" },
@@ -314,7 +318,7 @@ export function contentFactoryWorkflow(): Workflow {
   };
 }
 
-// Research Lab: Start → Researcher + Fact Checker loop → Report Writer → End
+// Research Lab: Start → [Loop: Researcher + Fact Checker] → Report Writer → End
 export function researchLabWorkflow(): Workflow {
   const startId = uuidv4();
   const researcherId = uuidv4();
@@ -330,11 +334,24 @@ export function researchLabWorkflow(): Workflow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
+      { id: startId, type: 'start', position: { x: 60, y: 230 }, data: {} },
+      {
+        id: researchLoopId,
+        type: "loop",
+        position: { x: 260, y: 100 },
+        data: {
+          targetNodeId: researcherId,
+          reviewerNodeId: factCheckerId,
+          maxRetries: 2,
+          exitCondition: "reviewer_approves",
+        },
+      },
       {
         id: researcherId,
         type: "agent",
-        position: { x: 300, y: 80 },
+        position: { x: 30, y: 70 },
+        parentId: researchLoopId,
+        extent: "parent" as const,
         data: {
           name: "Researcher",
           roleDescription: "Gathers and synthesizes information",
@@ -348,7 +365,9 @@ export function researchLabWorkflow(): Workflow {
       {
         id: factCheckerId,
         type: "agent",
-        position: { x: 300, y: 280 },
+        position: { x: 274, y: 70 },
+        parentId: researchLoopId,
+        extent: "parent" as const,
         data: {
           name: "Fact Checker",
           roleDescription: "Critically evaluates the research",
@@ -360,20 +379,9 @@ export function researchLabWorkflow(): Workflow {
         } satisfies AgentNodeData,
       },
       {
-        id: researchLoopId,
-        type: "loop",
-        position: { x: 560, y: 180 },
-        data: {
-          targetNodeId: researcherId,
-          reviewerNodeId: factCheckerId,
-          maxRetries: 2,
-          exitCondition: "reviewer_approves",
-        },
-      },
-      {
         id: reportWriterId,
         type: "agent",
-        position: { x: 820, y: 180 },
+        position: { x: 880, y: 210 },
         data: {
           name: "Report Writer",
           roleDescription: "Turns research into a polished report",
@@ -384,7 +392,7 @@ export function researchLabWorkflow(): Workflow {
           templateId: "documentation-writer",
         } satisfies AgentNodeData,
       },
-      { id: endId, type: 'end', position: { x: 1060, y: 180 }, data: {} },
+      { id: endId, type: 'end', position: { x: 1140, y: 210 }, data: {} },
     ],
     edges: [
       { id: uuidv4(), sourceNodeId: startId, targetNodeId: researchLoopId, contextMode: "full" },
@@ -395,7 +403,7 @@ export function researchLabWorkflow(): Workflow {
   };
 }
 
-// Software Factory: Start → Plan Loop → Review Gate → Dev Loop → End
+// Software Factory: Start → [Loop: Planner + Reviewer] → Gate → [Loop: Developer + Tester] → End
 export function softwareFactoryWorkflow(): Workflow {
   const startId = uuidv4();
   const plannerId = uuidv4();
@@ -415,11 +423,25 @@ export function softwareFactoryWorkflow(): Workflow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
+      { id: startId, type: 'start', position: { x: 60, y: 270 }, data: {} },
+      // Plan loop group
+      {
+        id: plannerLoopId,
+        type: "loop",
+        position: { x: 260, y: 140 },
+        data: {
+          targetNodeId: plannerId,
+          reviewerNodeId: planReviewerId,
+          maxRetries: 2,
+          exitCondition: "reviewer_approves",
+        },
+      },
       {
         id: plannerId,
         type: "agent",
-        position: { x: 300, y: 80 },
+        position: { x: 30, y: 70 },
+        parentId: plannerLoopId,
+        extent: "parent" as const,
         data: {
           name: "Planner",
           roleDescription: "Plans the architecture and requirements",
@@ -450,7 +472,9 @@ A structured markdown document with: Executive Summary, Requirements, Architectu
       {
         id: planReviewerId,
         type: "agent",
-        position: { x: 300, y: 280 },
+        position: { x: 274, y: 70 },
+        parentId: plannerLoopId,
+        extent: "parent" as const,
         data: {
           name: "Plan Reviewer",
           roleDescription: "Reviews the architecture plan",
@@ -480,30 +504,33 @@ Your response MUST end with either:
         } satisfies AgentNodeData,
       },
       {
-        id: plannerLoopId,
-        type: "loop",
-        position: { x: 560, y: 180 },
-        data: {
-          targetNodeId: plannerId,
-          reviewerNodeId: planReviewerId,
-          maxRetries: 2,
-          exitCondition: "reviewer_approves",
-        },
-      },
-      {
         id: reviewGateId,
         type: "review_gate",
-        position: { x: 800, y: 180 },
+        position: { x: 880, y: 240 },
         data: {
           message:
             "Review the Software Design Document. Approve to proceed to implementation, or provide feedback to revise.",
           allowEdit: true,
         },
       },
+      // Dev loop group
+      {
+        id: devLoopId,
+        type: "loop",
+        position: { x: 1100, y: 140 },
+        data: {
+          targetNodeId: developerId,
+          reviewerNodeId: testerId,
+          maxRetries: 3,
+          exitCondition: "reviewer_approves",
+        },
+      },
       {
         id: developerId,
         type: "agent",
-        position: { x: 1040, y: 80 },
+        position: { x: 30, y: 70 },
+        parentId: devLoopId,
+        extent: "parent" as const,
         data: {
           name: "Developer",
           roleDescription: "Implements the approved design",
@@ -535,7 +562,9 @@ Complete, working code files with clear file structure and all imports listed.
       {
         id: testerId,
         type: "agent",
-        position: { x: 1040, y: 280 },
+        position: { x: 274, y: 70 },
+        parentId: devLoopId,
+        extent: "parent" as const,
         data: {
           name: "Tester",
           roleDescription: "Tests the implementation against requirements",
@@ -565,18 +594,7 @@ Your response MUST end with either:
           templateId: "unit-test-writer",
         } satisfies AgentNodeData,
       },
-      {
-        id: devLoopId,
-        type: "loop",
-        position: { x: 1300, y: 180 },
-        data: {
-          targetNodeId: developerId,
-          reviewerNodeId: testerId,
-          maxRetries: 3,
-          exitCondition: "reviewer_approves",
-        },
-      },
-      { id: endId, type: 'end', position: { x: 1560, y: 180 }, data: {} },
+      { id: endId, type: 'end', position: { x: 1720, y: 270 }, data: {} },
     ],
     edges: [
       { id: uuidv4(), sourceNodeId: startId, targetNodeId: plannerLoopId, contextMode: "full" },

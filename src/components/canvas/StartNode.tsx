@@ -3,7 +3,7 @@ import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { Play } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 
-export default memo(function StartNode({ id }: NodeProps) {
+export default memo(function StartNode(_: NodeProps) {
   const { currentRun } = useRunStore()
   const input = currentRun?.input
 
@@ -27,15 +27,14 @@ export default memo(function StartNode({ id }: NodeProps) {
         )}
       </div>
 
-      {/* OUT label */}
       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-emerald-400/30 pointer-events-none select-none">
-        OUT
+        task
       </span>
 
       <Handle
         type="source"
         position={Position.Right}
-        id={`${id}-source`}
+        id="task"
         className="!bg-emerald-500/70 !border-emerald-500/40 !w-3 !h-3"
       />
     </div>

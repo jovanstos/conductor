@@ -1,12 +1,16 @@
-import { X } from 'lucide-react'
+import { useState } from 'react'
+import { X, ArrowLeft } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
-import type { WorkflowNode, AgentNodeData, LoopNodeData, ReviewGateData } from '../../types'
+import type { WorkflowNode, LoopNodeData, ReviewGateData } from '../../types'
 import AgentInspector from './AgentInspector'
 
 export default function Inspector() {
   const { currentWorkflow, selectedNodeId, setSelectedNode } = useWorkflowStore()
 
   const selectedNode = currentWorkflow?.nodes.find((n) => n.id === selectedNodeId)
+  const parentNode = selectedNode?.parentId
+    ? currentWorkflow?.nodes.find((n) => n.id === selectedNode.parentId)
+    : null
 
   return (
     <div className="w-full h-full bg-[#0a0a0d] border-l border-white/5 flex flex-col overflow-hidden">
@@ -25,6 +29,17 @@ export default function Inspector() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
+        {/* Breadcrumb for child nodes inside a loop group */}
+        {parentNode && (
+          <button
+            className="flex items-center gap-1.5 text-[10px] text-amber-400/50 hover:text-amber-400/80 transition-colors mb-4 -mt-1"
+            onClick={() => setSelectedNode(parentNode.id)}
+          >
+            <ArrowLeft size={10} />
+            Back to Loop Group
+          </button>
+        )}
+
         {!selectedNode ? (
           <WorkflowSettings />
         ) : selectedNode.type === 'agent' ? (
@@ -44,7 +59,7 @@ export default function Inspector() {
 function nodeTypeLabel(type: string): string {
   const map: Record<string, string> = {
     agent: 'Agent Node',
-    loop: 'Loop Node',
+    loop: 'Loop Group',
     review_gate: 'Review Gate',
   }
   return map[type] ?? 'Node'
@@ -77,97 +92,100 @@ function WorkflowSettings() {
   )
 }
 
-function LoopInspector({ node }: { node: WorkflowNode }) {
-  const { currentWorkflow, updateNode } = useWorkflowStore()
-  const d = node.data as LoopNodeData
-  const agentNodes = currentWorkflow?.nodes.filter((n) => n.type === 'agent') ?? []
+type LoopTab = 'loop' | 'worker' | 'reviewer'
 
-  const sameAgent = d.targetNodeId && d.reviewerNodeId && d.targetNodeId === d.reviewerNodeId
-  const missingTarget = !d.targetNodeId
-  const missingReviewer = !d.reviewerNodeId
-  const noAgents = agentNodes.length === 0
+function LoopInspector({ node }: { node: WorkflowNode }) {
+  const { currentWorkflow, updateNode, setSelectedNode } = useWorkflowStore()
+  const d = node.data as LoopNodeData
+  const [activeTab, setActiveTab] = useState<LoopTab>('loop')
+
+  const workerNode   = currentWorkflow?.nodes.find((n) => n.id === d.targetNodeId)
+  const reviewerNode = currentWorkflow?.nodes.find((n) => n.id === d.reviewerNodeId)
 
   return (
-    <div className="space-y-4">
-      {/* What is a loop — plain language */}
-      <div className="bg-white/3 rounded-lg px-3 py-2.5 text-[11px] text-white/40 leading-relaxed">
-        A loop has one agent do work, then another agent review it. If the reviewer isn't satisfied, the worker tries again — up to the max retries you set.
+    <div className="space-y-3">
+      {/* Tabs */}
+      <div className="flex gap-1 bg-white/4 rounded-lg p-1">
+        {(['loop', 'worker', 'reviewer'] as LoopTab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 text-[10px] py-1.5 rounded-md transition-colors capitalize ${
+              activeTab === tab
+                ? 'bg-amber-500/20 text-amber-300/90 font-medium'
+                : 'text-white/35 hover:text-white/60'
+            }`}
+          >
+            {tab === 'loop' ? 'Loop' : tab === 'worker' ? 'Worker' : 'Reviewer'}
+          </button>
+        ))}
       </div>
 
-      {/* Validation banner */}
-      {noAgents ? (
-        <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2.5 text-[11px] text-amber-300/80 leading-relaxed">
-          No agents in this workflow yet. Add Agent nodes to the canvas first, then assign them here.
+      {activeTab === 'loop' && (
+        <div className="space-y-4">
+          <div className="bg-white/3 rounded-lg px-3 py-2.5 text-[11px] text-white/40 leading-relaxed">
+            The worker runs the task. The reviewer checks it. If the reviewer isn't satisfied, the worker tries again — up to the max you set.
+          </div>
+
+          <Field label="Max attempts">
+            <input
+              type="number"
+              className={inputCls}
+              value={d.maxRetries}
+              min={1}
+              max={10}
+              onChange={(e) => updateNode(node.id, { data: { ...d, maxRetries: Number(e.target.value) } })}
+            />
+            <p className="text-[10px] text-white/25 mt-1">How many times the worker can try before giving up.</p>
+          </Field>
+
+          <Field label="Exit condition">
+            <select
+              className={selectCls}
+              value={d.exitCondition}
+              onChange={(e) =>
+                updateNode(node.id, { data: { ...d, exitCondition: e.target.value as LoopNodeData['exitCondition'] } })
+              }
+            >
+              <option style={optStyle} value="reviewer_approves">Stop as soon as reviewer approves</option>
+              <option style={optStyle} value="max_retries">Always run all attempts</option>
+            </select>
+            <p className="text-[10px] text-white/25 mt-1">
+              Reviewer must include "APPROVED" in its response to exit early.
+            </p>
+          </Field>
+
+          <div className="border-t border-white/5 pt-3">
+            <p className="text-[10px] text-white/25 mb-2">Quick access</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setActiveTab('worker'); workerNode && setSelectedNode(workerNode.id) }}
+                className="flex-1 text-[10px] py-2 rounded-lg border border-purple-500/20 text-purple-300/50 hover:border-purple-500/40 hover:text-purple-300/80 transition-colors"
+              >
+                Edit Worker →
+              </button>
+              <button
+                onClick={() => { setActiveTab('reviewer'); reviewerNode && setSelectedNode(reviewerNode.id) }}
+                className="flex-1 text-[10px] py-2 rounded-lg border border-sky-500/20 text-sky-300/50 hover:border-sky-500/40 hover:text-sky-300/80 transition-colors"
+              >
+                Edit Reviewer →
+              </button>
+            </div>
+          </div>
         </div>
-      ) : sameAgent ? (
-        <div className="bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-2.5 text-[11px] text-red-300/80">
-          Worker and reviewer can't be the same agent. Assign two different agents.
-        </div>
-      ) : (missingTarget || missingReviewer) ? (
-        <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2.5 text-[11px] text-amber-300/80">
-          {missingTarget && missingReviewer ? 'Assign both a worker and a reviewer to run this loop.' : missingTarget ? 'Assign a worker agent.' : 'Assign a reviewer agent.'}
-        </div>
-      ) : null}
+      )}
 
-      <Field label="Worker — does the task">
-        <select
-          className={`${selectCls} ${missingTarget ? 'border-amber-500/40' : ''}`}
-          value={d.targetNodeId}
-          onChange={(e) => updateNode(node.id, { data: { ...d, targetNodeId: e.target.value } })}
-        >
-          <option style={optStyle} value="">— select agent —</option>
-          {agentNodes.map((n) => (
-            <option style={optStyle} key={n.id} value={n.id}>
-              {(n.data as AgentNodeData).name}
-            </option>
-          ))}
-        </select>
-      </Field>
+      {activeTab === 'worker' && (
+        workerNode
+          ? <AgentInspector node={workerNode} />
+          : <p className="text-[11px] text-white/30">Worker agent not found.</p>
+      )}
 
-      <Field label="Reviewer — approves or requests changes">
-        <select
-          className={`${selectCls} ${missingReviewer ? 'border-amber-500/40' : ''}`}
-          value={d.reviewerNodeId}
-          onChange={(e) => updateNode(node.id, { data: { ...d, reviewerNodeId: e.target.value } })}
-        >
-          <option style={optStyle} value="">— select agent —</option>
-          {agentNodes.map((n) => (
-            <option style={optStyle} key={n.id} value={n.id}>
-              {(n.data as AgentNodeData).name}
-            </option>
-          ))}
-        </select>
-        <p className="text-[10px] text-white/25 mt-1">
-          Reviewer's output must include the word "APPROVED" to exit early.
-        </p>
-      </Field>
-
-      <Field label="Max attempts">
-        <input
-          type="number"
-          className={inputCls}
-          value={d.maxRetries}
-          min={1}
-          max={10}
-          onChange={(e) => updateNode(node.id, { data: { ...d, maxRetries: Number(e.target.value) } })}
-        />
-        <p className="text-[10px] text-white/25 mt-1">
-          How many times the worker can try before giving up.
-        </p>
-      </Field>
-
-      <Field label="Exit condition">
-        <select
-          className={selectCls}
-          value={d.exitCondition}
-          onChange={(e) =>
-            updateNode(node.id, { data: { ...d, exitCondition: e.target.value as LoopNodeData['exitCondition'] } })
-          }
-        >
-          <option style={optStyle} value="reviewer_approves">Stop as soon as reviewer approves</option>
-          <option style={optStyle} value="max_retries">Always run all attempts</option>
-        </select>
-      </Field>
+      {activeTab === 'reviewer' && (
+        reviewerNode
+          ? <AgentInspector node={reviewerNode} />
+          : <p className="text-[11px] text-white/30">Reviewer agent not found.</p>
+      )}
     </div>
   )
 }

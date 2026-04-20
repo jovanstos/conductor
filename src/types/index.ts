@@ -41,13 +41,19 @@ export type WorkflowNode = {
   type: NodeType
   position: { x: number; y: number }
   data: AgentNodeData | LoopNodeData | ReviewGateData | StartNodeData | EndNodeData
+  parentId?: string
+  extent?: 'parent'
 }
+
+export type EdgeContextMode = 'full' | 'previous' | 'none'
 
 export type WorkflowEdge = {
   id: string
   sourceNodeId: string
   targetNodeId: string
-  contextMode: 'full' | 'summary' | 'structured'
+  sourceHandle?: string
+  targetHandle?: string
+  contextMode: EdgeContextMode
 }
 
 export type WorkflowSettings = {

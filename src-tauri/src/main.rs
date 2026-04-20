@@ -40,6 +40,10 @@ struct WorkflowNode {
     node_type: String,
     position: Position,
     data: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parent_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    extent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

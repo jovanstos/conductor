@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog'
-import type { Workflow, WorkflowNode, WorkflowEdge } from '../types'
+import type { Workflow, WorkflowNode, WorkflowEdge, AgentNodeData, LoopNodeData } from '../types'
 import * as tauri from '../lib/tauri'
-import { newWorkflow } from '../lib/defaults'
+import { newWorkflow, newAgentNodeData } from '../lib/defaults'
 
 type ViewMode = 'canvas' | 'list'
 
@@ -16,7 +16,6 @@ interface WorkflowStore {
   taskInput: string
   isLoading: boolean
 
-  // Undo/Redo history
   _history: Workflow[]
   _historyIndex: number
   _copiedNode: WorkflowNode | null
@@ -32,10 +31,13 @@ interface WorkflowStore {
   updateWorkflowMeta: (patch: Partial<Pick<Workflow, 'name' | 'description' | 'settings'>>) => void
 
   addNode: (node: WorkflowNode) => void
+  addLoopGroup: (params: { groupId: string; workerId: string; reviewerId: string; position: { x: number; y: number } }) => void
   updateNode: (id: string, patch: Partial<WorkflowNode>) => void
   removeNode: (id: string) => void
   addEdge: (edge: WorkflowEdge) => void
   removeEdge: (id: string) => void
+  updateEdge: (id: string, patch: Partial<WorkflowEdge>) => void
+  getChildNodes: (parentId: string) => WorkflowNode[]
 
   undo: () => void
   redo: () => void
@@ -51,6 +53,26 @@ interface WorkflowStore {
 
 function snapshot<T>(v: T): T {
   return JSON.parse(JSON.stringify(v))
+}
+
+function makeWorkerData(overrides?: Partial<AgentNodeData>): AgentNodeData {
+  return newAgentNodeData({
+    name: 'Worker',
+    roleDescription: 'Does the task',
+    systemPrompt: '## Role\nYou are a skilled worker agent.\n\n## Objective\nComplete the given task thoroughly. If given reviewer feedback, revise accordingly.\n\n## Output format\nComplete, well-structured response.\n\n## Constraints\n- Be specific and actionable\n- Address all feedback points when revising',
+    contextMode: 'full_chain',
+    ...overrides,
+  })
+}
+
+function makeReviewerData(overrides?: Partial<AgentNodeData>): AgentNodeData {
+  return newAgentNodeData({
+    name: 'Reviewer',
+    roleDescription: 'Reviews and provides feedback',
+    systemPrompt: '## Role\nYou are a critical reviewer.\n\n## Objective\nReview the worker\'s output and provide structured feedback.\n\n## Output format\nYour response MUST end with either:\n- "APPROVED" if the output is satisfactory\n- "NEEDS REVISION" followed by specific numbered feedback points\n\n## Constraints\n- Be constructive and specific\n- Only say APPROVED when genuinely satisfied',
+    contextMode: 'full_chain',
+    ...overrides,
+  })
 }
 
 export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
@@ -149,6 +171,58 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
     })
   },
 
+  addLoopGroup: ({ groupId, workerId, reviewerId, position }) => {
+    set((s) => {
+      if (!s.currentWorkflow) return s
+      const snap = snapshot(s.currentWorkflow)
+      const hist = [...s._history.slice(0, s._historyIndex + 1), snap].slice(-HISTORY_LIMIT)
+
+      const groupNode: WorkflowNode = {
+        id: groupId,
+        type: 'loop',
+        position,
+        data: {
+          targetNodeId: workerId,
+          reviewerNodeId: reviewerId,
+          maxRetries: 3,
+          exitCondition: 'reviewer_approves',
+        } satisfies LoopNodeData,
+      }
+
+      const workerNode: WorkflowNode = {
+        id: workerId,
+        type: 'agent',
+        position: { x: 30, y: 70 },
+        parentId: groupId,
+        extent: 'parent',
+        data: makeWorkerData(),
+      }
+
+      const reviewerNode: WorkflowNode = {
+        id: reviewerId,
+        type: 'agent',
+        position: { x: 234, y: 70 },
+        parentId: groupId,
+        extent: 'parent',
+        data: makeReviewerData(),
+      }
+
+      const updated = {
+        ...s.currentWorkflow,
+        nodes: [...s.currentWorkflow.nodes, groupNode, workerNode, reviewerNode],
+      }
+      tauri.saveWorkflow(updated).catch(() => {})
+      return {
+        currentWorkflow: updated,
+        workflows: s.workflows.map((w) => (w.id === updated.id ? updated : w)),
+        _history: hist,
+        _historyIndex: hist.length - 1,
+        canUndo: true,
+        canRedo: false,
+      }
+    })
+  },
+
   updateNode: (id, patch) => {
     set((s) => {
       if (!s.currentWorkflow) return s
@@ -175,16 +249,23 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
       if (!s.currentWorkflow) return s
       const snap = snapshot(s.currentWorkflow)
       const hist = [...s._history.slice(0, s._historyIndex + 1), snap].slice(-HISTORY_LIMIT)
-      const nodes = s.currentWorkflow.nodes.filter((n) => n.id !== id)
+
+      // Collect node + all children (for loop groups)
+      const toRemove = new Set([id])
+      for (const n of s.currentWorkflow.nodes) {
+        if (n.parentId === id) toRemove.add(n.id)
+      }
+
+      const nodes = s.currentWorkflow.nodes.filter((n) => !toRemove.has(n.id))
       const edges = s.currentWorkflow.edges.filter(
-        (e) => e.sourceNodeId !== id && e.targetNodeId !== id,
+        (e) => !toRemove.has(e.sourceNodeId) && !toRemove.has(e.targetNodeId),
       )
       const updated = { ...s.currentWorkflow, nodes, edges }
       tauri.saveWorkflow(updated).catch(() => {})
       return {
         currentWorkflow: updated,
         workflows: s.workflows.map((w) => (w.id === updated.id ? updated : w)),
-        selectedNodeId: s.selectedNodeId === id ? null : s.selectedNodeId,
+        selectedNodeId: toRemove.has(s.selectedNodeId ?? '') ? null : s.selectedNodeId,
         _history: hist,
         _historyIndex: hist.length - 1,
         canUndo: true,
@@ -233,6 +314,25 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
     })
   },
 
+  updateEdge: (id, patch) => {
+    set((s) => {
+      if (!s.currentWorkflow) return s
+      const edges = s.currentWorkflow.edges.map((e) =>
+        e.id === id ? { ...e, ...patch } : e,
+      )
+      const updated = { ...s.currentWorkflow, edges }
+      tauri.saveWorkflow(updated).catch(() => {})
+      return {
+        currentWorkflow: updated,
+        workflows: s.workflows.map((w) => (w.id === updated.id ? updated : w)),
+      }
+    })
+  },
+
+  getChildNodes: (parentId) => {
+    return get().currentWorkflow?.nodes.filter((n) => n.parentId === parentId) ?? []
+  },
+
   undo: () => {
     set((s) => {
       if (!s.canUndo || s._historyIndex < 0) return s
@@ -254,11 +354,6 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
       if (!s.canRedo) return s
       const newIndex = s._historyIndex + 1
       if (newIndex >= s._history.length) return s
-      // redo means moving forward past the snapshot — but our history stores the state BEFORE the mutation
-      // so we need to apply up to newIndex+1 if it exists, otherwise use what's after the current snapshot
-      // Simple approach: history[newIndex] is the pre-mutation snapshot at that index
-      // The post-mutation state is history[newIndex+1] if it exists, or currentWorkflow before undo started
-      // Since we can't track future states cleanly here, use the snapshot at newIndex+1
       const nextState = s._history[newIndex + 1] ?? s._history[newIndex]
       if (!nextState) return s
       tauri.saveWorkflow(nextState).catch(() => {})
