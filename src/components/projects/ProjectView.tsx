@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen, Download, Play, X } from 'lucide-react'
+import { FolderOpen, Folder, FolderOpenIcon, Download, Play, X, ChevronRight, FileText } from 'lucide-react'
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
-import { openProject, zipAndSaveWorkspace } from '../../lib/tauri'
-import type { FileEntry, ProjectEntry } from '../../types'
+import { openProjectTree, zipAndSaveWorkspace } from '../../lib/tauri'
+import type { DirEntry, ProjectEntry } from '../../types'
 import { useRunStore } from '../../stores/runStore'
 import { useWorkflowStore } from '../../stores/workflowStore'
 
@@ -11,9 +11,110 @@ interface Props {
   onClose: () => void
 }
 
+// ── File icon helpers ────────────────────────────────────────────────────────
+
+function getFileColor(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? ''
+  if (['ts', 'tsx'].includes(ext)) return 'text-blue-400'
+  if (['js', 'jsx', 'mjs'].includes(ext)) return 'text-yellow-400'
+  if (['py'].includes(ext)) return 'text-green-400'
+  if (['rs'].includes(ext)) return 'text-orange-400'
+  if (['go'].includes(ext)) return 'text-cyan-400'
+  if (['css', 'scss', 'less'].includes(ext)) return 'text-pink-400'
+  if (['html', 'htm'].includes(ext)) return 'text-orange-300'
+  if (['json', 'toml', 'yaml', 'yml'].includes(ext)) return 'text-amber-300'
+  if (['md', 'txt', 'rst'].includes(ext)) return 'text-gray-400'
+  return 'text-white/40'
+}
+
+// ── Recursive tree node ──────────────────────────────────────────────────────
+
+interface TreeNodeProps {
+  node: DirEntry
+  depth: number
+  selectedPath: string | null
+  onSelectFile: (path: string, content: string) => void
+}
+
+function TreeNode({ node, depth, selectedPath, onSelectFile }: TreeNodeProps) {
+  const [expanded, setExpanded] = useState(depth < 2)
+  const indent = depth * 12
+
+  if (node.isDir) {
+    return (
+      <div>
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          className="w-full text-left flex items-center gap-1.5 py-0.5 text-[11px] font-mono text-white/50 hover:text-white/75 hover:bg-white/5 transition-colors"
+          style={{ paddingLeft: `${8 + indent}px`, paddingRight: '8px' }}
+        >
+          <ChevronRight
+            size={9}
+            className={`shrink-0 transition-transform duration-150 ${expanded ? 'rotate-90' : ''}`}
+          />
+          {expanded
+            ? <FolderOpenIcon size={11} className="shrink-0 text-yellow-400/70" />
+            : <Folder size={11} className="shrink-0 text-yellow-400/60" />
+          }
+          <span className="truncate">{node.name}</span>
+        </button>
+        {expanded && node.children.map((child) => (
+          <TreeNode
+            key={child.path}
+            node={child}
+            depth={depth + 1}
+            selectedPath={selectedPath}
+            onSelectFile={onSelectFile}
+          />
+        ))}
+      </div>
+    )
+  }
+
+  const isSelected = selectedPath === node.path
+  return (
+    <button
+      onClick={() => onSelectFile(node.path, node.content ?? '')}
+      className={`w-full text-left flex items-center gap-1.5 py-0.5 text-[11px] font-mono truncate transition-colors ${
+        isSelected
+          ? 'bg-emerald-500/15 text-emerald-300'
+          : 'text-white/45 hover:text-white/70 hover:bg-white/5'
+      }`}
+      style={{ paddingLeft: `${20 + indent}px`, paddingRight: '8px' }}
+      title={node.path}
+    >
+      <FileText size={10} className={`shrink-0 ${isSelected ? 'text-emerald-400' : getFileColor(node.name)}`} />
+      <span className="truncate">{node.name}</span>
+    </button>
+  )
+}
+
+// ── Count helpers ────────────────────────────────────────────────────────────
+
+function countFiles(entries: DirEntry[]): number {
+  let count = 0
+  for (const e of entries) {
+    if (e.isDir) count += countFiles(e.children)
+    else count += 1
+  }
+  return count
+}
+
+function findFirstFile(entries: DirEntry[]): DirEntry | null {
+  for (const e of entries) {
+    if (!e.isDir) return e
+    const found = findFirstFile(e.children)
+    if (found) return found
+  }
+  return null
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
+
 export default function ProjectView({ project, onClose }: Props) {
-  const [files, setFiles] = useState<FileEntry[]>([])
-  const [selected, setSelected] = useState<FileEntry | null>(null)
+  const [tree, setTree] = useState<DirEntry[]>([])
+  const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [selectedContent, setSelectedContent] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [exportMsg, setExportMsg] = useState<string | null>(null)
@@ -23,13 +124,22 @@ export default function ProjectView({ project, onClose }: Props) {
 
   useEffect(() => {
     setLoading(true)
-    openProject(project.path)
-      .then((f) => {
-        setFiles(f)
-        setSelected(f[0] ?? null)
+    openProjectTree(project.path)
+      .then((entries) => {
+        setTree(entries)
+        const first = findFirstFile(entries)
+        if (first) {
+          setSelectedPath(first.path)
+          setSelectedContent(first.content ?? '')
+        }
       })
       .finally(() => setLoading(false))
   }, [project.path])
+
+  function handleSelectFile(path: string, content: string) {
+    setSelectedPath(path)
+    setSelectedContent(content)
+  }
 
   async function handleExport() {
     const dest = await saveDialog({
@@ -71,9 +181,11 @@ export default function ProjectView({ project, onClose }: Props) {
     }
   }
 
+  const fileCount = countFiles(tree)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-4xl h-[80vh] bg-[#0e0e13] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-5xl h-[85vh] bg-[#0e0e13] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/8 flex items-center gap-3 shrink-0">
@@ -106,7 +218,7 @@ export default function ProjectView({ project, onClose }: Props) {
           </div>
         </div>
 
-        {/* Workflow picker banner — shown when no workflow is active */}
+        {/* Workflow picker banner */}
         {showWorkflowPicker && (
           <div className="px-5 py-3 bg-emerald-500/5 border-b border-emerald-500/15 shrink-0">
             <p className="text-xs text-white/60 mb-2">Pick a workflow to run this project with:</p>
@@ -139,39 +251,34 @@ export default function ProjectView({ project, onClose }: Props) {
 
         {/* Body */}
         {loading ? (
-          <div className="flex-1 flex items-center justify-center text-white/25 text-sm">Loading files...</div>
-        ) : files.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center text-white/25 text-sm">No files in this project yet.</div>
+          <div className="flex-1 flex items-center justify-center text-white/25 text-sm">Loading project...</div>
+        ) : tree.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center text-white/25 text-sm">No files found in this project.</div>
         ) : (
           <div className="flex-1 flex overflow-hidden">
-            {/* File tree */}
-            <div className="w-52 shrink-0 border-r border-white/8 overflow-y-auto py-2">
-              <p className="px-4 mb-1 text-[10px] text-white/25 uppercase tracking-widest">
-                Files ({files.length})
+            {/* File tree sidebar */}
+            <div className="w-60 shrink-0 border-r border-white/8 overflow-y-auto py-2">
+              <p className="px-4 mb-2 text-[10px] text-white/25 uppercase tracking-widest">
+                {fileCount} file{fileCount !== 1 ? 's' : ''}
               </p>
-              {files.map((f) => (
-                <button
-                  key={f.path}
-                  onClick={() => setSelected(f)}
-                  className={`w-full text-left px-4 py-1.5 text-[11px] font-mono truncate transition-colors ${
-                    selected?.path === f.path
-                      ? 'bg-emerald-500/15 text-emerald-300'
-                      : 'text-white/45 hover:text-white/70 hover:bg-white/5'
-                  }`}
-                  title={f.path}
-                >
-                  {f.path}
-                </button>
+              {tree.map((node) => (
+                <TreeNode
+                  key={node.path}
+                  node={node}
+                  depth={0}
+                  selectedPath={selectedPath}
+                  onSelectFile={handleSelectFile}
+                />
               ))}
             </div>
 
             {/* File preview */}
             <div className="flex-1 overflow-auto p-4">
-              {selected ? (
+              {selectedPath ? (
                 <>
-                  <p className="text-[11px] text-white/30 font-mono mb-3">{selected.path}</p>
+                  <p className="text-[11px] text-white/30 font-mono mb-3">{selectedPath}</p>
                   <pre className="text-xs text-white/70 whitespace-pre-wrap font-mono leading-relaxed">
-                    {selected.content}
+                    {selectedContent || <span className="text-white/20 italic">Empty file</span>}
                   </pre>
                 </>
               ) : (

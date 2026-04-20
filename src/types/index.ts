@@ -125,6 +125,14 @@ export type FileEntry = {
   content: string
 }
 
+export type DirEntry = {
+  name: string
+  path: string      // relative path from project root
+  isDir: boolean
+  children: DirEntry[]
+  content?: string  // text content for files; undefined for dirs / binary
+}
+
 export type WorkspaceConfig = {
   mode: WorkspaceMode
   workspacePath: string

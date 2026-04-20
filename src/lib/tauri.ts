@@ -7,6 +7,7 @@ import type {
   ModelConfig,
   LLMMessage,
   FileEntry,
+  DirEntry,
   ProjectEntry,
   StepStartedPayload,
   StepDonePayload,
@@ -75,6 +76,8 @@ export const validateApiKey = (provider: string) =>
   invoke<string>('validate_api_key', { provider })
 export const openProject = (projectPath: string) =>
   invoke<FileEntry[]>('open_project', { projectPath })
+export const openProjectTree = (projectPath: string) =>
+  invoke<DirEntry[]>('open_project_tree', { projectPath })
 
 // App config
 export type AppConfig = { defaultProjectsPath?: string }

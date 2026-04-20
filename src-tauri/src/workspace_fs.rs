@@ -22,6 +22,19 @@ pub struct ProjectEntry {
     pub last_modified: String,
 }
 
+/// A node in the project directory tree. Dirs have children; files have content.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirEntry {
+    pub name: String,
+    /// Relative path from the project root (forward slashes)
+    pub path: String,
+    pub is_dir: bool,
+    pub children: Vec<DirEntry>,
+    /// File text content — `None` for directories or binary files
+    pub content: Option<String>,
+}
+
 // ─────────────────────────────────────────────
 // Injected instruction block appended to system
 // prompts when a workspace is active
@@ -197,14 +210,48 @@ pub fn parse_file_blocks(response: &str) -> Vec<FileEntry> {
     results
 }
 
+/// Render the directory tree from a flat file list for agent context.
+fn build_tree_display_from_files(files: &[FileEntry]) -> String {
+    let mut sorted_paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+    sorted_paths.sort();
+
+    let mut out = String::new();
+    let mut shown_dirs: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for path in sorted_paths {
+        let parts: Vec<&str> = path.split('/').collect();
+
+        // Show intermediate directories before the file
+        for i in 0..parts.len().saturating_sub(1) {
+            let dir_path = parts[..=i].join("/");
+            if shown_dirs.insert(dir_path) {
+                let indent = "  ".repeat(i);
+                out.push_str(&format!("{}{}/\n", indent, parts[i]));
+            }
+        }
+
+        // The file itself
+        let depth = parts.len().saturating_sub(1);
+        let indent = "  ".repeat(depth);
+        if let Some(name) = parts.last() {
+            out.push_str(&format!("{}{}\n", indent, name));
+        }
+    }
+
+    out
+}
+
 /// Build the workspace manifest string to inject before the user message.
 pub fn build_workspace_manifest(files: &[FileEntry]) -> String {
     let total_chars: usize = files.iter().map(|f| f.content.len()).sum();
-    let mut out = String::from("## Current workspace files\n\n");
+    let mut out = String::from("## Project directory structure\n\n```\n");
+    out.push_str(&build_tree_display_from_files(files));
+    out.push_str("```\n\n");
+    out.push_str("## Current workspace files\n\n");
 
     if total_chars > 100_000 {
         // Over limit — list names + sizes only
-        out.push_str("*(File contents truncated — too large to include in full. File names and sizes:)*\n\n");
+        out.push_str("*(File contents truncated — too large to include in full. See directory structure above.)*\n\n");
         for f in files {
             out.push_str(&format!("- `{}` ({} chars)\n", f.path, f.content.len()));
         }
@@ -448,4 +495,78 @@ pub fn list_projects(base_path: Option<String>) -> Result<Vec<ProjectEntry>, Str
 #[tauri::command]
 pub fn open_project(project_path: String) -> Result<Vec<FileEntry>, String> {
     read_manifest_internal(&project_path)
+}
+
+// ─────────────────────────────────────────────
+// Directory tree — for the UI file explorer
+// ─────────────────────────────────────────────
+
+/// Directories to skip when building the tree (heavy / not relevant to source)
+fn should_skip_dir(name: &str) -> bool {
+    matches!(
+        name,
+        "node_modules" | "__pycache__" | "target" | "dist" | "build"
+            | ".git" | ".svn" | ".hg" | "vendor" | ".next" | ".nuxt"
+            | "coverage" | ".turbo" | ".cache" | "out" | ".idea" | ".vscode"
+    )
+}
+
+fn build_dir_tree(base: &Path, dir: &Path) -> Result<Vec<DirEntry>, String> {
+    let mut entries = Vec::new();
+
+    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+        // Skip hidden entries
+        if name.starts_with('.') {
+            continue;
+        }
+
+        let rel = path
+            .strip_prefix(base)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        if path.is_dir() {
+            if should_skip_dir(&name) {
+                continue;
+            }
+            let children = build_dir_tree(base, &path)?;
+            entries.push(DirEntry { name, path: rel, is_dir: true, children, content: None });
+        } else {
+            let content = if is_binary(&path) {
+                None
+            } else {
+                let text = std::fs::read_to_string(&path).unwrap_or_default();
+                // Cap individual file at 200KB to stay responsive
+                if text.len() > 200_000 {
+                    Some(format!("[File too large to preview — {} bytes]", text.len()))
+                } else {
+                    Some(text)
+                }
+            };
+            entries.push(DirEntry { name, path: rel, is_dir: false, children: vec![], content });
+        }
+    }
+
+    // Dirs first, then files; alphabetical within each group (case-insensitive)
+    entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+
+    Ok(entries)
+}
+
+#[tauri::command]
+pub fn open_project_tree(project_path: String) -> Result<Vec<DirEntry>, String> {
+    let base = PathBuf::from(&project_path);
+    if !base.exists() {
+        return Ok(vec![]);
+    }
+    build_dir_tree(&base, &base)
 }

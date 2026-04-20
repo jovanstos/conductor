@@ -1770,6 +1770,7 @@ fn main() {
             workspace_fs::zip_and_save_workspace,
             workspace_fs::list_projects,
             workspace_fs::open_project,
+            workspace_fs::open_project_tree,
             load_config,
             save_config,
             write_text_file,
