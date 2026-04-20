@@ -6,6 +6,17 @@ import type {
   AgentNodeData,
 } from "../types";
 
+export const PROVIDER_COLORS: Record<string, string> = {
+  anthropic: '#f97316', // orange — Anthropic brand
+  openai:    '#d1d5db', // near-white — OpenAI brand
+  ollama:    '#3b82f6', // blue — Ollama brand
+  custom:    '#8b5cf6', // purple — fallback
+}
+
+export function getProviderColor(provider: string | undefined): string {
+  return PROVIDER_COLORS[provider ?? ''] ?? PROVIDER_COLORS.custom
+}
+
 export const DEFAULT_MODEL: ModelConfig = {
   provider: "anthropic",
   modelId: "claude-sonnet-4-6",

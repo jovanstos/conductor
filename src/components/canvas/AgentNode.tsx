@@ -8,7 +8,7 @@ import {
 import type { AgentNodeData, LoopNodeData } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
-import { getRoleInfo, type RoleCategory } from '../../lib/defaults'
+import { getRoleInfo, getProviderColor, type RoleCategory } from '../../lib/defaults'
 
 function RoleIcon({ category, size = 13, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
   const props = { size, className }
@@ -129,13 +129,8 @@ export default memo(function AgentNode({ id, data }: NodeProps) {
         {/* Model row */}
         <div className="flex items-center gap-1.5 pb-2 border-b border-white/5">
           <div
-            className="w-1.5 h-1.5 rounded-full shrink-0 opacity-70"
-            style={{
-              background:
-                d.model?.provider === 'anthropic' ? '#a78bfa' :
-                d.model?.provider === 'openai'    ? '#34d399' :
-                d.model?.provider === 'ollama'    ? '#fb923c' : '#60a5fa',
-            }}
+            className="w-1.5 h-1.5 rounded-full shrink-0 opacity-80"
+            style={{ background: getProviderColor(d.model?.provider) }}
           />
           <span className="text-[10px] text-white/20 truncate">
             {d.model?.modelId?.split('-').slice(0, 2).join('-') ?? 'no model'}

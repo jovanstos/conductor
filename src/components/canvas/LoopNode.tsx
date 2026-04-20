@@ -4,6 +4,7 @@ import { X, RefreshCw, ArrowRight, Check, Zap, CornerDownLeft } from 'lucide-rea
 import type { LoopNodeData, AgentNodeData, RunStep } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
+import { useDragStore } from '../../stores/dragStore'
 
 export default memo(function LoopNode({ id, data }: NodeProps) {
   const d = data as unknown as LoopNodeData
@@ -18,6 +19,10 @@ export default memo(function LoopNode({ id, data }: NodeProps) {
 
   const workerStep   = currentRun?.steps.filter((s) => s.nodeId === d.targetNodeId).at(-1)
   const reviewerStep = currentRun?.steps.filter((s) => s.nodeId === d.reviewerNodeId).at(-1)
+
+  const { dropTarget } = useDragStore()
+  const workerDropActive   = dropTarget?.loopId === id && dropTarget.slot === 'worker'
+  const reviewerDropActive = dropTarget?.loopId === id && dropTarget.slot === 'reviewer'
 
   const isConfigured = !!d.targetNodeId && !!d.reviewerNodeId
   const isSelected   = selectedNodeId === id
@@ -100,6 +105,7 @@ export default memo(function LoopNode({ id, data }: NodeProps) {
             configured={!!d.targetNodeId}
             step={workerStep}
             accent="purple"
+            isDropTarget={workerDropActive}
           />
 
           {/* Arrow column */}
@@ -115,6 +121,7 @@ export default memo(function LoopNode({ id, data }: NodeProps) {
             configured={!!d.reviewerNodeId}
             step={reviewerStep}
             accent="sky"
+            isDropTarget={reviewerDropActive}
           />
         </div>
 
@@ -163,35 +170,47 @@ function AgentBox({
   configured,
   step,
   accent,
+  isDropTarget,
 }: {
   label: string
   name: string
   configured: boolean
   step: RunStep | undefined
   accent: 'purple' | 'sky'
+  isDropTarget: boolean
 }) {
   const isRunning = step?.status === 'running'
   const isDone    = step?.status === 'done'
 
-  const borderClass = isRunning
-    ? accent === 'purple' ? 'border-purple-500/60' : 'border-sky-500/60'
-    : isDone
-      ? 'border-emerald-500/30'
-      : accent === 'purple' ? 'border-purple-500/20' : 'border-sky-500/20'
+  const borderClass = isDropTarget
+    ? accent === 'purple'
+      ? 'border-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.4)]'
+      : 'border-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.4)]'
+    : isRunning
+      ? accent === 'purple' ? 'border-purple-500/60' : 'border-sky-500/60'
+      : isDone
+        ? 'border-emerald-500/30'
+        : accent === 'purple' ? 'border-purple-500/20' : 'border-sky-500/20'
 
-  const labelClass = accent === 'purple' ? 'text-purple-400/50' : 'text-sky-400/50'
+  const labelClass = isDropTarget
+    ? accent === 'purple' ? 'text-purple-300/80' : 'text-sky-300/80'
+    : accent === 'purple' ? 'text-purple-400/50' : 'text-sky-400/50'
 
   return (
-    <div className={`flex-1 border rounded-lg p-2 min-w-0 ${borderClass} bg-black/20 transition-colors`}>
+    <div className={`flex-1 border rounded-lg p-2 min-w-0 ${borderClass} transition-all ${isDropTarget ? 'bg-white/5' : 'bg-black/20'}`}>
       <div className={`text-[8px] font-mono ${labelClass} mb-0.5 flex items-center gap-1`}>
-        {isRunning && <Zap size={7} className="animate-pulse" />}
-        {isDone    && <Check size={7} className="text-emerald-400/60" />}
+        {isDropTarget && <span className="animate-pulse">⬇</span>}
+        {!isDropTarget && isRunning && <Zap size={7} className="animate-pulse" />}
+        {!isDropTarget && isDone    && <Check size={7} className="text-emerald-400/60" />}
         {label}
       </div>
-      <div className={`text-[11px] truncate ${configured ? 'text-white/65' : 'text-amber-400/35 italic'}`}>
-        {name}
+      <div className={`text-[11px] truncate ${
+        isDropTarget ? (accent === 'purple' ? 'text-purple-200/80' : 'text-sky-200/80')
+        : configured ? 'text-white/65' : 'text-amber-400/35 italic'
+      }`}>
+        {isDropTarget ? 'Drop to assign' : name}
       </div>
-      {step?.output && (
+      {!isDropTarget && step?.output && (
         <p className="mt-1 text-[9px] text-white/30 line-clamp-2 leading-relaxed">{step.output}</p>
       )}
     </div>

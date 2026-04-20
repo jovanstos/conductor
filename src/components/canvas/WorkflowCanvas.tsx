@@ -27,6 +27,7 @@ import {
   Redo2,
 } from "lucide-react";
 import { useWorkflowStore } from "../../stores/workflowStore";
+import { useDragStore } from "../../stores/dragStore";
 import type {
   WorkflowNode,
   WorkflowEdge,
@@ -103,6 +104,8 @@ export default function WorkflowCanvas() {
     copySelectedNode,
     pasteNode,
   } = useWorkflowStore();
+
+  const { setDropTarget } = useDragStore();
 
   const [rfNodes, setRfNodes, onRFNodesChange] = useNodesState<RFNode>(
     currentWorkflow?.nodes.map(toRFNode) ?? [],
@@ -189,6 +192,49 @@ export default function WorkflowCanvas() {
       );
     },
     [storeAddEdge, setRfEdges],
+  );
+
+  // Approximate rendered dimensions used for hit-testing
+  const AGENT_W = 256; // w-64
+  const AGENT_H = 160;
+  const LOOP_W  = 320; // w-80
+  const LOOP_H  = 220;
+
+  const handleNodeDrag = useCallback(
+    (_: React.MouseEvent, node: RFNode) => {
+      if (node.type !== "agent") { setDropTarget(null); return; }
+      const cx = node.position.x + AGENT_W / 2;
+      const cy = node.position.y + AGENT_H / 2;
+      let found: { loopId: string; slot: "worker" | "reviewer" } | null = null;
+      for (const n of rfNodes) {
+        if (n.type !== "loop") continue;
+        const lx = n.position.x, ly = n.position.y;
+        if (cx >= lx && cx <= lx + LOOP_W && cy >= ly && cy <= ly + LOOP_H) {
+          found = { loopId: n.id, slot: cx < lx + LOOP_W / 2 ? "worker" : "reviewer" };
+          break;
+        }
+      }
+      setDropTarget(found);
+    },
+    [rfNodes, setDropTarget],
+  );
+
+  const handleNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: RFNode) => {
+      const { dropTarget } = useDragStore.getState();
+      if (node.type === "agent" && dropTarget) {
+        const loopRFNode = rfNodes.find((n) => n.id === dropTarget.loopId);
+        if (loopRFNode) {
+          const cur = loopRFNode.data as LoopNodeData;
+          const patch = dropTarget.slot === "worker"
+            ? { ...cur, targetNodeId: node.id }
+            : { ...cur, reviewerNodeId: node.id };
+          updateNode(dropTarget.loopId, { data: patch });
+        }
+      }
+      setDropTarget(null);
+    },
+    [rfNodes, updateNode, setDropTarget],
   );
 
   function addAgentNode() {
@@ -330,6 +376,8 @@ export default function WorkflowCanvas() {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
+        onNodeDrag={handleNodeDrag}
+        onNodeDragStop={handleNodeDragStop}
         onNodeClick={(_, node) => setSelectedNode(node.id)}
         onPaneClick={() => setSelectedNode(null)}
         nodeTypes={NODE_TYPES}

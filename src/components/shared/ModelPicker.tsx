@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { ModelConfig, ModelProvider } from '../../types'
-import { ANTHROPIC_MODELS, OPENAI_MODELS } from '../../lib/defaults'
+import { ANTHROPIC_MODELS, OPENAI_MODELS, getProviderColor } from '../../lib/defaults'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -164,16 +164,10 @@ export default function ModelPicker({
 }
 
 function ProviderDot({ provider, hasKey }: { provider: ModelProvider; hasKey: boolean }) {
-  const colors: Record<ModelProvider, string> = {
-    anthropic: '#a78bfa',
-    openai: '#34d399',
-    ollama: '#fb923c',
-    custom: '#60a5fa',
-  }
   return (
     <div
       className="w-2 h-2 rounded-full shrink-0"
-      style={{ background: hasKey ? colors[provider] : 'rgba(255,255,255,0.15)' }}
+      style={{ background: hasKey ? getProviderColor(provider) : 'rgba(255,255,255,0.15)' }}
     />
   )
 }
