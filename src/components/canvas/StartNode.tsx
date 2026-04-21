@@ -16,20 +16,16 @@ export default memo(function StartNode(_: NodeProps) {
           </div>
           <div>
             <p className="text-sm font-semibold text-white/85">Start</p>
-            <p className="text-[11px] text-emerald-400/60">Workflow input</p>
+            <p className="text-xs text-emerald-400/60">Workflow input</p>
           </div>
         </div>
 
         {input ? (
-          <p className="text-[10px] text-white/40 line-clamp-2 leading-relaxed">{input}</p>
+          <p className="text-xs text-white/45 line-clamp-2 leading-relaxed">{input}</p>
         ) : (
-          <p className="text-[10px] text-white/20 italic">Task appears here on run…</p>
+          <p className="text-xs text-white/25 italic">Task appears here on run…</p>
         )}
       </div>
-
-      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-emerald-400/30 pointer-events-none select-none">
-        task
-      </span>
 
       <Handle
         type="source"

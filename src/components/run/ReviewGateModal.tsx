@@ -50,7 +50,7 @@ export default function ReviewGateModal() {
 
           {/* Feedback field (required when rejecting) */}
           <div className="mt-4">
-            <p className="text-[10px] text-white/30 uppercase tracking-wider mb-2">
+            <p className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-2">
               Feedback <span className="text-red-400/60 normal-case">— required to reject</span>
             </p>
             <textarea

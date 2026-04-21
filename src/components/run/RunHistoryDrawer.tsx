@@ -36,9 +36,9 @@ function StepRow({ step }: { step: RunStep }) {
         onClick={() => setOpen((v) => !v)}
       >
         <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_COLOR[step.status] ?? 'bg-white/20'}`} />
-        <span className="text-[11px] text-white/55 flex-1 truncate">{step.nodeName}</span>
+        <span className="text-xs text-white/55 flex-1 truncate">{step.nodeName}</span>
         {step.tokensUsed != null && (
-          <span className="text-[10px] text-white/20">{step.tokensUsed.toLocaleString()} tok</span>
+          <span className="text-xs text-white/20">{step.tokensUsed.toLocaleString()} tok</span>
         )}
         {open ? <ChevronUp size={10} className="text-white/25 group-hover:text-white/50" /> : <ChevronDown size={10} className="text-white/25 group-hover:text-white/50" />}
       </button>
@@ -46,7 +46,7 @@ function StepRow({ step }: { step: RunStep }) {
       {open && (
         <div className="pb-1 space-y-1">
           {step.output && (
-            <pre className="text-[10px] text-white/40 whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto rounded bg-white/3 px-2 py-1.5">
+            <pre className="text-xs text-white/40 whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto rounded bg-white/3 px-2 py-1.5">
               {step.output}
             </pre>
           )}
@@ -54,7 +54,7 @@ function StepRow({ step }: { step: RunStep }) {
             <div>
               <button
                 onClick={() => setShowPrompt((v) => !v)}
-                className="text-[10px] text-purple-400/50 hover:text-purple-400/80 transition-colors"
+                className="text-xs text-purple-400/50 hover:text-purple-400/80 transition-colors"
               >
                 {showPrompt
                   ? <><ChevronUp size={10} className="inline mr-1" />Hide prompt</>
@@ -62,7 +62,7 @@ function StepRow({ step }: { step: RunStep }) {
                 }
               </button>
               {showPrompt && (
-                <pre className="mt-1 text-[10px] text-white/30 whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto rounded bg-purple-500/5 border border-purple-500/10 px-2 py-1.5">
+                <pre className="mt-1 text-xs text-white/30 whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto rounded bg-purple-500/5 border border-purple-500/10 px-2 py-1.5">
                   {step.input}
                 </pre>
               )}
@@ -71,14 +71,14 @@ function StepRow({ step }: { step: RunStep }) {
           {step.filesWritten && step.filesWritten.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {step.filesWritten.map((f) => (
-                <span key={f} className="text-[10px] bg-emerald-500/10 text-emerald-400/60 rounded px-1.5 py-0.5">
+                <span key={f} className="text-xs bg-emerald-500/10 text-emerald-400/60 rounded px-1.5 py-0.5">
                   {f}
                 </span>
               ))}
             </div>
           )}
           {step.error && (
-            <p className="text-[10px] text-red-400/70 bg-red-500/8 rounded px-2 py-1">{step.error}</p>
+            <p className="text-xs text-red-400/70 bg-red-500/8 rounded px-2 py-1">{step.error}</p>
           )}
         </div>
       )}
@@ -100,14 +100,14 @@ function RunRow({ run }: { run: Run }) {
       >
         <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_COLOR[run.status] ?? 'bg-white/20'}`} />
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] text-white/65 truncate">{run.input || '(no input)'}</p>
-          <p className="text-[10px] text-white/25 mt-0.5">{fmtDate(run.startedAt)}</p>
+          <p className="text-xs text-white/65 truncate">{run.input || '(no input)'}</p>
+          <p className="text-xs text-white/25 mt-0.5">{fmtDate(run.startedAt)}</p>
         </div>
         <div className="shrink-0 text-right">
-          <span className="text-[10px] text-white/35 capitalize block">{run.status}</span>
-          {duration && <span className="text-[10px] text-white/20 block">{duration}</span>}
+          <span className="text-xs text-white/35 capitalize block">{run.status}</span>
+          {duration && <span className="text-xs text-white/20 block">{duration}</span>}
           {doneSteps > 0 && (
-            <span className="text-[10px] text-white/20 block">{doneSteps} step{doneSteps !== 1 ? 's' : ''}</span>
+            <span className="text-xs text-white/20 block">{doneSteps} step{doneSteps !== 1 ? 's' : ''}</span>
           )}
         </div>
         {expanded ? <ChevronUp size={10} className="text-white/20 ml-1" /> : <ChevronDown size={10} className="text-white/20 ml-1" />}
@@ -119,7 +119,7 @@ function RunRow({ run }: { run: Run }) {
             <div className="mb-2">
               <button
                 onClick={() => setShowOutput((v) => !v)}
-                className="text-[11px] text-emerald-400/60 hover:text-emerald-400/90 transition-colors"
+                className="text-xs text-emerald-400/60 hover:text-emerald-400/90 transition-colors"
               >
                 {showOutput
                   ? <><ChevronUp size={10} className="inline mr-1" />Hide final output</>
@@ -127,7 +127,7 @@ function RunRow({ run }: { run: Run }) {
                 }
               </button>
               {showOutput && (
-                <pre className="mt-1.5 text-[11px] text-white/50 whitespace-pre-wrap break-words leading-relaxed max-h-52 overflow-y-auto rounded bg-white/3 px-2.5 py-2">
+                <pre className="mt-1.5 text-xs text-white/50 whitespace-pre-wrap break-words leading-relaxed max-h-52 overflow-y-auto rounded bg-white/3 px-2.5 py-2">
                   {run.finalOutput}
                 </pre>
               )}
@@ -135,7 +135,7 @@ function RunRow({ run }: { run: Run }) {
           )}
           {run.steps.length > 0 && (
             <div>
-              <p className="text-[10px] text-white/25 mb-1.5 uppercase tracking-widest">Steps</p>
+              <p className="text-xs font-semibold text-white/25 mb-1.5 uppercase tracking-widest">Steps</p>
               {run.steps.map((step, i) => (
                 <StepRow key={`${step.nodeId}-${i}`} step={step} />
               ))}
@@ -172,7 +172,7 @@ export default function RunHistoryDrawer({
         <div>
           <p className="text-sm font-semibold text-white/80">Run History</p>
           {!loading && (
-            <p className="text-[10px] text-white/30 mt-0.5">{runs.length} run{runs.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-white/30 mt-0.5">{runs.length} run{runs.length !== 1 ? 's' : ''}</p>
           )}
         </div>
         <button
@@ -187,12 +187,12 @@ export default function RunHistoryDrawer({
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {loading ? (
           <div className="flex items-center justify-center h-24">
-            <span className="text-[11px] text-white/25 animate-pulse">Loading...</span>
+            <span className="text-xs text-white/25 animate-pulse">Loading...</span>
           </div>
         ) : runs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 gap-2">
             <Clock size={24} className="opacity-20" />
-            <p className="text-[11px] text-white/25">No runs yet for this workflow</p>
+            <p className="text-xs text-white/25">No runs yet for this workflow</p>
           </div>
         ) : (
           runs.map((run) => <RunRow key={run.id} run={run} />)

@@ -30,7 +30,7 @@ export default function ToolConfirmModal() {
               An agent wants to {isShell ? 'run a shell command' : 'delete a file'}.
             </p>
             <div className="mt-3 bg-black/40 border border-white/8 rounded-lg px-3 py-2.5">
-              <p className="text-[11px] text-white/35 mb-1 uppercase tracking-wide font-medium">
+              <p className="text-xs text-white/35 mb-1 uppercase tracking-wide font-medium">
                 {isShell ? 'Command' : 'File'}
               </p>
               <pre className="text-xs text-amber-200/80 font-mono whitespace-pre-wrap leading-relaxed">
@@ -39,7 +39,7 @@ export default function ToolConfirmModal() {
             </div>
             <div className="flex items-center gap-2 mt-2">
               <TriangleAlert size={11} className="text-amber-500/60 shrink-0" />
-              <p className="text-[10px] text-white/35">
+              <p className="text-xs text-white/35">
                 {isShell
                   ? 'This will execute code on your system. Only allow if you trust this agent.'
                   : 'This will permanently delete the file. This cannot be undone.'}

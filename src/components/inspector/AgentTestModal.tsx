@@ -60,7 +60,7 @@ export default function AgentTestModal({
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/6">
           <div>
             <p className="text-sm font-semibold text-white/85">Test Agent</p>
-            <p className="text-[11px] text-white/35 mt-0.5">{data.name}</p>
+            <p className="text-xs text-white/35 mt-0.5">{data.name}</p>
           </div>
           <button
             onClick={onClose}
@@ -76,7 +76,7 @@ export default function AgentTestModal({
           <div>
             <button
               onClick={() => setShowPrompt((v) => !v)}
-              className="text-[11px] text-purple-400/60 hover:text-purple-400/90 transition-colors"
+              className="text-xs text-purple-400/60 hover:text-purple-400/90 transition-colors"
             >
               {showPrompt
                 ? <><ChevronUp size={11} className="inline mr-1" />Hide system prompt</>
@@ -84,7 +84,7 @@ export default function AgentTestModal({
               }
             </button>
             {showPrompt && (
-              <pre className="mt-2 text-[11px] text-white/35 whitespace-pre-wrap break-words leading-relaxed max-h-36 overflow-y-auto rounded-lg bg-purple-500/5 border border-purple-500/10 px-3 py-2">
+              <pre className="mt-2 text-xs text-white/35 whitespace-pre-wrap break-words leading-relaxed max-h-36 overflow-y-auto rounded-lg bg-purple-500/5 border border-purple-500/10 px-3 py-2">
                 {data.systemPrompt || '(no system prompt set)'}
               </pre>
             )}
@@ -92,7 +92,7 @@ export default function AgentTestModal({
 
           {/* Input */}
           <div>
-            <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1.5">Test Input</p>
+            <p className="text-xs font-semibold text-white/30 uppercase tracking-wider mb-1.5">Test Input</p>
             <textarea
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors resize-none placeholder:text-white/20"
               rows={3}
@@ -104,12 +104,12 @@ export default function AgentTestModal({
               }}
               disabled={loading}
             />
-            <p className="text-[10px] text-white/20 mt-1">Ctrl+Enter to send</p>
+            <p className="text-xs text-white/20 mt-1">Ctrl+Enter to send</p>
           </div>
 
           {/* Output */}
           {loading && (
-            <div className="flex items-center gap-2 text-[11px] text-white/35 animate-pulse">
+            <div className="flex items-center gap-2 text-xs text-white/35 animate-pulse">
               <Loader2 size={12} className="animate-spin" />
               <span>Thinking{elapsedMs != null ? ` · ${fmtMs(elapsedMs)}` : '...'}</span>
             </div>
@@ -117,19 +117,19 @@ export default function AgentTestModal({
 
           {error && (
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5">
-              <p className="text-[11px] text-red-400">{error}</p>
+              <p className="text-xs text-red-400">{error}</p>
             </div>
           )}
 
           {output != null && !loading && (
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[10px] text-white/30 uppercase tracking-wider">Response</p>
+                <p className="text-xs font-semibold text-white/30 uppercase tracking-wider">Response</p>
                 {elapsedMs != null && (
-                  <span className="text-[10px] text-white/25">{fmtMs(elapsedMs)}</span>
+                  <span className="text-xs text-white/25">{fmtMs(elapsedMs)}</span>
                 )}
               </div>
-              <pre className="text-[12px] text-white/65 whitespace-pre-wrap break-words leading-relaxed max-h-64 overflow-y-auto rounded-lg bg-white/3 border border-white/6 px-3 py-2.5">
+              <pre className="text-xs text-white/65 whitespace-pre-wrap break-words leading-relaxed max-h-64 overflow-y-auto rounded-lg bg-white/3 border border-white/6 px-3 py-2.5">
                 {output}
               </pre>
             </div>

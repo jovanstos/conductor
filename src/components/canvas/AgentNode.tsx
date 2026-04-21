@@ -10,7 +10,7 @@ import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
 import { getRoleInfo, getProviderColor, type RoleCategory } from '../../lib/defaults'
 
-function RoleIcon({ category, size = 13, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
+function RoleIcon({ category, size = 14, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
   const props = { size, className }
   switch (category) {
     case 'developer':  return <Code2 {...props} />
@@ -34,7 +34,7 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
   const status = step?.status ?? 'idle'
   const role = getRoleInfo(d.name, d.roleDescription || '')
 
-  const isChild = !!parentId
+  const isChild    = !!parentId
   const isSelected = selectedNodeId === id
   const isRunning  = status === 'running'
   const isDone     = status === 'done'
@@ -49,12 +49,18 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
       : isError
         ? 'border-red-500/50'
         : isSelected
-          ? 'border-white/25'
+          ? 'border-white/30'
           : needsSetup
-            ? 'border-amber-500/25'
-            : 'border-white/10'
+            ? 'border-amber-500/30'
+            : 'border-white/12'
 
-  const bgColor = isRunning ? 'bg-[#1c1626]' : isDone ? 'bg-[#101a12]' : isError ? 'bg-[#1a1010]' : 'bg-[#141418]'
+  const bgColor = isRunning
+    ? 'bg-purple-950/60'
+    : isDone
+      ? 'bg-emerald-950/40'
+      : isError
+        ? 'bg-red-950/40'
+        : 'bg-[#141418]'
 
   return (
     <div
@@ -62,7 +68,7 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
       onClick={() => setSelectedNode(id)}
     >
       {/* Role accent strip */}
-      <div className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl ${role.dotColor} opacity-50`} />
+      <div className={`absolute left-0 top-3 bottom-3 w-0.5 rounded-full ${role.dotColor} opacity-60`} />
 
       {/* Delete button — hidden for child nodes inside a loop group */}
       {!isChild && (
@@ -75,11 +81,6 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         </button>
       )}
 
-      {/* context label near left handle */}
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-purple-400/25 pointer-events-none select-none">
-        ctx
-      </span>
-
       <Handle
         type="target"
         position={Position.Left}
@@ -87,22 +88,22 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         className="!bg-purple-500/60 !border-purple-400/30 !w-3 !h-3"
       />
 
-      <div className="px-5 py-3">
+      <div className="px-4 py-3">
         {/* Header row */}
-        <div className="flex items-start gap-2 mb-2">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+        <div className="flex items-center gap-2.5 mb-2.5">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
             isRunning ? 'bg-purple-500/25 animate-pulse' : isDone ? 'bg-emerald-500/15' : role.bgColor
           }`}>
             {isRunning
-              ? <Zap size={13} className="text-purple-300" />
+              ? <Zap size={14} className="text-purple-300" />
               : isDone
-                ? <Check size={13} className="text-emerald-400" />
-                : <RoleIcon category={role.category} size={13} className={role.textColor} />
+                ? <Check size={14} className="text-emerald-400" />
+                : <RoleIcon category={role.category} size={14} className={role.textColor} />
             }
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-white/90 truncate leading-tight">{d.name}</p>
-            <p className={`text-[10px] truncate ${isRunning ? 'text-purple-400/70' : isDone ? 'text-emerald-400/60' : role.textColor + '/55'}`}>
+            <p className="text-sm font-semibold text-white/90 truncate leading-snug">{d.name}</p>
+            <p className={`text-xs truncate ${isRunning ? 'text-purple-400/70' : isDone ? 'text-emerald-400/60' : role.textColor + '/55'}`}>
               {isRunning ? 'Generating…' : isDone ? 'Completed' : role.label}
             </p>
           </div>
@@ -110,16 +111,16 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         </div>
 
         {/* Model row */}
-        <div className="flex items-center gap-1.5 pb-2 border-b border-white/5">
+        <div className="flex items-center gap-1.5 pb-2.5 border-b border-white/6">
           <div
-            className="w-1.5 h-1.5 rounded-full shrink-0 opacity-80"
+            className="w-2 h-2 rounded-full shrink-0"
             style={{ background: getProviderColor(d.model?.provider) }}
           />
-          <span className="text-[10px] text-white/20 truncate">
+          <span className="text-xs text-white/30 truncate">
             {d.model?.modelId?.split('-').slice(0, 2).join('-') ?? 'no model'}
           </span>
           {isDone && step?.tokensUsed && (
-            <span className="ml-auto text-[9px] text-white/15 tabular-nums">{step.tokensUsed.toLocaleString()} tok</span>
+            <span className="ml-auto text-xs text-white/20 tabular-nums">{step.tokensUsed.toLocaleString()} tok</span>
           )}
         </div>
 
@@ -127,14 +128,14 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         {step?.input && (
           <div className="mt-2">
             <button
-              className="flex items-center gap-1 text-[9px] text-white/20 hover:text-white/40 transition-colors w-full text-left"
+              className="flex items-center gap-1 text-xs text-white/25 hover:text-white/45 transition-colors w-full text-left"
               onClick={(e) => { e.stopPropagation(); setInputExpanded((v) => !v) }}
             >
-              {inputExpanded ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-              <span className="font-mono tracking-wide text-purple-400/40">INPUT</span>
+              {inputExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              <span className="font-mono text-purple-400/50 tracking-wider text-xs uppercase">Input</span>
             </button>
             {inputExpanded && (
-              <p className="mt-1 text-[10px] text-white/30 line-clamp-4 leading-relaxed border-l-2 border-purple-500/20 pl-2">
+              <p className="mt-1 text-xs text-white/35 line-clamp-4 leading-relaxed border-l-2 border-purple-500/20 pl-2">
                 {step.input}
               </p>
             )}
@@ -144,27 +145,22 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         {/* OUTPUT section */}
         {step?.output ? (
           <div className={`mt-1.5 ${step.input ? 'border-t border-white/5 pt-1.5' : ''}`}>
-            <span className="font-mono text-[9px] tracking-wide text-emerald-400/40 block mb-1">OUTPUT</span>
-            <p className="text-[10px] text-white/45 line-clamp-3 leading-relaxed">{step.output}</p>
+            <span className="font-mono text-xs uppercase tracking-wider text-emerald-400/50 block mb-1">Output</span>
+            <p className="text-xs text-white/50 line-clamp-3 leading-relaxed">{step.output}</p>
           </div>
         ) : isRunning ? (
-          <div className="mt-2 flex items-center gap-1.5">
-            <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            <span className="text-[10px] text-purple-300/50 ml-1">Thinking…</span>
+          <div className="mt-2.5 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]" />
+            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:150ms]" />
+            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:300ms]" />
+            <span className="text-xs text-purple-300/50 ml-1">Thinking…</span>
           </div>
         ) : needsSetup ? (
           <div className="mt-2">
-            <p className="text-[9px] text-amber-400/40 italic">Click to configure instructions</p>
+            <p className="text-xs text-amber-400/50 italic">Click to configure instructions</p>
           </div>
         ) : null}
       </div>
-
-      {/* response label near right handle */}
-      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-emerald-400/25 pointer-events-none select-none">
-        out
-      </span>
 
       <Handle
         type="source"
@@ -179,13 +175,13 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
 function StatusBadge({ status }: { status: string }) {
   if (status === 'done')
     return (
-      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center gap-0.5 shrink-0">
-        <Check size={8} /> done
+      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center gap-1 shrink-0 font-medium">
+        <Check size={11} /> Done
       </span>
     )
   if (status === 'running')
-    return <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 animate-pulse shrink-0">running</span>
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 animate-pulse shrink-0 font-medium">Running</span>
   if (status === 'error')
-    return <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 shrink-0">error</span>
+    return <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 shrink-0 font-medium">Error</span>
   return null
 }

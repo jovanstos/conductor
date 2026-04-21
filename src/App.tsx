@@ -252,7 +252,7 @@ function EmptyState() {
         >
           + Create a Workflow
         </button>
-        <p className="text-[11px] text-white/20">Start from a template or build from scratch</p>
+        <p className="text-xs text-white/20">Start from a template or build from scratch</p>
       </div>
       {showModal && <NewWorkflowModal onClose={() => setShowModal(false)} />}
     </div>

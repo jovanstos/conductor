@@ -14,16 +14,16 @@ export default function Inspector() {
 
   return (
     <div className="w-full h-full bg-[#0a0a0d] border-l border-white/5 flex flex-col overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
-        <p className="text-[10px] text-white/30 uppercase tracking-widest">
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">
           {selectedNode ? nodeTypeLabel(selectedNode.type) : 'Inspector'}
         </p>
         {selectedNode && (
           <button
             onClick={() => setSelectedNode(null)}
-            className="text-white/20 hover:text-white/50"
+            className="text-white/25 hover:text-white/55 transition-colors"
           >
-            <X size={13} />
+            <X size={14} />
           </button>
         )}
       </div>
@@ -32,10 +32,10 @@ export default function Inspector() {
         {/* Breadcrumb for child nodes inside a loop group */}
         {parentNode && (
           <button
-            className="flex items-center gap-1.5 text-[10px] text-amber-400/50 hover:text-amber-400/80 transition-colors mb-4 -mt-1"
+            className="flex items-center gap-1.5 text-xs text-amber-400/55 hover:text-amber-400/85 transition-colors mb-4 -mt-1"
             onClick={() => setSelectedNode(parentNode.id)}
           >
-            <ArrowLeft size={10} />
+            <ArrowLeft size={12} />
             Back to Loop Group
           </button>
         )}
@@ -71,9 +71,9 @@ function WorkflowSettings() {
 
   return (
     <div className="space-y-4">
-      <p className="text-[10px] text-white/25">Select a node on the canvas to edit it, or update workflow settings below.</p>
+      <p className="text-xs text-white/30 leading-relaxed">Select a node on the canvas to edit it, or update workflow settings below.</p>
       <div>
-        <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1.5">Workflow name</p>
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-1.5">Workflow name</p>
         <input
           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50"
           value={currentWorkflow.name}
@@ -81,7 +81,7 @@ function WorkflowSettings() {
         />
       </div>
       <div>
-        <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1.5">Description</p>
+        <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-1.5">Description</p>
         <textarea
           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50 h-20 resize-none"
           value={currentWorkflow.description}
@@ -110,10 +110,10 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 text-[10px] py-1.5 rounded-md transition-colors capitalize ${
+            className={`flex-1 text-xs py-1.5 rounded-md transition-colors font-medium ${
               activeTab === tab
-                ? 'bg-amber-500/20 text-amber-300/90 font-medium'
-                : 'text-white/35 hover:text-white/60'
+                ? 'bg-amber-500/20 text-amber-300 shadow-sm'
+                : 'text-white/40 hover:text-white/65'
             }`}
           >
             {tab === 'loop' ? 'Loop' : tab === 'worker' ? 'Worker' : 'Reviewer'}
@@ -123,7 +123,7 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
 
       {activeTab === 'loop' && (
         <div className="space-y-4">
-          <div className="bg-white/3 rounded-lg px-3 py-2.5 text-[11px] text-white/40 leading-relaxed">
+          <div className="bg-white/3 rounded-lg px-3 py-2.5 text-xs text-white/45 leading-relaxed">
             The worker runs the task. The reviewer checks it. If the reviewer isn't satisfied, the worker tries again — up to the max you set.
           </div>
 
@@ -136,7 +136,7 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
               max={10}
               onChange={(e) => updateNode(node.id, { data: { ...d, maxRetries: Number(e.target.value) } })}
             />
-            <p className="text-[10px] text-white/25 mt-1">How many times the worker can try before giving up.</p>
+            <p className="text-xs text-white/30 mt-1">How many times the worker can try before giving up.</p>
           </Field>
 
           <Field label="Exit condition">
@@ -150,23 +150,23 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
               <option style={optStyle} value="reviewer_approves">Stop as soon as reviewer approves</option>
               <option style={optStyle} value="max_retries">Always run all attempts</option>
             </select>
-            <p className="text-[10px] text-white/25 mt-1">
+            <p className="text-xs text-white/30 mt-1">
               Reviewer must include "APPROVED" in its response to exit early.
             </p>
           </Field>
 
           <div className="border-t border-white/5 pt-3">
-            <p className="text-[10px] text-white/25 mb-2">Quick access</p>
+            <p className="text-xs text-white/30 mb-2">Quick access</p>
             <div className="flex gap-2">
               <button
                 onClick={() => { setActiveTab('worker'); workerNode && setSelectedNode(workerNode.id) }}
-                className="flex-1 text-[10px] py-2 rounded-lg border border-purple-500/20 text-purple-300/50 hover:border-purple-500/40 hover:text-purple-300/80 transition-colors"
+                className="flex-1 text-xs py-2 rounded-lg border border-purple-500/20 text-purple-300/55 hover:border-purple-500/40 hover:text-purple-300/85 transition-colors"
               >
                 Edit Worker →
               </button>
               <button
                 onClick={() => { setActiveTab('reviewer'); reviewerNode && setSelectedNode(reviewerNode.id) }}
-                className="flex-1 text-[10px] py-2 rounded-lg border border-sky-500/20 text-sky-300/50 hover:border-sky-500/40 hover:text-sky-300/80 transition-colors"
+                className="flex-1 text-xs py-2 rounded-lg border border-sky-500/20 text-sky-300/55 hover:border-sky-500/40 hover:text-sky-300/85 transition-colors"
               >
                 Edit Reviewer →
               </button>
@@ -178,13 +178,13 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
       {activeTab === 'worker' && (
         workerNode
           ? <AgentInspector node={workerNode} />
-          : <p className="text-[11px] text-white/30">Worker agent not found.</p>
+          : <p className="text-xs text-white/30">Worker agent not found.</p>
       )}
 
       {activeTab === 'reviewer' && (
         reviewerNode
           ? <AgentInspector node={reviewerNode} />
-          : <p className="text-[11px] text-white/30">Reviewer agent not found.</p>
+          : <p className="text-xs text-white/30">Reviewer agent not found.</p>
       )}
     </div>
   )
@@ -222,7 +222,7 @@ function GateInspector({ node }: { node: WorkflowNode }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] text-white/35 uppercase tracking-wider mb-1.5">{label}</p>
+      <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-1.5">{label}</p>
       {children}
     </div>
   )

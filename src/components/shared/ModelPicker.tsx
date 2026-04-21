@@ -57,8 +57,8 @@ export default function ModelPicker({
               <div key={p.id}>
                 <div className="px-3 py-1.5 bg-white/3 flex items-center gap-2 sticky top-0">
                   <ProviderDot provider={p.id} hasKey={status?.hasKey ?? false} />
-                  <span className="text-[10px] text-white/40 uppercase tracking-wider">{p.label}</span>
-                  {!status?.hasKey && <span className="text-[9px] text-amber-400/60 ml-auto">no key</span>}
+                  <span className="text-xs text-white/40 uppercase tracking-wider">{p.label}</span>
+                  {!status?.hasKey && <span className="text-xs text-amber-400/60 ml-auto">no key</span>}
                 </div>
                 {models.map((m) => (
                   <button
@@ -79,13 +79,13 @@ export default function ModelPicker({
           <div>
             <div className="px-3 py-1.5 bg-white/3 flex items-center gap-2 sticky top-0">
               <ProviderDot provider="ollama" hasKey={ollamaModels.length > 0} />
-              <span className="text-[10px] text-white/40 uppercase tracking-wider">Ollama (local)</span>
-              {ollamaLoading && <span className="text-[9px] text-white/30 ml-auto">scanning...</span>}
+              <span className="text-xs text-white/40 uppercase tracking-wider">Ollama (local)</span>
+              {ollamaLoading && <span className="text-xs text-white/30 ml-auto">scanning...</span>}
               {!ollamaLoading && ollamaModels.length === 0 && (
-                <span className="text-[9px] text-amber-400/50 ml-auto">not detected</span>
+                <span className="text-xs text-amber-400/50 ml-auto">not detected</span>
               )}
               {!ollamaLoading && ollamaModels.length > 0 && (
-                <span className="text-[9px] text-green-400/60 ml-auto">{ollamaModels.length} model{ollamaModels.length !== 1 ? 's' : ''}</span>
+                <span className="text-xs text-green-400/60 ml-auto">{ollamaModels.length} model{ollamaModels.length !== 1 ? 's' : ''}</span>
               )}
             </div>
             {ollamaModels.map((name) => (
@@ -101,7 +101,7 @@ export default function ModelPicker({
             ))}
             {/* Custom model input */}
             <div className="px-3 py-2 border-t border-white/5">
-              <p className="text-[9px] text-white/25 mb-1.5 uppercase tracking-wider">Custom model name</p>
+              <p className="text-xs font-semibold text-white/25 mb-1.5 uppercase tracking-wider">Custom model name</p>
               <div className="flex gap-1.5">
                 <input
                   value={customModel}
@@ -135,21 +135,21 @@ export default function ModelPicker({
           <div className="px-3 py-3 border-t border-white/8 space-y-3 bg-white/2">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <label className="text-[10px] text-white/35 w-20">Creativity</label>
+                <label className="text-xs font-semibold text-white/35 w-20">Creativity</label>
                 <input
                   type="range" min={0} max={1} step={0.05}
                   value={value.temperature}
                   onChange={(e) => onChange({ ...value, temperature: Number(e.target.value) })}
                   className="flex-1 accent-purple-500"
                 />
-                <span className="text-[11px] text-white/50 w-6 text-right">{value.temperature}</span>
+                <span className="text-xs text-white/50 w-6 text-right">{value.temperature}</span>
               </div>
-              <p className="text-[9px] text-white/20 pl-0.5">
+              <p className="text-xs text-white/20 pl-0.5">
                 Low = focused & predictable · High = creative & varied
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <label className="text-[10px] text-white/35 w-20">Max length</label>
+              <label className="text-xs font-semibold text-white/35 w-20">Max length</label>
               <input
                 type="number" value={value.maxTokens} min={256} max={16384}
                 onChange={(e) => onChange({ ...value, maxTokens: Number(e.target.value) })}

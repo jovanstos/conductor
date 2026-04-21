@@ -12,10 +12,6 @@ export default memo(function EndNode(_: NodeProps) {
     <div className={`w-48 rounded-xl border shadow-lg transition-colors ${
       isDone ? 'border-indigo-400/60 bg-[#10101f]' : 'border-indigo-500/30 bg-[#10101a]'
     }`}>
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-indigo-400/30 pointer-events-none select-none">
-        result
-      </span>
-
       <Handle
         type="target"
         position={Position.Left}
@@ -32,16 +28,16 @@ export default memo(function EndNode(_: NodeProps) {
           </div>
           <div>
             <p className="text-sm font-semibold text-white/85">End</p>
-            <p className="text-[11px] text-indigo-400/60">
+            <p className="text-xs text-indigo-400/60">
               {isDone ? 'Final result' : 'Final output'}
             </p>
           </div>
         </div>
 
         {finalOutput ? (
-          <p className="text-[10px] text-white/45 line-clamp-3 leading-relaxed">{finalOutput}</p>
+          <p className="text-xs text-white/50 line-clamp-3 leading-relaxed">{finalOutput}</p>
         ) : (
-          <p className="text-[10px] text-white/20 italic">Worker result arrives here</p>
+          <p className="text-xs text-white/25 italic">Worker result arrives here</p>
         )}
       </div>
     </div>

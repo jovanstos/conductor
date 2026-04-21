@@ -105,7 +105,7 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
                 <div className="flex items-center gap-2 mb-0.5">
                   <p className="text-sm font-semibold text-white/90">{s.name}</p>
                   {s.agentCount > 0 && (
-                    <span className="text-[10px] text-white/30 bg-white/6 px-2 py-0.5 rounded-full">
+                    <span className="text-xs text-white/30 bg-white/6 px-2 py-0.5 rounded-full">
                       {s.agentCount} agents
                     </span>
                   )}

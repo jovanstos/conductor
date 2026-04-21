@@ -6,8 +6,15 @@ import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
 
 // Group dimensions — must match the style applied in toRFNode()
-export const LOOP_GROUP_W = 560
-export const LOOP_GROUP_H = 260
+export const LOOP_GROUP_W = 580
+export const LOOP_GROUP_H = 270
+
+// Child card geometry (relative to group top-left, px)
+const CARD_TOP    = 72   // top of child agent cards
+const CARD_H      = 160  // height of child agent cards (w-64 = 256px wide)
+const WORKER_X    = 28   // left edge of worker card
+const REVIEWER_X  = 292  // left edge of reviewer card (WORKER_X + 256 + 8 gap)
+const CARD_W      = 256  // width of each card (w-64)
 
 export default memo(function LoopGroupNode({ id, data }: NodeProps) {
   const d = data as unknown as LoopNodeData
@@ -33,21 +40,17 @@ export default memo(function LoopGroupNode({ id, data }: NodeProps) {
         : 'border-amber-500/20'
 
   const bgColor = isLoopRunning
-    ? 'bg-amber-500/4'
+    ? 'bg-amber-500/5'
     : isLoopDone
-      ? 'bg-emerald-500/3'
+      ? 'bg-emerald-500/4'
       : 'bg-[#0f0e09]/80'
 
-  // Child agent card geometry (relative to group top-left)
-  // Worker: x=30, y=70   width=256  height=160 (w-64)
-  // Reviewer: x=274, y=70
-  const W_LEFT   = 30   + 256  // right edge of worker
-  const W_MID_Y  = 70  + 80  // vertical midpoint of worker
-  const R_LEFT   = 274              // left edge of reviewer
-  const R_MID_Y  = W_MID_Y
-  const R_RIGHT  = 274 + 256       // right edge of reviewer
-  const W_BOT_Y  = 70  + 150
-  const R_BOT_Y  = W_BOT_Y
+  // Geometry for SVG arrows
+  const workerRight  = WORKER_X + CARD_W
+  const workerMidY   = CARD_TOP + CARD_H / 2
+  const reviewerLeft = REVIEWER_X
+  const reviewerRight = REVIEWER_X + CARD_W
+  const cardBotY     = CARD_TOP + CARD_H
 
   return (
     <div
@@ -65,53 +68,58 @@ export default memo(function LoopGroupNode({ id, data }: NodeProps) {
       </button>
 
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 h-10 px-4 flex items-center gap-2 border-b border-amber-500/10">
-        <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isLoopRunning ? 'bg-amber-500/20' : 'bg-amber-500/10'}`}>
+      <div className="absolute top-0 left-0 right-0 h-11 px-4 flex items-center gap-2.5 border-b border-amber-500/10">
+        <div className={`w-6 h-6 rounded-md flex items-center justify-center ${isLoopRunning ? 'bg-amber-500/20' : 'bg-amber-500/10'}`}>
           <RefreshCw
-            size={11}
-            className={`text-amber-400 ${isLoopRunning ? 'animate-spin' : ''}`}
-            style={isLoopRunning ? { animationDuration: '1.5s' } : undefined}
+            size={12}
+            className={`text-amber-400 ${isLoopRunning ? 'animate-spin [animation-duration:1.5s]' : ''}`}
           />
         </div>
-        <span className="text-[11px] font-semibold text-white/70">Feedback Loop</span>
-        <span className="text-[9px] text-amber-400/40">up to {d.maxRetries}×</span>
-        <span className="text-[9px] text-amber-400/30 ml-auto">
+        <span className="text-sm font-semibold text-white/75">Feedback Loop</span>
+        <span className="text-xs text-amber-400/50 font-medium">up to {d.maxRetries}×</span>
+        <span className="text-xs text-amber-400/35 ml-auto">
           {d.exitCondition === 'reviewer_approves' ? 'exits on approval' : `always runs ${d.maxRetries}×`}
         </span>
         {isLoopDone && (
-          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center gap-0.5 ml-1">
-            <Check size={7} /> done
+          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center gap-1 font-medium">
+            <Check size={11} /> Done
           </span>
         )}
       </div>
 
-      {/* Agent slot labels */}
-      <span className="absolute text-[8px] font-mono text-purple-400/40 pointer-events-none select-none" style={{ left: 30, top: 54 }}>
-        WORKER
+      {/* Slot labels — positioned above each card */}
+      <span
+        className="absolute text-xs font-semibold tracking-wider text-purple-400/50 pointer-events-none select-none uppercase"
+        style={{ left: WORKER_X, top: CARD_TOP - 18 }}
+      >
+        Worker
       </span>
-      <span className="absolute text-[8px] font-mono text-sky-400/40 pointer-events-none select-none" style={{ left: 274, top: 54 }}>
-        REVIEWER
+      <span
+        className="absolute text-xs font-semibold tracking-wider text-sky-400/50 pointer-events-none select-none uppercase"
+        style={{ left: REVIEWER_X, top: CARD_TOP - 18 }}
+      >
+        Reviewer
       </span>
 
       {/* Internal flow arrows — SVG overlay, non-interactive */}
       <svg
-        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+        className="absolute inset-0 w-full h-full pointer-events-none"
       >
         <defs>
           <marker id={`loop-fwd-${id}`} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
             <path d="M0,0 L0,6 L6,3 z" fill="rgba(245,158,11,0.5)" />
           </marker>
           <marker id={`loop-back-${id}`} markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto-start-reverse">
-            <path d="M0,0 L0,6 L6,3 z" fill="rgba(239,68,68,0.3)" />
+            <path d="M0,0 L0,6 L6,3 z" fill="rgba(239,68,68,0.35)" />
           </marker>
         </defs>
 
         {/* Forward arrow: worker → reviewer */}
         <line
-          x1={W_LEFT}
-          y1={W_MID_Y}
-          x2={R_LEFT}
-          y2={R_MID_Y}
+          x1={workerRight}
+          y1={workerMidY}
+          x2={reviewerLeft}
+          y2={workerMidY}
           stroke="rgba(245,158,11,0.4)"
           strokeWidth={1.5}
           markerEnd={`url(#loop-fwd-${id})`}
@@ -119,7 +127,7 @@ export default memo(function LoopGroupNode({ id, data }: NodeProps) {
 
         {/* Feedback arc: reviewer bottom → worker bottom */}
         <path
-          d={`M ${R_RIGHT} ${R_BOT_Y} C ${R_RIGHT + 30} ${R_BOT_Y + 55} ${W_LEFT - 230} ${W_BOT_Y + 55} ${W_LEFT - 256} ${W_BOT_Y}`}
+          d={`M ${reviewerRight} ${cardBotY} C ${reviewerRight + 32} ${cardBotY + 52} ${WORKER_X - 20} ${cardBotY + 52} ${WORKER_X} ${cardBotY}`}
           fill="none"
           stroke="rgba(239,68,68,0.25)"
           strokeWidth={1.5}
@@ -130,30 +138,23 @@ export default memo(function LoopGroupNode({ id, data }: NodeProps) {
 
       {/* Live phase label */}
       {isWorkerRunning && (
-        <span className="absolute bottom-3 left-0 right-0 text-center text-[9px] text-purple-400/60 pointer-events-none">
+        <span className="absolute bottom-3 left-0 right-0 text-center text-xs text-purple-400/60 pointer-events-none">
           Worker generating…
         </span>
       )}
       {isReviewerRunning && (
-        <span className="absolute bottom-3 left-0 right-0 text-center text-[9px] text-sky-400/60 pointer-events-none">
+        <span className="absolute bottom-3 left-0 right-0 text-center text-xs text-sky-400/60 pointer-events-none">
           Reviewer checking…
         </span>
       )}
 
       {/* External handles */}
-      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-amber-400/25 pointer-events-none select-none">
-        ctx
-      </span>
       <Handle
         type="target"
         position={Position.Left}
         id="context"
         className="!bg-amber-500/50 !border-amber-400/30 !w-3 !h-3"
       />
-
-      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-mono text-emerald-400/25 pointer-events-none select-none">
-        out
-      </span>
       <Handle
         type="source"
         position={Position.Right}

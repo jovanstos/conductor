@@ -52,7 +52,7 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto py-2">
         <SectionLabel label="My Workflows" />
         {filtered.length === 0 ? (
-          <p className="px-4 py-2 text-[11px] text-white/25">No workflows yet</p>
+          <p className="px-4 py-2 text-xs text-white/25">No workflows yet</p>
         ) : (
           filtered.map((w) => (
             <WorkflowItem
@@ -96,7 +96,7 @@ export default function Sidebar() {
             </button>
           </div>
           {projects.length === 0 ? (
-            <p className="px-4 py-1 text-[11px] text-white/20">No saved projects</p>
+            <p className="px-4 py-1 text-xs text-white/20">No saved projects</p>
           ) : (
             projects.map((p) => (
               <ProjectItem
@@ -141,7 +141,7 @@ export default function Sidebar() {
 
 function SectionLabel({ label }: { label: string }) {
   return (
-    <p className="px-4 mb-1.5 text-[11px] text-white/30 uppercase tracking-widest font-medium">{label}</p>
+    <p className="px-4 mb-1.5 text-xs font-semibold text-white/30 uppercase tracking-widest">{label}</p>
   )
 }
 
@@ -192,7 +192,7 @@ function WorkflowItem({
           {rosterDots.map((r, i) => (
             <div key={i} className={`w-1.5 h-1.5 rounded-full ${r.dotColor} opacity-60`} title={r.label} />
           ))}
-          {agentNodes.length > 5 && <span className="text-[9px] text-white/20 ml-0.5">+{agentNodes.length - 5}</span>}
+          {agentNodes.length > 5 && <span className="text-xs text-white/20 ml-0.5">+{agentNodes.length - 5}</span>}
         </div>
       )}
       {hover && (

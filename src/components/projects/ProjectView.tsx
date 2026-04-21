@@ -45,7 +45,7 @@ function TreeNode({ node, depth, selectedPath, onSelectFile }: TreeNodeProps) {
       <div>
         <button
           onClick={() => setExpanded((e) => !e)}
-          className="w-full text-left flex items-center gap-1.5 py-0.5 text-[11px] font-mono text-white/50 hover:text-white/75 hover:bg-white/5 transition-colors"
+          className="w-full text-left flex items-center gap-1.5 py-0.5 text-xs font-mono text-white/50 hover:text-white/75 hover:bg-white/5 transition-colors"
           style={{ paddingLeft: `${8 + indent}px`, paddingRight: '8px' }}
         >
           <ChevronRight
@@ -75,7 +75,7 @@ function TreeNode({ node, depth, selectedPath, onSelectFile }: TreeNodeProps) {
   return (
     <button
       onClick={() => onSelectFile(node.path, node.content ?? '')}
-      className={`w-full text-left flex items-center gap-1.5 py-0.5 text-[11px] font-mono truncate transition-colors ${
+      className={`w-full text-left flex items-center gap-1.5 py-0.5 text-xs font-mono truncate transition-colors ${
         isSelected
           ? 'bg-emerald-500/15 text-emerald-300'
           : 'text-white/45 hover:text-white/70 hover:bg-white/5'
@@ -192,7 +192,7 @@ export default function ProjectView({ project, onClose }: Props) {
           <FolderOpen size={18} className="text-emerald-400 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white/90 truncate">{project.name}</p>
-            <p className="text-[11px] text-white/30 font-mono truncate">{project.path}</p>
+            <p className="text-xs text-white/30 font-mono truncate">{project.path}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {exportMsg && <span className="text-xs text-emerald-300">{exportMsg}</span>}
@@ -258,7 +258,7 @@ export default function ProjectView({ project, onClose }: Props) {
           <div className="flex-1 flex overflow-hidden">
             {/* File tree sidebar */}
             <div className="w-60 shrink-0 border-r border-white/8 overflow-y-auto py-2">
-              <p className="px-4 mb-2 text-[10px] text-white/25 uppercase tracking-widest">
+              <p className="px-4 mb-2 text-xs font-semibold text-white/25 uppercase tracking-widest">
                 {fileCount} file{fileCount !== 1 ? 's' : ''}
               </p>
               {tree.map((node) => (
@@ -276,7 +276,7 @@ export default function ProjectView({ project, onClose }: Props) {
             <div className="flex-1 overflow-auto p-4">
               {selectedPath ? (
                 <>
-                  <p className="text-[11px] text-white/30 font-mono mb-3">{selectedPath}</p>
+                  <p className="text-xs text-white/30 font-mono mb-3">{selectedPath}</p>
                   <pre className="text-xs text-white/70 whitespace-pre-wrap font-mono leading-relaxed">
                     {selectedContent || <span className="text-white/20 italic">Empty file</span>}
                   </pre>

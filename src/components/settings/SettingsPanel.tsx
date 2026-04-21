@@ -212,7 +212,7 @@ function ApiKeyRow({
         )}
       </div>
       {testResult && (
-        <p className={`text-[11px] pl-5 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+        <p className={`text-xs pl-5 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
           {testResult.ok ? <Check size={11} className="inline mr-1" /> : <X size={11} className="inline mr-1" />}{testResult.msg}
         </p>
       )}
@@ -228,7 +228,7 @@ function OllamaSettings() {
         Ollama runs locally. Make sure it's running before using local models.
       </p>
       <div className="flex items-center gap-3">
-        <label className="text-[10px] text-white/40 uppercase tracking-wider w-20">Base URL</label>
+        <label className="text-xs text-white/40 uppercase tracking-wider w-20">Base URL</label>
         <input
           className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50"
           value={ollamaUrl}

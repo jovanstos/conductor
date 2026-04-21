@@ -91,7 +91,7 @@ export default function ResultModal() {
             {totalTokens > 0 && <StatPill icon={<Cpu size={11} />} label={`${totalTokens.toLocaleString()} tokens`} />}
             {totalFiles > 0 && <StatPill icon={<FileText size={11} />} label={`${totalFiles} file${totalFiles !== 1 ? 's' : ''} created`} />}
             {duration && <StatPill icon={<Clock size={11} />} label={duration} />}
-            <span className="text-[10px] text-white/20 ml-auto">{startTime}</span>
+            <span className="text-xs text-white/20 ml-auto">{startTime}</span>
           </div>
         </div>
 
@@ -170,7 +170,7 @@ export default function ResultModal() {
 
 function StatPill({ icon, label }: { icon: ReactNode; label: string }) {
   return (
-    <div className="flex items-center gap-1.5 text-[11px] text-white/45">
+    <div className="flex items-center gap-1.5 text-xs text-white/45">
       <span className="text-white/30">{icon}</span>
       {label}
     </div>
@@ -193,7 +193,7 @@ function TeamContributionRow({ step }: { step: RunStep }) {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-white/75">{step.nodeName}</p>
-          <p className="text-[10px] text-white/30">
+          <p className="text-xs text-white/30">
             {filesCount > 0 ? `Created ${filesCount} file${filesCount !== 1 ? 's' : ''}` : 'Wrote response'}
             {step.tokensUsed ? ` · ${step.tokensUsed.toLocaleString()} tokens` : ''}
           </p>
@@ -201,18 +201,18 @@ function TeamContributionRow({ step }: { step: RunStep }) {
         {filesCount > 0 && (
           <div className="flex flex-wrap gap-1 max-w-[160px] justify-end">
             {step.filesWritten!.slice(0, 3).map((f) => (
-              <span key={f} className="text-[9px] bg-emerald-500/10 text-emerald-400/60 rounded px-1.5 py-0.5 font-mono truncate max-w-[80px]">
+              <span key={f} className="text-xs bg-emerald-500/10 text-emerald-400/60 rounded px-1.5 py-0.5 font-mono truncate max-w-[80px]">
                 {f.split('/').pop()}
               </span>
             ))}
-            {filesCount > 3 && <span className="text-[9px] text-white/20">+{filesCount - 3}</span>}
+            {filesCount > 3 && <span className="text-xs text-white/20">+{filesCount - 3}</span>}
           </div>
         )}
         {open ? <ChevronUp size={11} className="text-white/20 shrink-0" /> : <ChevronDown size={11} className="text-white/20 shrink-0" />}
       </button>
       {open && step.output && (
         <div className="mt-2 max-h-40 overflow-y-auto rounded-lg bg-black/20 px-2.5 py-2 border border-white/5">
-          <pre className="text-[11px] text-white/50 whitespace-pre-wrap leading-relaxed font-mono">{step.output}</pre>
+          <pre className="text-xs text-white/50 whitespace-pre-wrap leading-relaxed font-mono">{step.output}</pre>
         </div>
       )}
     </div>

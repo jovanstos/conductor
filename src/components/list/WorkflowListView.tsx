@@ -146,9 +146,9 @@ function ListRow({
         <span className="text-sm text-white/40">{icon}</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm text-white/80 font-medium truncate">{getName()}</p>
-          <p className="text-[11px] text-white/35 truncate">{getSubtitle()}</p>
+          <p className="text-xs text-white/35 truncate">{getSubtitle()}</p>
         </div>
-        <span className={`text-[10px] font-mono ${statusColor}`}>{status}</span>
+        <span className={`text-xs font-mono ${statusColor}`}>{status}</span>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
           className="text-white/15 hover:text-red-400 text-xs transition-colors ml-1"
@@ -159,7 +159,7 @@ function ListRow({
 
       {output && (
         <div className="px-3 pb-2.5 border-t border-white/5">
-          <p className="text-[11px] text-white/40 leading-relaxed line-clamp-3 pt-2">{output}</p>
+          <p className="text-xs text-white/40 leading-relaxed line-clamp-3 pt-2">{output}</p>
         </div>
       )}
     </div>
