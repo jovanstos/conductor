@@ -4,6 +4,7 @@ import type {
   WorkflowSettings,
   Workflow,
   AgentNodeData,
+  ToolNameId,
 } from "../types";
 
 export const PROVIDER_COLORS: Record<string, string> = {
@@ -230,9 +231,60 @@ export function newAgentNodeData(
     model: { ...DEFAULT_MODEL },
     contextMode: "full_chain",
     maxTokens: 999999,
+    toolsEnabled: [],
     ...overrides,
   };
 }
+
+// ── Tool registry ────────────────────────────────────
+
+export type ToolGroup = 'filesystem' | 'shell' | 'web'
+
+export type ToolRegistryEntry = {
+  id: ToolNameId
+  label: string
+  description: string
+  group: ToolGroup
+  requiresConfirmation: boolean
+}
+
+export const TOOL_REGISTRY: ToolRegistryEntry[] = [
+  { id: 'read_file',          label: 'Read File',          description: 'Read the contents of a file',                          group: 'filesystem', requiresConfirmation: false },
+  { id: 'write_file',         label: 'Write File',         description: 'Create or overwrite a file with new content',          group: 'filesystem', requiresConfirmation: false },
+  { id: 'edit_file',          label: 'Edit File',          description: 'Replace a specific string in a file (token-efficient)', group: 'filesystem', requiresConfirmation: false },
+  { id: 'list_directory',     label: 'List Directory',     description: 'List files and folders in a directory',                group: 'filesystem', requiresConfirmation: false },
+  { id: 'search_files',       label: 'Search Files',       description: 'Search for a pattern across files recursively',        group: 'filesystem', requiresConfirmation: false },
+  { id: 'create_directory',   label: 'Create Directory',   description: 'Create a new directory (including parent dirs)',       group: 'filesystem', requiresConfirmation: false },
+  { id: 'move_file',          label: 'Move / Rename File', description: 'Move or rename a file or directory',                  group: 'filesystem', requiresConfirmation: false },
+  { id: 'delete_file',        label: 'Delete File',        description: 'Permanently delete a file',                           group: 'filesystem', requiresConfirmation: true  },
+  { id: 'run_shell_command',  label: 'Run Shell Command',  description: 'Execute a shell command on the system',               group: 'shell',      requiresConfirmation: true  },
+  { id: 'fetch_url',          label: 'Fetch URL',          description: 'Download and read content from a URL',                group: 'web',        requiresConfirmation: false },
+]
+
+export const TOOL_GROUPS: { id: ToolGroup; label: string }[] = [
+  { id: 'filesystem', label: 'File System' },
+  { id: 'shell',      label: 'Shell' },
+  { id: 'web',        label: 'Web' },
+]
+
+export const TOOL_PRESETS: { id: string; label: string; tools: ToolNameId[] }[] = [
+  { id: 'none',        label: 'No Tools',    tools: [] },
+  {
+    id: 'readonly',
+    label: 'Read-Only',
+    tools: ['read_file', 'list_directory', 'search_files'],
+  },
+  {
+    id: 'file-editor',
+    label: 'File Editor',
+    tools: ['read_file', 'write_file', 'edit_file', 'list_directory', 'search_files', 'create_directory', 'move_file'],
+  },
+  {
+    id: 'full-dev',
+    label: 'Full Dev',
+    tools: ['read_file', 'write_file', 'edit_file', 'list_directory', 'search_files', 'create_directory', 'move_file', 'delete_file', 'run_shell_command', 'fetch_url'],
+  },
+]
 
 // Content Factory: Start → [Loop: Writer + Editor] → Final Polish → End
 export function contentFactoryWorkflow(): Workflow {

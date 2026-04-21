@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { X, Zap, ChevronDown, ChevronRight, Plus, Play, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone } from 'lucide-react'
-import type { WorkflowNode, AgentNodeData, Template } from '../../types'
+import { X, Zap, ChevronDown, ChevronRight, Plus, Play, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Wrench, AlertTriangle } from 'lucide-react'
+import type { WorkflowNode, AgentNodeData, Template, ToolNameId } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
-import { BUILT_IN_TEMPLATES, getRoleInfo, type RoleCategory } from '../../lib/defaults'
+import { BUILT_IN_TEMPLATES, getRoleInfo, TOOL_REGISTRY, TOOL_GROUPS, TOOL_PRESETS, type RoleCategory } from '../../lib/defaults'
 import { getTemplates, saveTemplate, deleteTemplate } from '../../lib/tauri'
 import ModelPicker from '../shared/ModelPicker'
 import AgentTestModal from './AgentTestModal'
@@ -39,7 +39,9 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
   const [maxTokens, setMaxTokens] = useState(d.maxTokens)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showTools, setShowTools] = useState(false)
   const [showTestModal, setShowTestModal] = useState(false)
+  const [toolsEnabled, setToolsEnabled] = useState<ToolNameId[]>(d.toolsEnabled ?? [])
 
   // Custom template save state
   const [showSaveForm, setShowSaveForm] = useState(false)
@@ -53,6 +55,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
     setPrompt(d.systemPrompt)
     setContextMode(d.contextMode)
     setMaxTokens(d.maxTokens)
+    setToolsEnabled(d.toolsEnabled ?? [])
     setShowTemplates(false)
     setShowSaveForm(false)
   }, [node.id])
@@ -65,8 +68,18 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
 
   function save(patch?: Partial<AgentNodeData>) {
     updateNode(node.id, {
-      data: { ...d, name, roleDescription: role, systemPrompt: prompt, contextMode, maxTokens, ...patch },
+      data: { ...d, name, roleDescription: role, systemPrompt: prompt, contextMode, maxTokens, toolsEnabled, ...patch },
     })
+  }
+
+  function saveTools(next: ToolNameId[]) {
+    setToolsEnabled(next)
+    updateNode(node.id, { data: { ...d, name, roleDescription: role, systemPrompt: prompt, contextMode, maxTokens, toolsEnabled: next } })
+  }
+
+  function toggleTool(id: ToolNameId) {
+    const next = toolsEnabled.includes(id) ? toolsEnabled.filter((t) => t !== id) : [...toolsEnabled, id]
+    saveTools(next)
   }
 
   function applyTemplate(t: Template | typeof BUILT_IN_TEMPLATES[number]) {
@@ -322,6 +335,90 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
           </Field>
         </div>
       )}
+
+      {/* Tools section */}
+      <div className="pt-2 border-t border-white/5">
+        <button
+          onClick={() => setShowTools((v) => !v)}
+          className="w-full flex items-center justify-between text-[10px] text-white/35 hover:text-white/55 transition-colors mb-1"
+        >
+          <span className="flex items-center gap-1.5">
+            <Wrench size={11} />
+            Tools
+            {toolsEnabled.length > 0 && (
+              <span className="bg-purple-500/20 text-purple-300 text-[9px] px-1.5 py-0.5 rounded-full">
+                {toolsEnabled.length} active
+              </span>
+            )}
+          </span>
+          {showTools ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        </button>
+
+        {showTools && (
+          <div className="space-y-2">
+            {/* Preset buttons */}
+            <div className="flex flex-wrap gap-1">
+              {TOOL_PRESETS.map((preset) => {
+                const active = preset.tools.length === toolsEnabled.length && preset.tools.every((t) => toolsEnabled.includes(t))
+                return (
+                  <button
+                    key={preset.id}
+                    onClick={() => saveTools(preset.tools as ToolNameId[])}
+                    className={`text-[10px] px-2 py-1 rounded-lg border transition-colors ${
+                      active
+                        ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
+                        : 'bg-white/4 border-white/10 text-white/40 hover:border-white/25 hover:text-white/60'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Per-group checkboxes */}
+            <div className="space-y-2">
+              {TOOL_GROUPS.map((group) => {
+                const groupTools = TOOL_REGISTRY.filter((t) => t.group === group.id)
+                return (
+                  <div key={group.id}>
+                    <p className="text-[9px] text-white/25 uppercase tracking-wider mb-1">{group.label}</p>
+                    <div className="space-y-0.5">
+                      {groupTools.map((tool) => {
+                        const checked = toolsEnabled.includes(tool.id)
+                        return (
+                          <label key={tool.id} className="flex items-center gap-2 cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleTool(tool.id)}
+                              className="w-3 h-3 accent-purple-500 cursor-pointer"
+                            />
+                            <span className="text-[11px] text-white/55 group-hover:text-white/75 transition-colors flex items-center gap-1 flex-1">
+                              {tool.label}
+                              {tool.requiresConfirmation && (
+                                <span className="text-[9px] text-amber-400/60 flex items-center gap-0.5 ml-1">
+                                  <AlertTriangle size={9} /> asks permission
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {toolsEnabled.length > 0 && (
+              <p className="text-[10px] text-white/25 leading-relaxed">
+                When tools are active the agent reads files on demand — no large context injections.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Test agent button */}
       <div className="pt-2 border-t border-white/5">

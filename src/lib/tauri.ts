@@ -15,6 +15,9 @@ import type {
   StepChunkPayload,
   GatePausedPayload,
   CompletedPayload,
+  ToolCallStartedPayload,
+  ToolCallDonePayload,
+  ToolConfirmRequestPayload,
 } from '../types'
 
 // Workflow CRUD
@@ -90,6 +93,10 @@ export const writeTextFile = (path: string, content: string) =>
 export const importWorkflow = (json: string) =>
   invoke<Workflow>('import_workflow', { json })
 
+// Tool confirmation response
+export const respondToolConfirmation = (runId: string, toolCallId: string, approved: boolean) =>
+  invoke<void>('respond_tool_confirmation', { runId, toolCallId, approved })
+
 // Tauri event listeners for run lifecycle
 export type RunEventHandlers = {
   onStepStarted?: (payload: StepStartedPayload) => void
@@ -99,6 +106,9 @@ export type RunEventHandlers = {
   onGatePaused?: (payload: GatePausedPayload) => void
   onCompleted?: (payload: CompletedPayload) => void
   onCancelled?: () => void
+  onToolCallStarted?: (payload: ToolCallStartedPayload) => void
+  onToolCallDone?: (payload: ToolCallDonePayload) => void
+  onToolConfirmRequest?: (payload: ToolConfirmRequestPayload) => void
 }
 
 export async function listenToRun(
@@ -144,6 +154,24 @@ export async function listenToRun(
 
     handlers.onCancelled
       ? listen<void>(`conductor://run/${runId}/cancelled`, () => handlers.onCancelled!())
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onToolCallStarted
+      ? listen<ToolCallStartedPayload>(`conductor://run/${runId}/tool_call_started`, (e) =>
+          handlers.onToolCallStarted!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onToolCallDone
+      ? listen<ToolCallDonePayload>(`conductor://run/${runId}/tool_call_done`, (e) =>
+          handlers.onToolCallDone!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onToolConfirmRequest
+      ? listen<ToolConfirmRequestPayload>(`conductor://run/${runId}/tool_confirm_request`, (e) =>
+          handlers.onToolConfirmRequest!(e.payload),
+        )
       : Promise.resolve<UnlistenFn>(() => {}),
   ])
 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
-import { FolderOpen, Clock, Download, X, ChevronDown, ChevronUp, ChevronRight, Pause, ArrowRight, Square, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Zap } from 'lucide-react'
+import { FolderOpen, Clock, Download, X, ChevronDown, ChevronUp, ChevronRight, Pause, ArrowRight, Square, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Zap, Wrench } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 import * as tauri from '../../lib/tauri'
-import type { RunStep } from '../../types'
+import type { RunStep, ToolCallRecord } from '../../types'
 import { getRoleInfo, type RoleCategory } from '../../lib/defaults'
 
 function RoleIcon({ category, size = 12, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
@@ -18,6 +18,50 @@ function RoleIcon({ category, size = 12, className = '' }: { category: RoleCateg
     case 'marketer': return <Megaphone {...props} />
     default: return <Zap {...props} />
   }
+}
+
+function ToolCallBadge({ tc }: { tc: ToolCallRecord }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const borderColor =
+    tc.status === 'running' ? 'border-purple-500/30 bg-purple-500/6'
+    : tc.isError ? 'border-red-500/30 bg-red-500/6'
+    : 'border-white/8 bg-white/3'
+
+  const iconColor =
+    tc.status === 'running' ? 'text-purple-400'
+    : tc.isError ? 'text-red-400'
+    : 'text-emerald-400'
+
+  return (
+    <div className={`mt-1 rounded-lg border px-2.5 py-1.5 ${borderColor}`}>
+      <div className="flex items-center gap-1.5">
+        <Wrench size={10} className={iconColor} />
+        <span className="text-[10px] font-mono text-white/60 truncate flex-1">
+          {tc.toolName}
+          {tc.argsPreview ? <span className="text-white/35">({tc.argsPreview})</span> : ''}
+        </span>
+        {tc.status === 'running' && (
+          <span className="flex items-center gap-0.5 shrink-0">
+            <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce" />
+            <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce [animation-delay:0.15s]" />
+            <span className="w-1 h-1 bg-purple-400 rounded-full animate-bounce [animation-delay:0.3s]" />
+          </span>
+        )}
+        {tc.status !== 'running' && tc.resultPreview && (
+          <button onClick={() => setExpanded(v => !v)} className="text-white/25 hover:text-white/50 shrink-0">
+            {expanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+        )}
+        {tc.isError && <span className="text-[9px] text-red-400 shrink-0">error</span>}
+      </div>
+      {expanded && tc.resultPreview && (
+        <pre className="mt-1 text-[10px] text-white/45 whitespace-pre-wrap leading-relaxed font-mono border-t border-white/6 pt-1">
+          {tc.resultPreview}
+        </pre>
+      )}
+    </div>
+  )
 }
 
 function stepDurationMs(step: RunStep): number | null {
@@ -340,6 +384,15 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
             <pre className="text-[10px] text-purple-200/60 whitespace-pre-wrap leading-relaxed font-mono">
               {step.output}
             </pre>
+          </div>
+        )}
+
+        {/* Tool calls */}
+        {(step.toolCalls?.length ?? 0) > 0 && (
+          <div className="mt-1.5 space-y-1">
+            {step.toolCalls!.map((tc) => (
+              <ToolCallBadge key={tc.toolCallId} tc={tc} />
+            ))}
           </div>
         )}
 

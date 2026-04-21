@@ -14,6 +14,18 @@ export type NodeType = 'agent' | 'loop' | 'review_gate' | 'start' | 'end' | 'dec
 export type StartNodeData = { label?: string }
 export type EndNodeData = { label?: string }
 
+export type ToolNameId =
+  | 'read_file'
+  | 'write_file'
+  | 'edit_file'
+  | 'list_directory'
+  | 'search_files'
+  | 'create_directory'
+  | 'delete_file'
+  | 'move_file'
+  | 'fetch_url'
+  | 'run_shell_command'
+
 export type AgentNodeData = {
   name: string
   roleDescription: string
@@ -22,6 +34,7 @@ export type AgentNodeData = {
   contextMode: 'none' | 'previous' | 'full_chain'
   maxTokens: number
   templateId?: string
+  toolsEnabled?: ToolNameId[]
 }
 
 export type LoopNodeData = {
@@ -76,6 +89,17 @@ export type Workflow = {
 export type RunStatus = 'running' | 'paused' | 'completed' | 'failed' | 'cancelled'
 export type StepStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped'
 
+export type ToolCallStatus = 'running' | 'done' | 'error'
+
+export type ToolCallRecord = {
+  toolCallId: string
+  toolName: string
+  argsPreview: string
+  status: ToolCallStatus
+  resultPreview?: string
+  isError?: boolean
+}
+
 export type RunStep = {
   nodeId: string
   nodeName: string
@@ -88,6 +112,7 @@ export type RunStep = {
   tokensUsed?: number
   error?: string
   filesWritten?: string[]
+  toolCalls?: ToolCallRecord[]
 }
 
 export type Run = {
@@ -155,3 +180,6 @@ export type StepErrorPayload = { nodeId: string; error: string }
 export type StepChunkPayload = { nodeId: string; chunk: string }
 export type GatePausedPayload = { nodeId: string; output: string; message: string }
 export type CompletedPayload = { finalOutput: string }
+export type ToolCallStartedPayload = { nodeId: string; toolCallId: string; toolName: string; argsPreview: string }
+export type ToolCallDonePayload = { nodeId: string; toolCallId: string; toolName: string; resultPreview: string; isError: boolean }
+export type ToolConfirmRequestPayload = { nodeId: string; toolCallId: string; toolName: string; description: string }

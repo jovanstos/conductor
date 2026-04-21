@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Run, RunStep, GatePausedPayload } from '../types'
+import type { Run, RunStep, GatePausedPayload, ToolCallRecord, ToolConfirmRequestPayload } from '../types'
 import * as tauri from '../lib/tauri'
 
 export type PendingRunConfig = {
@@ -14,6 +14,7 @@ interface RunStore {
   isRunning: boolean
   isPaused: boolean
   gateInfo: GatePausedPayload | null
+  toolConfirmRequest: ToolConfirmRequestPayload | null
   logLines: string[]
   showResultModal: boolean
   pendingRun: PendingRunConfig | null
@@ -40,6 +41,9 @@ interface RunStore {
   _setGateInfo: (info: GatePausedPayload | null) => void
   _setRunStatus: (status: Run['status']) => void
   _setFinalOutput: (output: string) => void
+  _addToolCall: (nodeId: string, tc: ToolCallRecord) => void
+  _updateToolCall: (nodeId: string, toolCallId: string, patch: Partial<ToolCallRecord>) => void
+  _setToolConfirmRequest: (req: ToolConfirmRequestPayload | null) => void
 }
 
 export const useRunStore = create<RunStore>()((set, get) => ({
@@ -47,6 +51,7 @@ export const useRunStore = create<RunStore>()((set, get) => ({
   isRunning: false,
   isPaused: false,
   gateInfo: null,
+  toolConfirmRequest: null,
   logLines: [],
   showResultModal: false,
   pendingRun: null,
@@ -150,4 +155,31 @@ export const useRunStore = create<RunStore>()((set, get) => ({
       showResultModal: true,
     }))
   },
+
+  _addToolCall: (nodeId, tc) => {
+    set((s) => {
+      if (!s.currentRun) return s
+      const steps = s.currentRun.steps.map((step) => {
+        if (step.nodeId !== nodeId) return step
+        return { ...step, toolCalls: [...(step.toolCalls ?? []), tc] }
+      })
+      return { currentRun: { ...s.currentRun, steps } }
+    })
+  },
+
+  _updateToolCall: (nodeId, toolCallId, patch) => {
+    set((s) => {
+      if (!s.currentRun) return s
+      const steps = s.currentRun.steps.map((step) => {
+        if (step.nodeId !== nodeId) return step
+        const toolCalls = (step.toolCalls ?? []).map((tc) =>
+          tc.toolCallId === toolCallId ? { ...tc, ...patch } : tc,
+        )
+        return { ...step, toolCalls }
+      })
+      return { currentRun: { ...s.currentRun, steps } }
+    })
+  },
+
+  _setToolConfirmRequest: (req) => set({ toolConfirmRequest: req }),
 }))

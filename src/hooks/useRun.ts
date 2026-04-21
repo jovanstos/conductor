@@ -3,8 +3,18 @@ import { listenToRun } from '../lib/tauri'
 import { useRunStore } from '../stores/runStore'
 
 export function useRun(runId: string | null | undefined) {
-  const { _addStep, _updateStep, _appendStepOutput, _addLog, _setGateInfo, _setFinalOutput, _setRunStatus } =
-    useRunStore()
+  const {
+    _addStep,
+    _updateStep,
+    _appendStepOutput,
+    _addLog,
+    _setGateInfo,
+    _setFinalOutput,
+    _setRunStatus,
+    _addToolCall,
+    _updateToolCall,
+    _setToolConfirmRequest,
+  } = useRunStore()
 
   useEffect(() => {
     if (!runId) return
@@ -48,6 +58,25 @@ export function useRun(runId: string | null | undefined) {
         _setRunStatus('cancelled')
         _addLog(`[cancelled] → Run cancelled.`)
       },
+      onToolCallStarted: (p) => {
+        _addToolCall(p.nodeId, {
+          toolCallId: p.toolCallId,
+          toolName: p.toolName,
+          argsPreview: p.argsPreview,
+          status: 'running',
+        })
+        _addLog(`[tool] → ${p.toolName}(${p.argsPreview})`)
+      },
+      onToolCallDone: (p) => {
+        _updateToolCall(p.nodeId, p.toolCallId, {
+          status: p.isError ? 'error' : 'done',
+          resultPreview: p.resultPreview,
+          isError: p.isError,
+        })
+      },
+      onToolConfirmRequest: (p) => {
+        _setToolConfirmRequest(p)
+      },
     }).then((unlisten) => {
       cleanup = unlisten
     })
@@ -55,5 +84,5 @@ export function useRun(runId: string | null | undefined) {
     return () => {
       cleanup?.()
     }
-  }, [runId, _addStep, _updateStep, _appendStepOutput, _addLog, _setGateInfo, _setFinalOutput, _setRunStatus])
+  }, [runId, _addStep, _updateStep, _appendStepOutput, _addLog, _setGateInfo, _setFinalOutput, _setRunStatus, _addToolCall, _updateToolCall, _setToolConfirmRequest])
 }

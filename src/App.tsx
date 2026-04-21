@@ -12,6 +12,7 @@ import RunDrawer from './components/run/RunDrawer'
 import RunStartModal from './components/run/RunStartModal'
 import RunHistoryDrawer from './components/run/RunHistoryDrawer'
 import ReviewGateModal from './components/run/ReviewGateModal'
+import ToolConfirmModal from './components/run/ToolConfirmModal'
 import ResultModal from './components/run/ResultModal'
 import SettingsPanel from './components/settings/SettingsPanel'
 
@@ -25,7 +26,7 @@ function clamp(v: number, min: number, max: number) {
 
 export default function App() {
   const { loadWorkflows, currentWorkflow, taskInput, setTaskInput } = useWorkflowStore()
-  const { cancelRun, isRunning, currentRun, gateInfo, showResultModal, pendingRun, setPendingRun } = useRunStore()
+  const { cancelRun, isRunning, currentRun, gateInfo, toolConfirmRequest, showResultModal, pendingRun, setPendingRun } = useRunStore()
   const { loadProviderStatuses, loadConfig, isOpen: settingsOpen } = useSettingsStore()
 
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
@@ -179,6 +180,7 @@ export default function App() {
       )}
       {pendingRun && <RunStartModal />}
       {gateInfo && <ReviewGateModal />}
+      {toolConfirmRequest && <ToolConfirmModal />}
       {showResultModal && <ResultModal />}
       {settingsOpen && <SettingsPanel />}
     </div>
