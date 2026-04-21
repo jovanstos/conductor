@@ -732,16 +732,26 @@ async fn llm_call_streaming(
 
 const TOOL_EDIT_INSTRUCTIONS: &str = r#"
 
-## Agentic file editing instructions
+## How to use your tools
 
-You have access to file system tools. Follow these rules:
-- Always use `read_file` before editing a file to see its current content.
-- Use `edit_file` for targeted changes (replace a specific string). This is far more token-efficient than rewriting entire files.
-- Use `write_file` only for creating brand-new files.
-- Use `list_directory` to explore the project structure before diving in.
-- Chain tool calls naturally: explore → read → edit → verify.
-- Do NOT output file contents in your text response — use the tools instead.
-- When done with all changes, write a brief summary of what you did.
+You have file system tools available. Use them purposefully:
+- `list_directory` / `read_file` — explore and understand the codebase. Limit yourself to reading what you actually need.
+- `write_file` — create new files (plans, specs, code, etc.)
+- `edit_file` — make targeted changes to existing files (replace an exact string)
+- `run_shell_command` — run commands like tests, builds, installs
+
+## Critical output rule
+
+Your TEXT RESPONSE is the primary output that gets passed to the next agent in the workflow. It must be complete and self-contained.
+
+After doing your research and any file operations, write a detailed text response that covers:
+- Everything the next agent needs to know to continue
+- Your analysis, plan, decisions, and reasoning
+- A summary of any files you created or modified, with their key contents
+
+If you created files, mention them and their key contents in your text — do not assume the next agent will find or read them.
+
+**Do NOT stop after tool calls without writing a full text response.** The tool calls are for gathering information and creating artifacts. Your text is the handoff.
 "#;
 
 fn tool_definitions(enabled_names: &[String]) -> Vec<ToolDef> {
@@ -965,7 +975,7 @@ async fn call_anthropic_with_tools(
                 let tokens = val.pointer("/usage/output_tokens")
                     .and_then(|v| v.as_u64()).map(|n| n as u32);
                 let text = text_parts.join("");
-                if text.is_empty() { return Err("Empty response from Anthropic".into()); }
+                // Empty text is valid — agent may have completed all work via tool calls
                 return Ok(LlmTurnResult::Text { content: text, tokens_used: tokens });
             }
         }
@@ -1041,7 +1051,7 @@ async fn call_openai_compat_with_tools(
     }
 
     let text = message["content"].as_str().unwrap_or("").to_string();
-    if text.is_empty() { return Err("Empty response from model".into()); }
+    // Empty text is valid — agent may have completed all work via tool calls
     Ok(LlmTurnResult::Text { content: text, tokens_used: tokens })
 }
 
@@ -1611,14 +1621,37 @@ async fn exec_agent(
     let permissions = ToolPermissionConfig::default();
     let provider = data.model.provider.clone();
 
+    // Accumulates all text produced across the entire loop (preceding texts + final response).
+    // This becomes the chain output so subsequent agents have the full narrative.
+    let mut accumulated_text = String::new();
+    // Tracks read-only iterations with no writes; triggers forced output after the limit.
+    let mut read_only_streak = 0u32;
+    // After this many consecutive read-only iterations, strip tools and demand text output.
+    const READ_LIMIT: u32 = 4;
+
     let tool_loop_result: Result<String, String> = 'tool_loop: {
-        for _iteration in 0..25u32 {
+        for _iteration in 0..20u32 {
             if cancel.load(Ordering::Relaxed) {
                 break 'tool_loop Err("__cancelled__".into());
             }
 
+            // If the agent has been reading without producing anything, force it to write output.
+            let (call_tools, call_messages) = if read_only_streak >= READ_LIMIT {
+                let mut msgs = messages.clone();
+                msgs.push(serde_json::json!({
+                    "role": "user",
+                    "content": "You have done enough research. Do NOT call any more tools. \
+                    Write your complete, detailed output as a text response right now. \
+                    Include everything the next agent needs to know."
+                }));
+                (false, msgs) // no tools → forces text response
+            } else {
+                (true, messages.clone())
+            };
+
             let turn = match llm_call_with_tools(
-                &data.model, &system_prompt, &messages, &state.keys_file(), &tool_defs
+                &data.model, &system_prompt, &call_messages, &state.keys_file(),
+                if call_tools { &tool_defs } else { &[] }
             ).await {
                 Ok(t) => t,
                 Err(e) => break 'tool_loop Err(e),
@@ -1626,19 +1659,28 @@ async fn exec_agent(
 
             match turn {
                 LlmTurnResult::Text { content, tokens_used } => {
+                    total_tokens = tokens_used;
                     if !content.is_empty() {
+                        if !accumulated_text.is_empty() {
+                            accumulated_text.push('\n');
+                        }
+                        accumulated_text.push_str(&content);
                         let _ = app.emit(
                             &format!("conductor://run/{}/step_chunk", run_id),
                             serde_json::json!({ "nodeId": node_id, "chunk": content }),
                         );
                     }
-                    total_tokens = tokens_used;
-                    break 'tool_loop Ok(content);
+                    break 'tool_loop Ok(accumulated_text.clone());
                 }
 
                 LlmTurnResult::ToolCalls { tool_calls, preceding_text } => {
-                    if let Some(text) = &preceding_text {
+                    // Collect any narrative the agent wrote before calling tools
+                    if let Some(ref text) = preceding_text {
                         if !text.is_empty() {
+                            if !accumulated_text.is_empty() {
+                                accumulated_text.push('\n');
+                            }
+                            accumulated_text.push_str(text);
                             let _ = app.emit(
                                 &format!("conductor://run/{}/step_chunk", run_id),
                                 serde_json::json!({ "nodeId": node_id, "chunk": text }),
@@ -1650,7 +1692,9 @@ async fn exec_agent(
                         &tool_calls, &provider, preceding_text.as_deref()
                     ));
 
+                    let mut had_write = false;
                     let mut results: Vec<(String, bool)> = vec![];
+
                     for tc in &tool_calls {
                         let args_preview = format_args_preview(&tc.arguments);
                         let _ = app.emit(
@@ -1674,6 +1718,7 @@ async fn exec_agent(
                         };
 
                         if !is_error && (tc.name == "write_file" || tc.name == "edit_file") {
+                            had_write = true;
                             if let Some(p) = tc.arguments.get("path").and_then(|v| v.as_str()) {
                                 files_written.push(p.to_string());
                             }
@@ -1694,21 +1739,39 @@ async fn exec_agent(
                         results.push((content, is_error));
                     }
 
+                    // Track whether this iteration produced any writes
+                    if had_write {
+                        read_only_streak = 0;
+                    } else {
+                        read_only_streak += 1;
+                    }
+
                     let result_msgs = build_tool_result_messages(&tool_calls, &results, &provider);
                     messages.extend(result_msgs);
                 }
             }
         }
-        // Exhausted 25 iterations without a text response
-        Err("Agent reached maximum tool iterations without completing".into())
+
+        // Exhausted iterations — use whatever text was accumulated rather than erroring.
+        // The agent did produce content (via preceding texts), just never concluded cleanly.
+        if !accumulated_text.is_empty() {
+            Ok(accumulated_text.clone())
+        } else if !files_written.is_empty() {
+            Ok(String::new()) // build_effective_output will fill in from files
+        } else {
+            Err("Agent did not produce any output".into())
+        }
     };
 
     // Finalize step regardless of outcome
     step.completed_at = Some(now());
     match tool_loop_result {
-        Ok(output) => {
+        Ok(text_output) => {
+            // If files were written, include their contents in the output so subsequent
+            // agents (and the final result) have full access to the created work.
+            let effective_output = build_effective_output(&text_output, &files_written, workspace_path);
             step.status = "done".into();
-            step.output = output.clone();
+            step.output = effective_output.clone();
             step.tokens_used = total_tokens;
             step.files_written = files_written.clone();
             run.steps.push(step);
@@ -1716,12 +1779,12 @@ async fn exec_agent(
             let _ = app.emit(
                 &format!("conductor://run/{}/step_done", run_id),
                 serde_json::json!({
-                    "nodeId": node_id, "output": output,
+                    "nodeId": node_id, "output": effective_output,
                     "tokensUsed": total_tokens, "filesWritten": files_written,
                 }),
             );
-            ctx.chain.push((data.name.clone(), output.clone()));
-            Ok(output)
+            ctx.chain.push((data.name.clone(), effective_output.clone()));
+            Ok(effective_output)
         }
         Err(e) => {
             step.status = "error".into();
@@ -1740,6 +1803,49 @@ async fn exec_agent(
 fn is_approved(review: &str) -> bool {
     let upper = review.to_uppercase();
     upper.contains("APPROVED") && !upper.contains("NOT APPROVED")
+}
+
+/// Build the rich output string stored in the step and passed via the context chain.
+///
+/// Combines the agent's text narrative with the full contents of any files it created.
+/// Subsequent agents receive this as context — they get both the reasoning AND the artifacts
+/// without needing `read_file` themselves.
+fn build_effective_output(text: &str, files_written: &[String], workspace_path: Option<&str>) -> String {
+    if files_written.is_empty() {
+        return text.to_string();
+    }
+
+    let mut parts: Vec<String> = Vec::new();
+    if !text.is_empty() {
+        parts.push(text.to_string());
+    }
+
+    let mut file_sections: Vec<String> = Vec::new();
+    for path_str in files_written {
+        let full_path = {
+            let p = std::path::Path::new(path_str);
+            if p.is_absolute() {
+                p.to_path_buf()
+            } else if let Some(ws) = workspace_path {
+                std::path::Path::new(ws).join(p)
+            } else {
+                p.to_path_buf()
+            }
+        };
+        if let Ok(content) = std::fs::read_to_string(&full_path) {
+            file_sections.push(format!("--- {} ---\n{}", path_str, content));
+        } else {
+            file_sections.push(format!("--- {} --- (file not readable)", path_str));
+        }
+    }
+
+    if !file_sections.is_empty() {
+        let header = format!("Files created/modified: {}", files_written.join(", "));
+        parts.push(header);
+        parts.extend(file_sections);
+    }
+
+    parts.join("\n\n")
 }
 
 async fn exec_loop(
