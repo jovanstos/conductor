@@ -14,6 +14,23 @@ export const PROVIDER_COLORS: Record<string, string> = {
   custom:    '#8b5cf6', // purple — fallback
 }
 
+const CUSTOM_HOST_PALETTE = [
+  '#8b5cf6', // violet
+  '#06b6d4', // cyan
+  '#f59e0b', // amber
+  '#10b981', // emerald
+  '#ec4899', // pink
+  '#f97316', // orange
+  '#84cc16', // lime
+  '#6366f1', // indigo
+  '#e11d48', // rose
+  '#0ea5e9', // sky
+]
+
+export function pickHostColor(index: number): string {
+  return CUSTOM_HOST_PALETTE[index % CUSTOM_HOST_PALETTE.length]
+}
+
 export function getProviderColor(provider: string | undefined): string {
   return PROVIDER_COLORS[provider ?? ''] ?? PROVIDER_COLORS.custom
 }

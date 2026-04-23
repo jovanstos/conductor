@@ -12,7 +12,7 @@ import ProjectView from './projects/ProjectView'
 export default function Sidebar() {
   const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow, importWorkflow } =
     useWorkflowStore()
-  const { providerStatuses, openSettings, defaultProjectsPath } = useSettingsStore()
+  const { providerStatuses, customHosts, openSettings, defaultProjectsPath } = useSettingsStore()
   const [search, setSearch] = useState('')
   const [showNewModal, setShowNewModal] = useState(false)
   const [projects, setProjects] = useState<ProjectEntry[]>([])
@@ -118,10 +118,17 @@ export default function Sidebar() {
         <SectionLabel label="Providers" />
         {providerStatuses.map((p) => (
           <div key={p.provider} className="flex items-center gap-2 px-1 py-0.5">
-            <div
-              className={`w-1.5 h-1.5 rounded-full ${p.hasKey ? 'bg-green-500' : 'bg-white/15'}`}
-            />
+            <div className={`w-1.5 h-1.5 rounded-full ${p.hasKey ? 'bg-green-500' : 'bg-white/15'}`} />
             <span className="text-xs text-white/45 capitalize">{p.provider}</span>
+          </div>
+        ))}
+        {customHosts.map((h) => (
+          <div key={h.id} className="flex items-center gap-2 px-1 py-0.5">
+            <div
+              className="w-1.5 h-1.5 rounded-full shrink-0"
+              style={{ background: h.hasKey ? h.color : 'rgba(255,255,255,0.15)' }}
+            />
+            <span className="text-xs text-white/45 truncate">{h.name}</span>
           </div>
         ))}
       </div>

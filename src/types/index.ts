@@ -9,6 +9,14 @@ export type ModelConfig = {
   temperature: number
 }
 
+export type CustomHostConfig = {
+  id: string
+  name: string
+  baseUrl: string
+  models: string[]
+  color: string
+}
+
 export type NodeType = 'agent' | 'loop' | 'review_gate' | 'start' | 'end' | 'decision' | 'merge'
 
 export type StartNodeData = { label?: string }

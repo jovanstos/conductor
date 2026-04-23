@@ -5,10 +5,9 @@ import { ANTHROPIC_MODELS, OPENAI_MODELS, getProviderColor } from '../../lib/def
 import { useSettingsStore } from '../../stores/settingsStore'
 import { invoke } from '@tauri-apps/api/core'
 
-const PROVIDERS: { id: ModelProvider; label: string }[] = [
+const CLOUD_PROVIDERS: { id: ModelProvider; label: string }[] = [
   { id: 'anthropic', label: 'Anthropic' },
   { id: 'openai', label: 'OpenAI' },
-  { id: 'ollama', label: 'Ollama (local)' },
 ]
 
 export default function ModelPicker({
@@ -22,7 +21,7 @@ export default function ModelPicker({
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [ollamaLoading, setOllamaLoading] = useState(false)
   const [customModel, setCustomModel] = useState('')
-  const { providerStatuses } = useSettingsStore()
+  const { providerStatuses, customHosts } = useSettingsStore()
 
   useEffect(() => {
     if (!open) return
@@ -35,6 +34,12 @@ export default function ModelPicker({
   }, [open])
 
   const providerStatus = providerStatuses.find((p) => p.provider === value.provider)
+  const customHostStatus = value.provider === 'custom'
+    ? customHosts.find((h) => 'custom_' + h.id === value.apiKeyRef)
+    : undefined
+  const currentHasKey = value.provider === 'custom'
+    ? (customHostStatus?.hasKey ?? false)
+    : (providerStatus?.hasKey ?? value.provider === 'ollama')
 
   return (
     <div className="relative">
@@ -42,7 +47,7 @@ export default function ModelPicker({
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-2 bg-white/5 border border-white/10 hover:border-white/20 rounded-lg px-3 py-2 text-sm text-white/75 transition-colors text-left"
       >
-        <ProviderDot provider={value.provider} hasKey={providerStatus?.hasKey ?? value.provider === 'ollama'} />
+        <ProviderDot provider={value.provider} hasKey={currentHasKey} />
         <span className="flex-1 truncate">{value.modelId}</span>
         {open ? <ChevronUp size={12} className="text-white/25" /> : <ChevronDown size={12} className="text-white/25" />}
       </button>
@@ -50,7 +55,7 @@ export default function ModelPicker({
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a22] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
           {/* Cloud providers */}
-          {PROVIDERS.filter(p => p.id !== 'ollama').map((p) => {
+          {CLOUD_PROVIDERS.map((p) => {
             const models = p.id === 'anthropic' ? ANTHROPIC_MODELS : OPENAI_MODELS
             const status = providerStatuses.find((s) => s.provider === p.id)
             return (
@@ -63,7 +68,7 @@ export default function ModelPicker({
                 {models.map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => { onChange({ ...value, provider: p.id, modelId: m.id }); setOpen(false) }}
+                    onClick={() => { onChange({ ...value, provider: p.id, modelId: m.id, apiKeyRef: undefined, baseUrl: undefined }); setOpen(false) }}
                     className={`w-full text-left px-4 py-2 hover:bg-white/6 transition-colors text-sm ${
                       value.modelId === m.id && value.provider === p.id ? 'text-purple-300' : 'text-white/65'
                     }`}
@@ -130,6 +135,36 @@ export default function ModelPicker({
               </div>
             </div>
           </div>
+
+          {/* Custom Connections */}
+          {customHosts.map((host) => (
+            <div key={host.id}>
+              <div className="px-3 py-1.5 bg-white/3 flex items-center gap-2 sticky top-0">
+                <ProviderDot provider="custom" hasKey={host.hasKey} />
+                <span className="text-xs text-white/40 uppercase tracking-wider">{host.name}</span>
+                {!host.hasKey && <span className="text-xs text-amber-400/60 ml-auto">no key</span>}
+                {host.hasKey && <span className="text-xs text-purple-400/60 ml-auto">custom</span>}
+              </div>
+              {host.models.length === 0 && (
+                <p className="px-4 py-2 text-xs text-white/25 italic">No models — add them in Settings</p>
+              )}
+              {host.models.map((modelId) => (
+                <button
+                  key={modelId}
+                  onClick={() => {
+                    onChange({ ...value, provider: 'custom', modelId, apiKeyRef: 'custom_' + host.id, baseUrl: host.baseUrl })
+                    setOpen(false)
+                  }}
+                  className={`w-full text-left px-4 py-2 hover:bg-white/6 transition-colors text-sm font-mono ${
+                    value.provider === 'custom' && value.modelId === modelId && value.apiKeyRef === 'custom_' + host.id
+                      ? 'text-purple-300' : 'text-white/65'
+                  }`}
+                >
+                  {modelId}
+                </button>
+              ))}
+            </div>
+          ))}
 
           {/* Temperature and tokens */}
           <div className="px-3 py-3 border-t border-white/8 space-y-3 bg-white/2">

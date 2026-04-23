@@ -9,6 +9,7 @@ import type {
   FileEntry,
   DirEntry,
   ProjectEntry,
+  CustomHostConfig,
   StepStartedPayload,
   StepDonePayload,
   StepErrorPayload,
@@ -83,9 +84,13 @@ export const openProjectTree = (projectPath: string) =>
   invoke<DirEntry[]>('open_project_tree', { projectPath })
 
 // App config
-export type AppConfig = { defaultProjectsPath?: string }
+export type AppConfig = { defaultProjectsPath?: string; customHosts?: CustomHostConfig[] }
 export const loadConfig = () => invoke<AppConfig>('load_config')
 export const saveConfig = (config: AppConfig) => invoke<void>('save_config', { config })
+
+// Custom host validation
+export const validateCustomHost = (hostId: string, baseUrl: string) =>
+  invoke<string>('validate_custom_host', { hostId, baseUrl })
 
 // File save
 export const writeTextFile = (path: string, content: string) =>

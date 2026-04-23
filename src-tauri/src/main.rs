@@ -480,6 +480,40 @@ async fn call_ollama(
     Ok((text, None))
 }
 
+async fn call_openai_compat_nonstream(
+    url: &str,
+    auth_token: Option<&str>,
+    model_id: &str,
+    system: &str,
+    messages: &[ApiMessage],
+    max_tokens: u32,
+    temperature: f64,
+) -> Result<(String, Option<u32>), String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(|e| format!("HTTP client: {}", e))?;
+    let mut all = vec![ApiMessage { role: "system".into(), content: system.into() }];
+    all.extend_from_slice(messages);
+    let body = OpenAIRequest { model: model_id, messages: all, max_tokens, temperature };
+    let mut req = client.post(url).header("content-type", "application/json").json(&body);
+    if let Some(token) = auth_token {
+        req = req.header("Authorization", format!("Bearer {}", token));
+    }
+    let resp = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
+    let status = resp.status();
+    let raw = resp.text().await.map_err(|e| format!("Read response: {}", e))?;
+    if !status.is_success() {
+        return Err(format!("API {} — {}", status, &raw[..raw.len().min(200)]));
+    }
+    let parsed: OpenAIResponse = serde_json::from_str(&raw).map_err(|e| format!("Parse: {}", e))?;
+    let text = parsed.choices.into_iter().next()
+        .map(|c| c.message.content)
+        .ok_or_else(|| "Empty response".to_string())?;
+    let tokens = parsed.usage.and_then(|u| u.completion_tokens);
+    Ok((text, tokens))
+}
+
 async fn llm_call(
     model: &ModelConfig,
     system: &str,
@@ -505,6 +539,12 @@ async fn llm_call(
         "ollama" => {
             let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
             call_ollama(&model.model_id, base, system, messages, max_tokens, model.temperature).await
+        }
+        "custom" => {
+            let base = model.base_url.as_deref().unwrap_or("http://localhost:8080");
+            let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
+            let key = model.api_key_ref.as_deref().and_then(|r| load_keys(keys_file).remove(r));
+            call_openai_compat_nonstream(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature).await
         }
         p => Err(format!("Unsupported provider: {}", p)),
     }
@@ -721,6 +761,12 @@ async fn llm_call_streaming(
             let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
             let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
             call_openai_compat_stream(&url, None, &model.model_id, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
+        }
+        "custom" => {
+            let base = model.base_url.as_deref().unwrap_or("http://localhost:8080");
+            let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
+            let key = model.api_key_ref.as_deref().and_then(|r| load_keys(keys_file).remove(r));
+            call_openai_compat_stream(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
         }
         p => Err(format!("Unsupported provider: {}", p)),
     }
@@ -1082,6 +1128,12 @@ async fn llm_call_with_tools(
             let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
             let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
             call_openai_compat_with_tools(&url, None, &model.model_id, system, messages, max_tokens, model.temperature, tools).await
+        }
+        "custom" => {
+            let base = model.base_url.as_deref().unwrap_or("http://localhost:8080");
+            let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
+            let key = model.api_key_ref.as_deref().and_then(|r| load_keys(keys_file).remove(r));
+            call_openai_compat_with_tools(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature, tools).await
         }
         p => Err(format!("Unsupported provider: {}", p)),
     }
@@ -2333,6 +2385,27 @@ fn built_in_templates() -> Vec<Template> {
 // ─────────────────────────────────────────────
 
 #[tauri::command]
+async fn validate_custom_host(host_id: String, base_url: String, state: State<'_, Arc<AppState>>) -> Result<String, String> {
+    let keys = load_keys(&state.keys_file());
+    let key_name = format!("custom_{}", host_id);
+    let api_key = keys.get(&key_name).cloned()
+        .ok_or_else(|| "No API key configured for this host".to_string())?;
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_secs(10)).build()
+        .map_err(|e| format!("HTTP client: {}", e))?;
+    let url = format!("{}/v1/models", base_url.trim_end_matches('/'));
+    let resp = client.get(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    if resp.status().is_success() {
+        Ok("Connected successfully".into())
+    } else {
+        Err(format!("Connection test failed (HTTP {})", resp.status()))
+    }
+}
+
+#[tauri::command]
 async fn validate_api_key(provider: String, state: State<'_, Arc<AppState>>) -> Result<String, String> {
     let keys = load_keys(&state.keys_file());
     let api_key = match provider.as_str() {
@@ -2394,8 +2467,19 @@ fn write_text_file(path: String, content: String) -> Result<(), String> {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
+struct CustomHostConfigData {
+    id: String,
+    name: String,
+    base_url: String,
+    models: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct AppConfig {
     default_projects_path: Option<String>,
+    #[serde(default)]
+    custom_hosts: Vec<CustomHostConfigData>,
 }
 
 #[tauri::command]
@@ -2456,6 +2540,7 @@ fn main() {
             read_text_file,
             get_ollama_models,
             validate_api_key,
+            validate_custom_host,
             workspace_fs::create_run_workspace,
             workspace_fs::read_workspace_manifest,
             workspace_fs::write_workspace_files,
