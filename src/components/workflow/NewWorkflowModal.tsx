@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react'
-import { Sparkles, Settings, PenLine, FlaskConical, X, ArrowRight } from 'lucide-react'
+import { Sparkles, Settings, PenLine, FlaskConical, Wrench, Megaphone, X, ArrowRight } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
-import { softwareFactoryWorkflow, contentFactoryWorkflow, researchLabWorkflow } from '../../lib/defaults'
+import { softwareFactoryWorkflow, contentFactoryWorkflow, researchLabWorkflow, bugFixWorkflow, marketingCampaignWorkflow } from '../../lib/defaults'
 import * as tauri from '../../lib/tauri'
 
-type StarterIcon = 'blank' | 'software' | 'content' | 'research'
+type StarterIcon = 'blank' | 'software' | 'content' | 'research' | 'bugfix' | 'marketing'
 
 const STARTERS: { id: string; iconKey: StarterIcon; name: string; description: string; agentCount: number; color: string; iconBg: string; iconColor: string }[] = [
   {
@@ -24,6 +24,14 @@ const STARTERS: { id: string; iconKey: StarterIcon; name: string; description: s
     iconBg: 'bg-purple-500/12', iconColor: 'text-purple-300',
   },
   {
+    id: 'bug-fix', iconKey: 'bugfix',
+    name: 'Bug Fix Pipeline',
+    description: 'Reads your codebase, diagnoses the bug, implements a fix, and verifies it with a code review loop.',
+    agentCount: 4,
+    color: 'border-rose-500/25 hover:border-rose-500/50',
+    iconBg: 'bg-rose-500/12', iconColor: 'text-rose-300',
+  },
+  {
     id: 'content-factory', iconKey: 'content',
     name: 'Content Factory',
     description: 'Writer and editor that iterate until the content is polished and publish-ready.',
@@ -39,13 +47,23 @@ const STARTERS: { id: string; iconKey: StarterIcon; name: string; description: s
     color: 'border-blue-500/25 hover:border-blue-500/50',
     iconBg: 'bg-blue-500/12', iconColor: 'text-blue-300',
   },
+  {
+    id: 'marketing-campaign', iconKey: 'marketing',
+    name: 'Marketing Campaign',
+    description: 'Reviewed copy, platform-optimized social posts, and a campaign email — all from one brief.',
+    agentCount: 4,
+    color: 'border-orange-500/25 hover:border-orange-500/50',
+    iconBg: 'bg-orange-500/12', iconColor: 'text-orange-300',
+  },
 ]
 
 const STARTER_ICON: Record<StarterIcon, ReactNode> = {
   blank: <Sparkles size={18} />,
   software: <Settings size={18} />,
+  bugfix: <Wrench size={18} />,
   content: <PenLine size={18} />,
   research: <FlaskConical size={18} />,
+  marketing: <Megaphone size={18} />,
 }
 
 export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
@@ -56,9 +74,11 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
       await createWorkflow('New Workflow')
     } else {
       const wf =
-        id === 'software-factory' ? softwareFactoryWorkflow() :
-        id === 'content-factory' ? contentFactoryWorkflow() :
-        id === 'research-lab' ? researchLabWorkflow() :
+        id === 'software-factory'    ? softwareFactoryWorkflow() :
+        id === 'bug-fix'             ? bugFixWorkflow() :
+        id === 'content-factory'     ? contentFactoryWorkflow() :
+        id === 'research-lab'        ? researchLabWorkflow() :
+        id === 'marketing-campaign'  ? marketingCampaignWorkflow() :
         null
       if (!wf) return
       await tauri.saveWorkflow(wf)
