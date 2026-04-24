@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ReactFlow,
   Background,
@@ -24,8 +24,11 @@ import {
   StopCircle,
   Undo2,
   Redo2,
+  ChevronsRight,
+  X,
 } from "lucide-react";
 import { useWorkflowStore } from "../../stores/workflowStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import type {
   WorkflowNode,
   WorkflowEdge,
@@ -33,8 +36,10 @@ import type {
   StartNodeData,
   EndNodeData,
   EdgeContextMode,
+  ModelConfig,
 } from "../../types";
-import { newAgentNodeData } from "../../lib/defaults";
+import { newAgentNodeData, getProviderColor } from "../../lib/defaults";
+import ModelPicker from "../shared/ModelPicker";
 import AgentNode from "./AgentNode";
 import LoopGroupNode, { LOOP_GROUP_W, LOOP_GROUP_H } from "./LoopGroupNode";
 import ReviewGateNode from "./ReviewGateNode";
@@ -102,6 +107,7 @@ export default function WorkflowCanvas() {
     addEdge: storeAddEdge,
     removeEdge,
     setSelectedNode,
+    setAllAgentModels,
     undo,
     redo,
     canUndo,
@@ -109,6 +115,8 @@ export default function WorkflowCanvas() {
     copySelectedNode,
     pasteNode,
   } = useWorkflowStore();
+
+  const { defaultModel, setDefaultModel } = useSettingsStore();
 
   const [rfNodes, setRfNodes, onRFNodesChange] = useNodesState<RFNode>(
     currentWorkflow?.nodes.map(toRFNode) ?? [],
@@ -225,7 +233,7 @@ export default function WorkflowCanvas() {
         x: 300 + (rfNodes.length % 3) * 300,
         y: 160 + Math.floor(rfNodes.length / 3) * 220,
       },
-      data: newAgentNodeData(),
+      data: newAgentNodeData({ model: { ...defaultModel } }),
     });
   }
 
@@ -339,6 +347,13 @@ export default function WorkflowCanvas() {
           color="gray"
           disabled={!canRedo}
         />
+        <div className="w-px bg-white/10 mx-0.5 self-stretch" />
+        <ModelDefaultControl
+          defaultModel={defaultModel}
+          onModelChange={setDefaultModel}
+          onApplyToAll={() => setAllAgentModels(defaultModel)}
+          agentCount={currentWorkflow?.nodes.filter((n) => n.type === 'agent').length ?? 0}
+        />
       </div>
 
       <div className="absolute top-3 right-3 z-10">
@@ -394,6 +409,107 @@ export default function WorkflowCanvas() {
       </ReactFlow>
     </div>
   );
+}
+
+function ModelDefaultControl({
+  defaultModel,
+  onModelChange,
+  onApplyToAll,
+  agentCount,
+}: {
+  defaultModel: ModelConfig
+  onModelChange: (m: ModelConfig) => void
+  onApplyToAll: () => void
+  agentCount: number
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  function handleApply() {
+    if (agentCount === 0) return
+    setConfirmOpen(true)
+  }
+
+  function confirmApply() {
+    onApplyToAll()
+    setConfirmOpen(false)
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Model selector button */}
+      <div className="relative">
+        <button
+          onClick={() => setPickerOpen((o) => !o)}
+          title="Default model — used for new agents"
+          className="bg-[#1a1a22] border border-white/10 hover:border-white/20 text-xs px-2.5 py-1.5 rounded-lg text-white/50 hover:text-white/70 flex items-center gap-1.5 transition-colors"
+        >
+          <div
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ background: getProviderColor(defaultModel.provider) }}
+          />
+          <span className="max-w-[120px] truncate font-mono">{defaultModel.modelId}</span>
+        </button>
+        {pickerOpen && (
+          <div className="absolute top-full left-0 mt-1 w-72 z-50">
+            <ModelPicker
+              value={defaultModel}
+              onChange={(m) => { onModelChange(m); setPickerOpen(false) }}
+            />
+          </div>
+        )}
+        {/* click-away overlay */}
+        {pickerOpen && (
+          <div className="fixed inset-0 z-40" onClick={() => setPickerOpen(false)} />
+        )}
+      </div>
+
+      {/* Apply to all button */}
+      <button
+        onClick={handleApply}
+        disabled={agentCount === 0}
+        title={`Apply current model to all ${agentCount} agents in this workflow`}
+        className="bg-[#1a1a22] border border-white/10 hover:border-purple-500/40 text-xs px-2.5 py-1.5 rounded-lg text-white/40 hover:text-purple-300 flex items-center gap-1 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronsRight size={11} />
+        Apply to all
+      </button>
+
+      {/* Confirm dialog */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[#141418] border border-white/10 rounded-2xl w-80 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white/85">Apply model to all agents?</p>
+                <p className="text-xs text-white/40 mt-1 leading-relaxed">
+                  This will set all {agentCount} agent{agentCount !== 1 ? 's' : ''} to{' '}
+                  <span className="font-mono text-white/60">{defaultModel.modelId}</span>.
+                </p>
+              </div>
+              <button onClick={() => setConfirmOpen(false)} className="text-white/25 hover:text-white/60 transition-colors shrink-0">
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmOpen(false)}
+                className="flex-1 text-xs py-2 rounded-lg border border-white/10 text-white/40 hover:text-white/60 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmApply}
+                className="flex-1 text-xs py-2 rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 transition-colors font-medium"
+              >
+                Apply to all {agentCount}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ToolbarBtn({

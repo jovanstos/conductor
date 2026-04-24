@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Sparkles, Settings, PenLine, FlaskConical, Wrench, Megaphone, X, ArrowRight } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
+import { useSettingsStore } from '../../stores/settingsStore'
 import { softwareFactoryWorkflow, contentFactoryWorkflow, researchLabWorkflow, bugFixWorkflow, marketingCampaignWorkflow } from '../../lib/defaults'
 import * as tauri from '../../lib/tauri'
 
@@ -68,17 +69,18 @@ const STARTER_ICON: Record<StarterIcon, ReactNode> = {
 
 export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
   const { createWorkflow, loadWorkflows, setCurrentWorkflow } = useWorkflowStore()
+  const { defaultModel } = useSettingsStore()
 
   async function handleSelect(id: string) {
     if (id === 'blank') {
       await createWorkflow('New Workflow')
     } else {
       const wf =
-        id === 'software-factory'    ? softwareFactoryWorkflow() :
-        id === 'bug-fix'             ? bugFixWorkflow() :
-        id === 'content-factory'     ? contentFactoryWorkflow() :
-        id === 'research-lab'        ? researchLabWorkflow() :
-        id === 'marketing-campaign'  ? marketingCampaignWorkflow() :
+        id === 'software-factory'    ? softwareFactoryWorkflow(defaultModel) :
+        id === 'bug-fix'             ? bugFixWorkflow(defaultModel) :
+        id === 'content-factory'     ? contentFactoryWorkflow(defaultModel) :
+        id === 'research-lab'        ? researchLabWorkflow(defaultModel) :
+        id === 'marketing-campaign'  ? marketingCampaignWorkflow(defaultModel) :
         null
       if (!wf) return
       await tauri.saveWorkflow(wf)

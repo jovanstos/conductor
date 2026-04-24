@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog'
-import type { Workflow, WorkflowNode, WorkflowEdge, AgentNodeData, LoopNodeData } from '../types'
+import type { Workflow, WorkflowNode, WorkflowEdge, AgentNodeData, LoopNodeData, ModelConfig } from '../types'
 import * as tauri from '../lib/tauri'
 import { newWorkflow, newAgentNodeData } from '../lib/defaults'
 
@@ -44,6 +44,7 @@ interface WorkflowStore {
   copySelectedNode: () => void
   pasteNode: () => void
 
+  setAllAgentModels: (model: ModelConfig) => void
   importWorkflow: () => Promise<void>
   exportWorkflow: (id: string) => Promise<void>
   setSelectedNode: (id: string | null) => void
@@ -387,6 +388,28 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
     }
     get().addNode(newNode)
     set({ selectedNodeId: newNode.id })
+  },
+
+  setAllAgentModels: (model) => {
+    set((s) => {
+      if (!s.currentWorkflow) return s
+      const snap = snapshot(s.currentWorkflow)
+      const hist = [...s._history.slice(0, s._historyIndex + 1), snap].slice(-HISTORY_LIMIT)
+      const nodes = s.currentWorkflow.nodes.map((n): WorkflowNode => {
+        if (n.type !== 'agent') return n
+        return { ...n, data: { ...(n.data as AgentNodeData), model: { ...model } } }
+      })
+      const updated = { ...s.currentWorkflow, nodes }
+      tauri.saveWorkflow(updated).catch(() => {})
+      return {
+        currentWorkflow: updated,
+        workflows: s.workflows.map((w) => (w.id === updated.id ? updated : w)),
+        _history: hist,
+        _historyIndex: hist.length - 1,
+        canUndo: true,
+        canRedo: false,
+      }
+    })
   },
 
   importWorkflow: async () => {

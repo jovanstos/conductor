@@ -35,13 +35,22 @@ const platformDefaultPath =
     ? 'C:/Users/user/conductor_projects'
     : '~/conductor_projects'
 
+function loadStoredModel(): ModelConfig {
+  try {
+    const raw = localStorage.getItem('conductor_defaultModel')
+    return raw ? (JSON.parse(raw) as ModelConfig) : { ...DEFAULT_MODEL }
+  } catch {
+    return { ...DEFAULT_MODEL }
+  }
+}
+
 export const useSettingsStore = create<SettingsStore>()((set, get) => ({
   providerStatuses: [
     { provider: 'anthropic', hasKey: false },
     { provider: 'openai', hasKey: false },
     { provider: 'ollama', hasKey: false },
   ],
-  defaultModel: { ...DEFAULT_MODEL },
+  defaultModel: loadStoredModel(),
   ollamaUrl: 'http://localhost:11434',
   isOpen: false,
   defaultProjectsPath: platformDefaultPath,
@@ -150,7 +159,10 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
     }))
   },
 
-  setDefaultModel: (model) => set({ defaultModel: model }),
+  setDefaultModel: (model) => {
+    try { localStorage.setItem('conductor_defaultModel', JSON.stringify(model)) } catch { /* ignore */ }
+    set({ defaultModel: model })
+  },
   setOllamaUrl: (url) => set({ ollamaUrl: url }),
   openSettings: () => set({ isOpen: true }),
   closeSettings: () => set({ isOpen: false }),
