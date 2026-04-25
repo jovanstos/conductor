@@ -191,3 +191,33 @@ export type CompletedPayload = { finalOutput: string }
 export type ToolCallStartedPayload = { nodeId: string; toolCallId: string; toolName: string; argsPreview: string }
 export type ToolCallDonePayload = { nodeId: string; toolCallId: string; toolName: string; resultPreview: string; isError: boolean }
 export type ToolConfirmRequestPayload = { nodeId: string; toolCallId: string; toolName: string; description: string }
+
+// ── Chamber types ─────────────────────────────────────
+
+export type ChamberMode = 'audition' | 'war_room' | 'syndicate'
+export type ChamberRunStatus = 'idle' | 'running' | 'paused' | 'completed' | 'error' | 'cancelled'
+export type ChamberAgentStatus = 'waiting' | 'thinking' | 'typing' | 'critiquing' | 'done' | 'error'
+
+export type ChamberAgent = {
+  id: string
+  name: string
+  systemPrompt: string
+  model: ModelConfig
+}
+
+export type ChamberResult = {
+  agentId: string
+  agentName: string
+  output: string
+  score?: number
+  rank?: number
+}
+
+// Tauri event payloads for Chamber
+export type ChamberAgentStatusPayload = { agentId: string; agentName: string; status: ChamberAgentStatus }
+export type ChamberAgentChunkPayload  = { agentId: string; chunk: string }
+export type ChamberAgentDonePayload   = { agentId: string; output: string }
+export type ChamberPhasePayload       = { label: string; description: string }
+export type ChamberGatePausedPayload  = { message: string; phase: string; outputs: { agentId: string; agentName: string; output: string }[] }
+export type ChamberCompletedPayload   = { results: ChamberResult[]; finalOutput: string; winnerId?: string }
+export type ChamberErrorPayload       = { message: string }

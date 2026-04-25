@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import type { ModelConfig, ModelProvider } from '../../types'
 import { ANTHROPIC_MODELS, OPENAI_MODELS, getProviderColor } from '../../lib/defaults'
@@ -18,10 +19,41 @@ export default function ModelPicker({
   onChange: (model: ModelConfig) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [ollamaLoading, setOllamaLoading] = useState(false)
   const [customModel, setCustomModel] = useState('')
   const { providerStatuses, customHosts } = useSettingsStore()
+
+  function handleToggle() {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      // Prefer opening downward; if not enough room, flip upward
+      const spaceBelow = window.innerHeight - rect.bottom
+      const dropH = Math.min(384, spaceBelow - 8) // max-h-96 = 384px
+      if (spaceBelow >= 120) {
+        setDropdownStyle({
+          position: 'fixed',
+          top: rect.bottom + 4,
+          left: rect.left,
+          width: rect.width,
+          maxHeight: dropH,
+          zIndex: 9999,
+        })
+      } else {
+        setDropdownStyle({
+          position: 'fixed',
+          bottom: window.innerHeight - rect.top + 4,
+          left: rect.left,
+          width: rect.width,
+          maxHeight: Math.min(384, rect.top - 8),
+          zIndex: 9999,
+        })
+      }
+    }
+    setOpen((o) => !o)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -41,19 +73,14 @@ export default function ModelPicker({
     ? (customHostStatus?.hasKey ?? false)
     : (providerStatus?.hasKey ?? value.provider === 'ollama')
 
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-2 bg-white/5 border border-white/10 hover:border-white/20 rounded-lg px-3 py-2 text-sm text-white/75 transition-colors text-left"
+  const dropdownContent = (
+    <>
+      {/* click-away backdrop */}
+      <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+      <div
+        style={dropdownStyle}
+        className="bg-[#1a1a22] border border-white/10 rounded-xl shadow-2xl overflow-hidden overflow-y-auto"
       >
-        <ProviderDot provider={value.provider} hasKey={currentHasKey} />
-        <span className="flex-1 truncate">{value.modelId}</span>
-        {open ? <ChevronUp size={12} className="text-white/25" /> : <ChevronDown size={12} className="text-white/25" />}
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-[#1a1a22] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
           {/* Cloud providers */}
           {CLOUD_PROVIDERS.map((p) => {
             const models = p.id === 'anthropic' ? ANTHROPIC_MODELS : OPENAI_MODELS
@@ -193,7 +220,21 @@ export default function ModelPicker({
             </div>
           </div>
         </div>
-      )}
+      </>
+  )
+
+  return (
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        onClick={handleToggle}
+        className="w-full flex items-center gap-2 bg-white/5 border border-white/10 hover:border-white/20 rounded-lg px-3 py-2 text-sm text-white/75 transition-colors text-left"
+      >
+        <ProviderDot provider={value.provider} hasKey={currentHasKey} />
+        <span className="flex-1 truncate">{value.modelId}</span>
+        {open ? <ChevronUp size={12} className="text-white/25" /> : <ChevronDown size={12} className="text-white/25" />}
+      </button>
+      {open && createPortal(dropdownContent, document.body)}
     </div>
   )
 }

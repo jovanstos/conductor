@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { History, Play, Square, AlertTriangle, X, Sparkles } from 'lucide-react'
+import { History, Play, Square, AlertTriangle, X, Sparkles, Swords } from 'lucide-react'
 import { useWorkflowStore } from './stores/workflowStore'
 import { useRunStore } from './stores/runStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -15,6 +15,9 @@ import ReviewGateModal from './components/run/ReviewGateModal'
 import ToolConfirmModal from './components/run/ToolConfirmModal'
 import ResultModal from './components/run/ResultModal'
 import SettingsPanel from './components/settings/SettingsPanel'
+import ChamberView from './components/chamber/ChamberView'
+
+type MainTab = 'workflow' | 'chamber'
 
 const SIDEBAR_DEFAULT = 192
 const INSPECTOR_DEFAULT = 288
@@ -34,6 +37,7 @@ export default function App() {
   const [drawerHeight, setDrawerHeight] = useState(DRAWER_DEFAULT)
   const [runError, setRunError] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [activeTab, setActiveTab] = useState<MainTab>('workflow')
 
   useRun(currentRun?.id)
 
@@ -89,14 +93,43 @@ export default function App() {
 
       {/* ── Center column ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Workflow header bar */}
-        <div className="h-11 bg-[#0a0a0d] border-b border-white/5 flex items-center px-4 gap-3 shrink-0 relative">
-          <span className="text-sm font-medium text-white/70 truncate min-w-0">
-            {currentWorkflow?.name ?? 'No workflow selected'}
-          </span>
 
-          {currentWorkflow && (
-            <div className="ml-auto flex items-center gap-2">
+        {/* ── Tab bar ── */}
+        <div className="h-11 bg-[#0a0a0d] border-b border-white/5 flex items-center shrink-0 relative">
+          {/* Tabs */}
+          <div className="flex items-center h-full px-2 gap-0.5">
+            <button
+              onClick={() => setActiveTab('workflow')}
+              className={`h-8 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                activeTab === 'workflow'
+                  ? 'bg-white/8 text-white/85'
+                  : 'text-white/35 hover:text-white/60 hover:bg-white/4'
+              }`}
+            >
+              <Sparkles size={12} />
+              Workflow
+              {currentWorkflow && (
+                <span className="text-white/30 font-normal truncate max-w-[120px]">
+                  — {currentWorkflow.name}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('chamber')}
+              className={`h-8 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                activeTab === 'chamber'
+                  ? 'bg-amber-500/10 text-amber-300'
+                  : 'text-white/35 hover:text-white/60 hover:bg-white/4'
+              }`}
+            >
+              <Swords size={12} />
+              The Chamber
+            </button>
+          </div>
+
+          {/* Workflow controls — only shown on workflow tab */}
+          {activeTab === 'workflow' && currentWorkflow && (
+            <div className="ml-auto flex items-center gap-2 px-3">
               <button
                 onClick={() => setShowHistory((v) => !v)}
                 title="View run history"
@@ -105,14 +138,13 @@ export default function App() {
                 <History size={12} /> History
               </button>
               <input
-                className="w-64 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 outline-none focus:border-purple-500/50 placeholder:text-white/25"
+                className="w-60 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 outline-none focus:border-purple-500/50 placeholder:text-white/25"
                 placeholder="Describe your task..."
                 value={taskInput}
                 onChange={(e) => setTaskInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleRun()}
                 disabled={isRunning}
               />
-
               {isRunning ? (
                 <button
                   onClick={cancelRun}
@@ -131,7 +163,8 @@ export default function App() {
               )}
             </div>
           )}
-          {runError && (
+
+          {runError && activeTab === 'workflow' && (
             <div className="absolute top-full left-0 right-0 mt-1 mx-4 bg-red-500/15 border border-red-500/25 rounded-lg px-3 py-2 text-xs text-red-300 z-20 flex items-center gap-2">
               <AlertTriangle size={13} className="shrink-0" />
               <span>{runError}</span>
@@ -140,37 +173,38 @@ export default function App() {
           )}
         </div>
 
-        {/* Main content area */}
-        <div className="flex-1 flex overflow-hidden">
+        {/* ── Main content area ── */}
+        {activeTab === 'chamber' ? (
           <div className="flex-1 overflow-hidden">
-            {!currentWorkflow ? (
-              <EmptyState />
-            ) : (
-              <WorkflowCanvas />
-            )}
+            <ChamberView />
           </div>
-
-          {currentWorkflow && (
-            <>
-              <DragHandle
-                direction="h"
-                onDelta={(d) => setInspectorWidth((w) => clamp(w - d, 200, 520))}
-              />
-              <div className="shrink-0 h-full" style={{ width: inspectorWidth }}>
-                <Inspector />
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Run drawer */}
-        {currentRun && (
+        ) : (
           <>
-            <DragHandle
-              direction="v"
-              onDelta={(d) => setDrawerHeight((h) => clamp(h - d, 80, 640))}
-            />
-            <RunDrawer height={drawerHeight} />
+            <div className="flex-1 flex overflow-hidden">
+              <div className="flex-1 overflow-hidden">
+                {!currentWorkflow ? <EmptyState /> : <WorkflowCanvas />}
+              </div>
+              {currentWorkflow && (
+                <>
+                  <DragHandle
+                    direction="h"
+                    onDelta={(d) => setInspectorWidth((w) => clamp(w - d, 200, 520))}
+                  />
+                  <div className="shrink-0 h-full" style={{ width: inspectorWidth }}>
+                    <Inspector />
+                  </div>
+                </>
+              )}
+            </div>
+            {currentRun && (
+              <>
+                <DragHandle
+                  direction="v"
+                  onDelta={(d) => setDrawerHeight((h) => clamp(h - d, 80, 640))}
+                />
+                <RunDrawer height={drawerHeight} />
+              </>
+            )}
           </>
         )}
       </div>
