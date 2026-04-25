@@ -11,8 +11,16 @@ export default function ToolConfirmModal() {
 
   async function respond(approved: boolean) {
     if (!currentRun || !toolConfirmRequest) return
+    // Capture before clearing so the modal disappears immediately (prevents double-clicks)
+    const runId = currentRun.id
+    const { toolCallId } = toolConfirmRequest
     _setToolConfirmRequest(null)
-    await respondToolConfirmation(currentRun.id, toolConfirmRequest.toolCallId, approved)
+    try {
+      await respondToolConfirmation(runId, toolCallId, approved)
+    } catch (e) {
+      // If the invoke failed the backend is already gone (run cancelled); nothing to do
+      console.error('respondToolConfirmation failed:', e)
+    }
   }
 
   return (

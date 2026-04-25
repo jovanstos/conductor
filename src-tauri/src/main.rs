@@ -1361,9 +1361,11 @@ async fn execute_tool(
             let current = std::fs::read_to_string(&resolved)
                 .map_err(|e| format!("Cannot read '{}': {}", path, e))?;
             if !current.contains(old_str) {
+                // Give the agent a snippet so it can see what the file actually contains
+                let snippet = safe_truncate(&current, 600);
                 return Err(format!(
-                    "old_str not found in '{}'. Check that it exactly matches the file content (including whitespace and newlines).",
-                    path
+                    "old_str not found in '{}'.\n\nFile content (first 600 chars):\n{}\n\nUse read_file to see the exact content, then retry with a string that matches exactly (including whitespace and newlines).",
+                    path, snippet
                 ));
             }
             let count = current.matches(old_str).count();
@@ -1411,8 +1413,18 @@ async fn execute_tool(
                 if matches.len() >= 100 { break; }
                 let fname = entry.file_name().to_string_lossy().to_string();
                 if !file_glob.is_empty() {
-                    let ext = file_glob.trim_start_matches("*.").trim_start_matches('*');
-                    if !ext.is_empty() && !fname.ends_with(ext) { continue; }
+                    let glob = file_glob.trim();
+                    let matches = if let Some(ext) = glob.strip_prefix("*.") {
+                        // "*.ts" → must end with ".ts" (dot-inclusive to avoid false matches)
+                        fname.ends_with(&format!(".{}", ext))
+                    } else if glob.starts_with('*') {
+                        // "*foo" → suffix match
+                        fname.ends_with(&glob[1..])
+                    } else {
+                        // exact filename match (e.g. ".gitignore")
+                        fname == glob
+                    };
+                    if !matches { continue; }
                 }
                 if entry.metadata().map(|m| m.len()).unwrap_or(0) > 1_000_000 { continue; }
                 let content = match std::fs::read_to_string(entry.path()) {
