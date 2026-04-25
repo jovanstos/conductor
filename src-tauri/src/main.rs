@@ -215,32 +215,6 @@ impl Default for ToolPermissionConfig {
 // HTTP API types
 // ─────────────────────────────────────────────
 
-#[derive(Serialize)]
-struct AnthropicRequest<'a> {
-    model: &'a str,
-    max_tokens: u32,
-    system: &'a str,
-    messages: &'a [ApiMessage],
-    #[serde(skip_serializing_if = "Option::is_none")]
-    temperature: Option<f64>,
-}
-
-#[derive(Deserialize)]
-struct AnthropicResponse {
-    content: Vec<AnthropicContentBlock>,
-    usage: Option<AnthropicUsage>,
-}
-
-#[derive(Deserialize)]
-struct AnthropicContentBlock {
-    text: String,
-}
-
-#[derive(Deserialize)]
-struct AnthropicUsage {
-    output_tokens: Option<u32>,
-}
-
 #[derive(Deserialize)]
 struct AnthropicError {
     error: AnthropicErrorDetail,
@@ -251,30 +225,6 @@ struct AnthropicErrorDetail {
     #[serde(rename = "type")]
     error_type: String,
     message: String,
-}
-
-#[derive(Serialize)]
-struct OpenAIRequest<'a> {
-    model: &'a str,
-    messages: Vec<ApiMessage>,
-    max_tokens: u32,
-    temperature: f64,
-}
-
-#[derive(Deserialize)]
-struct OpenAIResponse {
-    choices: Vec<OpenAIChoice>,
-    usage: Option<OpenAIUsage>,
-}
-
-#[derive(Deserialize)]
-struct OpenAIChoice {
-    message: ApiMessage,
-}
-
-#[derive(Deserialize)]
-struct OpenAIUsage {
-    completion_tokens: Option<u32>,
 }
 
 // ─────────────────────────────────────────────
@@ -352,214 +302,6 @@ fn save_keys(path: &PathBuf, keys: &KeysMap) -> Result<(), String> {
     save_json(path, keys)
 }
 
-// ─────────────────────────────────────────────
-// LLM call implementations (legacy, non-tool)
-// ─────────────────────────────────────────────
-
-async fn call_anthropic(
-    model_id: &str,
-    api_key: &str,
-    system: &str,
-    messages: &[ApiMessage],
-    max_tokens: u32,
-    temperature: f64,
-) -> Result<(String, Option<u32>), String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| format!("HTTP client: {}", e))?;
-
-    let body = AnthropicRequest {
-        model: model_id,
-        max_tokens,
-        system,
-        messages,
-        temperature: if (temperature - 1.0).abs() > 1e-9 { Some(temperature) } else { None },
-    };
-
-    for attempt in 1..=3u32 {
-        let resp = client
-            .post("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", api_key)
-            .header("anthropic-version", "2023-06-01")
-            .header("content-type", "application/json")
-            .json(&body)
-            .send()
-            .await;
-
-        match resp {
-            Err(e) => {
-                if attempt == 3 { return Err(format!("Request failed: {}", e)); }
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                continue;
-            }
-            Ok(r) => {
-                let status = r.status();
-                let raw = r.text().await.map_err(|e| format!("Read response: {}", e))?;
-                if status.as_u16() == 503 || status.as_u16() == 529 {
-                    if attempt == 3 { return Err(format!("API unavailable ({})", status)); }
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    continue;
-                }
-                if !status.is_success() {
-                    if let Ok(err) = serde_json::from_str::<AnthropicError>(&raw) {
-                        return Err(format!("{}: {}", err.error.error_type, err.error.message));
-                    }
-                    return Err(format!("API {} — {}", status, &raw[..raw.len().min(200)]));
-                }
-                let parsed: AnthropicResponse = serde_json::from_str(&raw)
-                    .map_err(|e| format!("Parse: {} | raw: {}", e, &raw[..raw.len().min(200)]))?;
-                let text = parsed.content.into_iter().next()
-                    .map(|b| b.text)
-                    .ok_or_else(|| "Empty response".to_string())?;
-                let tokens = parsed.usage.and_then(|u| u.output_tokens);
-                return Ok((text, tokens));
-            }
-        }
-    }
-    Err("Retry loop exhausted".to_string())
-}
-
-async fn call_openai(
-    model_id: &str,
-    api_key: &str,
-    system: &str,
-    messages: &[ApiMessage],
-    max_tokens: u32,
-    temperature: f64,
-) -> Result<(String, Option<u32>), String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| format!("HTTP client: {}", e))?;
-    let mut all = vec![ApiMessage { role: "system".into(), content: system.into() }];
-    all.extend_from_slice(messages);
-    let body = OpenAIRequest { model: model_id, messages: all, max_tokens, temperature };
-    let resp = client
-        .post("https://api.openai.com/v1/chat/completions")
-        .header("Authorization", format!("Bearer {}", api_key))
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-    let status = resp.status();
-    let raw = resp.text().await.map_err(|e| format!("Read response: {}", e))?;
-    if !status.is_success() {
-        return Err(format!("OpenAI {} — {}", status, &raw[..raw.len().min(200)]));
-    }
-    let parsed: OpenAIResponse = serde_json::from_str(&raw).map_err(|e| format!("Parse: {}", e))?;
-    let text = parsed.choices.into_iter().next()
-        .map(|c| c.message.content)
-        .ok_or_else(|| "Empty response".to_string())?;
-    let tokens = parsed.usage.and_then(|u| u.completion_tokens);
-    Ok((text, tokens))
-}
-
-async fn call_ollama(
-    model_id: &str,
-    base_url: &str,
-    system: &str,
-    messages: &[ApiMessage],
-    max_tokens: u32,
-    temperature: f64,
-) -> Result<(String, Option<u32>), String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| format!("HTTP client: {}", e))?;
-    let mut all = vec![ApiMessage { role: "system".into(), content: system.into() }];
-    all.extend_from_slice(messages);
-    let body = OpenAIRequest { model: model_id, messages: all, max_tokens, temperature };
-    let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
-    let resp = client
-        .post(&url)
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Ollama request: {}", e))?;
-    let status = resp.status();
-    let raw = resp.text().await.map_err(|e| format!("Read response: {}", e))?;
-    if !status.is_success() {
-        return Err(format!("Ollama {} — {}", status, &raw[..raw.len().min(200)]));
-    }
-    let parsed: OpenAIResponse = serde_json::from_str(&raw).map_err(|e| format!("Parse: {}", e))?;
-    let text = parsed.choices.into_iter().next()
-        .map(|c| c.message.content)
-        .ok_or_else(|| "Empty response".to_string())?;
-    Ok((text, None))
-}
-
-async fn call_openai_compat_nonstream(
-    url: &str,
-    auth_token: Option<&str>,
-    model_id: &str,
-    system: &str,
-    messages: &[ApiMessage],
-    max_tokens: u32,
-    temperature: f64,
-) -> Result<(String, Option<u32>), String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| format!("HTTP client: {}", e))?;
-    let mut all = vec![ApiMessage { role: "system".into(), content: system.into() }];
-    all.extend_from_slice(messages);
-    let body = OpenAIRequest { model: model_id, messages: all, max_tokens, temperature };
-    let mut req = client.post(url).header("content-type", "application/json").json(&body);
-    if let Some(token) = auth_token {
-        req = req.header("Authorization", format!("Bearer {}", token));
-    }
-    let resp = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
-    let status = resp.status();
-    let raw = resp.text().await.map_err(|e| format!("Read response: {}", e))?;
-    if !status.is_success() {
-        return Err(format!("API {} — {}", status, &raw[..raw.len().min(200)]));
-    }
-    let parsed: OpenAIResponse = serde_json::from_str(&raw).map_err(|e| format!("Parse: {}", e))?;
-    let text = parsed.choices.into_iter().next()
-        .map(|c| c.message.content)
-        .ok_or_else(|| "Empty response".to_string())?;
-    let tokens = parsed.usage.and_then(|u| u.completion_tokens);
-    Ok((text, tokens))
-}
-
-async fn llm_call(
-    model: &ModelConfig,
-    system: &str,
-    messages: &[ApiMessage],
-    keys_file: &PathBuf,
-) -> Result<(String, Option<u32>), String> {
-    let max_tokens = effective_max_tokens(&model.provider, &model.model_id, model.max_tokens);
-    match model.provider.as_str() {
-        "anthropic" => {
-            let key = model.api_key_ref.as_deref()
-                .and_then(|r| load_keys(keys_file).remove(r))
-                .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
-                .ok_or_else(|| "No Anthropic API key configured".to_string())?;
-            call_anthropic(&model.model_id, &key, system, messages, max_tokens, model.temperature).await
-        }
-        "openai" => {
-            let key = model.api_key_ref.as_deref()
-                .and_then(|r| load_keys(keys_file).remove(r))
-                .or_else(|| std::env::var("OPENAI_API_KEY").ok())
-                .ok_or_else(|| "No OpenAI API key configured".to_string())?;
-            call_openai(&model.model_id, &key, system, messages, max_tokens, model.temperature).await
-        }
-        "ollama" => {
-            let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
-            call_ollama(&model.model_id, base, system, messages, max_tokens, model.temperature).await
-        }
-        "custom" => {
-            let base = model.base_url.as_deref().unwrap_or("http://localhost:8080");
-            let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
-            let key = model.api_key_ref.as_deref().and_then(|r| load_keys(keys_file).remove(r));
-            call_openai_compat_nonstream(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature).await
-        }
-        p => Err(format!("Unsupported provider: {}", p)),
-    }
-}
 
 fn effective_max_tokens(provider: &str, model_id: &str, requested: u32) -> u32 {
     let cap: u32 = match provider {
@@ -579,209 +321,6 @@ fn effective_max_tokens(provider: &str, model_id: &str, requested: u32) -> u32 {
     if requested == 0 || requested >= 100_000 { cap } else { requested.min(cap) }
 }
 
-// ─────────────────────────────────────────────
-// Streaming LLM calls (legacy, no tools)
-// ─────────────────────────────────────────────
-
-async fn call_anthropic_stream(
-    model_id: &str,
-    api_key: &str,
-    system: &str,
-    messages: &[ApiMessage],
-    max_tokens: u32,
-    temperature: f64,
-    app: &AppHandle,
-    run_id: &str,
-    node_id: &str,
-    cancel: &Arc<AtomicBool>,
-) -> Result<(String, Option<u32>), String> {
-    use futures_util::StreamExt;
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| format!("HTTP client: {}", e))?;
-    let mut body = serde_json::json!({
-        "model": model_id, "max_tokens": max_tokens,
-        "system": system, "messages": messages, "stream": true
-    });
-    if (temperature - 1.0).abs() > 1e-9 {
-        body["temperature"] = serde_json::json!(temperature);
-    }
-    let resp = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
-        .header("content-type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-    let status = resp.status();
-    if !status.is_success() {
-        let raw = resp.text().await.unwrap_or_default();
-        if let Ok(err) = serde_json::from_str::<AnthropicError>(&raw) {
-            return Err(format!("{}: {}", err.error.error_type, err.error.message));
-        }
-        return Err(format!("API {} — {}", status, &raw[..raw.len().min(200)]));
-    }
-    let mut byte_stream = resp.bytes_stream();
-    let mut full_output = String::new();
-    let mut line_buf = String::new();
-    let mut output_tokens: Option<u32> = None;
-    while let Some(chunk) = byte_stream.next().await {
-        if cancel.load(Ordering::Relaxed) { return Err("__cancelled__".into()); }
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        line_buf.push_str(&String::from_utf8_lossy(&bytes));
-        loop {
-            match line_buf.find('\n') {
-                None => break,
-                Some(pos) => {
-                    let line = line_buf[..pos].trim_end_matches('\r').to_string();
-                    line_buf = line_buf[pos + 1..].to_string();
-                    if let Some(data) = line.strip_prefix("data: ") {
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(data) {
-                            match val.get("type").and_then(|v| v.as_str()) {
-                                Some("content_block_delta") => {
-                                    if let Some(text) = val.pointer("/delta/text").and_then(|v| v.as_str()) {
-                                        if !text.is_empty() {
-                                            full_output.push_str(text);
-                                            let _ = app.emit(
-                                                &format!("conductor://run/{}/step_chunk", run_id),
-                                                serde_json::json!({ "nodeId": node_id, "chunk": text }),
-                                            );
-                                        }
-                                    }
-                                }
-                                Some("message_delta") => {
-                                    output_tokens = val.pointer("/usage/output_tokens")
-                                        .and_then(|v| v.as_u64()).map(|n| n as u32);
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if full_output.is_empty() { return Err("Empty response from Anthropic".into()); }
-    Ok((full_output, output_tokens))
-}
-
-async fn call_openai_compat_stream(
-    url: &str,
-    auth_token: Option<&str>,
-    model_id: &str,
-    system: &str,
-    messages: &[ApiMessage],
-    max_tokens: u32,
-    temperature: f64,
-    app: &AppHandle,
-    run_id: &str,
-    node_id: &str,
-    cancel: &Arc<AtomicBool>,
-) -> Result<(String, Option<u32>), String> {
-    use futures_util::StreamExt;
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
-        .build()
-        .map_err(|e| format!("HTTP client: {}", e))?;
-    let mut all = vec![ApiMessage { role: "system".into(), content: system.into() }];
-    all.extend_from_slice(messages);
-    let body = serde_json::json!({
-        "model": model_id, "messages": all,
-        "max_tokens": max_tokens, "temperature": temperature, "stream": true
-    });
-    let mut req = client.post(url).header("content-type", "application/json").json(&body);
-    if let Some(token) = auth_token {
-        req = req.header("Authorization", format!("Bearer {}", token));
-    }
-    let resp = req.send().await.map_err(|e| format!("Request failed: {}", e))?;
-    let status = resp.status();
-    if !status.is_success() {
-        let raw = resp.text().await.unwrap_or_default();
-        return Err(format!("API {} — {}", status, &raw[..raw.len().min(200)]));
-    }
-    let mut byte_stream = resp.bytes_stream();
-    let mut full_output = String::new();
-    let mut line_buf = String::new();
-    let mut output_tokens: Option<u32> = None;
-    while let Some(chunk) = byte_stream.next().await {
-        if cancel.load(Ordering::Relaxed) { return Err("__cancelled__".into()); }
-        let bytes = chunk.map_err(|e| format!("Stream error: {}", e))?;
-        line_buf.push_str(&String::from_utf8_lossy(&bytes));
-        loop {
-            match line_buf.find('\n') {
-                None => break,
-                Some(pos) => {
-                    let line = line_buf[..pos].trim_end_matches('\r').to_string();
-                    line_buf = line_buf[pos + 1..].to_string();
-                    let trimmed = line.trim();
-                    if trimmed.is_empty() || trimmed == "data: [DONE]" { continue; }
-                    if let Some(data) = trimmed.strip_prefix("data: ") {
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(data) {
-                            if let Some(text) = val.pointer("/choices/0/delta/content").and_then(|v| v.as_str()) {
-                                if !text.is_empty() {
-                                    full_output.push_str(text);
-                                    let _ = app.emit(
-                                        &format!("conductor://run/{}/step_chunk", run_id),
-                                        serde_json::json!({ "nodeId": node_id, "chunk": text }),
-                                    );
-                                }
-                            }
-                            if let Some(tokens) = val.pointer("/usage/completion_tokens").and_then(|v| v.as_u64()) {
-                                output_tokens = Some(tokens as u32);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if full_output.is_empty() { return Err("Empty response from model".into()); }
-    Ok((full_output, output_tokens))
-}
-
-async fn llm_call_streaming(
-    model: &ModelConfig,
-    system: &str,
-    messages: &[ApiMessage],
-    keys_file: &PathBuf,
-    app: &AppHandle,
-    run_id: &str,
-    node_id: &str,
-    cancel: &Arc<AtomicBool>,
-) -> Result<(String, Option<u32>), String> {
-    let max_tokens = effective_max_tokens(&model.provider, &model.model_id, model.max_tokens);
-    match model.provider.as_str() {
-        "anthropic" => {
-            let key = model.api_key_ref.as_deref()
-                .and_then(|r| load_keys(keys_file).remove(r))
-                .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
-                .ok_or_else(|| "No Anthropic API key — open Settings (⚙) to add one.".to_string())?;
-            call_anthropic_stream(&model.model_id, &key, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
-        }
-        "openai" => {
-            let key = model.api_key_ref.as_deref()
-                .and_then(|r| load_keys(keys_file).remove(r))
-                .or_else(|| std::env::var("OPENAI_API_KEY").ok())
-                .ok_or_else(|| "No OpenAI API key — open Settings (⚙) to add one.".to_string())?;
-            call_openai_compat_stream("https://api.openai.com/v1/chat/completions", Some(&key), &model.model_id, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
-        }
-        "ollama" => {
-            let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
-            let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
-            call_openai_compat_stream(&url, None, &model.model_id, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
-        }
-        "custom" => {
-            let base = model.base_url.as_deref().unwrap_or("http://localhost:8080");
-            let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
-            let key = model.api_key_ref.as_deref().and_then(|r| load_keys(keys_file).remove(r));
-            call_openai_compat_stream(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature, app, run_id, node_id, cancel).await
-        }
-        p => Err(format!("Unsupported provider: {}", p)),
-    }
-}
 
 // ─────────────────────────────────────────────
 // Tool-aware LLM calls (non-streaming, for agentic loop)
@@ -1177,13 +716,44 @@ fn platform_home() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("."))
 }
 
-fn check_path_allowed(path: &PathBuf, permissions: &ToolPermissionConfig) -> Result<(), String> {
-    let path_str = path.to_string_lossy();
+/// Normalize a path by resolving `.` and `..` components without touching the filesystem.
+fn normalize_path(path: &PathBuf) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => { out.pop(); }
+            std::path::Component::CurDir => {}
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Enforce that `path` stays inside `workspace_path` and is not in any denied list.
+fn check_path_safe(
+    path: &PathBuf,
+    workspace_path: Option<&str>,
+    permissions: &ToolPermissionConfig,
+) -> Result<(), String> {
+    let normalized = normalize_path(path);
+
+    // Workspace boundary: resolved path must be a child of the workspace root.
+    if let Some(ws) = workspace_path {
+        let ws_norm = normalize_path(&PathBuf::from(ws));
+        if !normalized.starts_with(&ws_norm) {
+            return Err(format!(
+                "Path '{}' is outside the allowed workspace — traversal outside the target directory is not permitted.",
+                normalized.display()
+            ));
+        }
+    }
+
+    let path_str = normalized.to_string_lossy();
     let home = platform_home();
     for denied in &permissions.denied_paths {
         let expanded = denied.replace('~', &home.to_string_lossy());
         if path_str.starts_with(&expanded) {
-            return Err(format!("Access to '{}' is denied", path.display()));
+            return Err(format!("Access to '{}' is denied", normalized.display()));
         }
     }
     Ok(())
@@ -1334,7 +904,7 @@ async fn execute_tool(
         "read_file" => {
             let path = args["path"].as_str().ok_or("missing path")?;
             let resolved = resolve_path(path, workspace_path);
-            check_path_allowed(&resolved, permissions)?;
+            check_path_safe(&resolved, workspace_path, permissions)?;
             let content = std::fs::read_to_string(&resolved)
                 .map_err(|e| format!("Cannot read '{}': {}", path, e))?;
             if content.len() > 200_000 {
@@ -1348,7 +918,7 @@ async fn execute_tool(
             let path = args["path"].as_str().ok_or("missing path")?;
             let content = args["content"].as_str().ok_or("missing content")?;
             let resolved = resolve_path(path, workspace_path);
-            check_path_allowed(&resolved, permissions)?;
+            check_path_safe(&resolved, workspace_path, permissions)?;
             if let Some(parent) = resolved.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {}", e))?;
             }
@@ -1362,7 +932,7 @@ async fn execute_tool(
             let old_str = args["old_str"].as_str().ok_or("missing old_str")?;
             let new_str = args["new_str"].as_str().ok_or("missing new_str")?;
             let resolved = resolve_path(path, workspace_path);
-            check_path_allowed(&resolved, permissions)?;
+            check_path_safe(&resolved, workspace_path, permissions)?;
             let current = std::fs::read_to_string(&resolved)
                 .map_err(|e| format!("Cannot read '{}': {}", path, e))?;
             if !current.contains(old_str) {
@@ -1458,7 +1028,7 @@ async fn execute_tool(
         "create_directory" => {
             let path = args["path"].as_str().ok_or("missing path")?;
             let resolved = resolve_path(path, workspace_path);
-            check_path_allowed(&resolved, permissions)?;
+            check_path_safe(&resolved, workspace_path, permissions)?;
             std::fs::create_dir_all(&resolved)
                 .map_err(|e| format!("Cannot create '{}': {}", path, e))?;
             Ok(format!("Created directory: {}", path))
@@ -1467,7 +1037,7 @@ async fn execute_tool(
         "delete_file" => {
             let path = args["path"].as_str().ok_or("missing path")?;
             let resolved = resolve_path(path, workspace_path);
-            check_path_allowed(&resolved, permissions)?;
+            check_path_safe(&resolved, workspace_path, permissions)?;
             let confirmed = request_tool_confirmation(
                 app, run_id, node_id, &tc.id, "delete_file",
                 &format!("Delete file: {}", path), state,
@@ -1483,8 +1053,8 @@ async fn execute_tool(
             let dst = args["dst"].as_str().ok_or("missing dst")?;
             let src_r = resolve_path(src, workspace_path);
             let dst_r = resolve_path(dst, workspace_path);
-            check_path_allowed(&src_r, permissions)?;
-            check_path_allowed(&dst_r, permissions)?;
+            check_path_safe(&src_r, workspace_path, permissions)?;
+            check_path_safe(&dst_r, workspace_path, permissions)?;
             std::fs::rename(&src_r, &dst_r)
                 .map_err(|e| format!("Cannot move '{}' to '{}': {}", src, dst, e))?;
             Ok(format!("Moved {} → {}", src, dst))
@@ -1654,51 +1224,7 @@ async fn exec_agent(
         files_written: vec![],
     };
 
-    // ── Legacy single-shot streaming path (no tools) ──
-    if !use_tools {
-        let messages = vec![ApiMessage { role: "user".into(), content: user_msg.clone() }];
-        match llm_call_streaming(&data.model, &system_prompt, &messages, &state.keys_file(), app, run_id, node_id, cancel).await {
-            Ok((output, tokens)) => {
-                let files_written = if let Some(ws_path) = workspace_path {
-                    let blocks = workspace_fs::parse_file_blocks(&output);
-                    if !blocks.is_empty() {
-                        workspace_fs::write_files_internal(ws_path, blocks).unwrap_or_default()
-                    } else { vec![] }
-                } else { vec![] };
-
-                step.completed_at = Some(now());
-                step.status = "done".into();
-                step.output = output.clone();
-                step.tokens_used = tokens;
-                step.files_written = files_written.clone();
-                run.steps.push(step);
-                let _ = save_json(&state.runs_dir().join(format!("{}.json", run_id)), run);
-                let _ = app.emit(
-                    &format!("conductor://run/{}/step_done", run_id),
-                    serde_json::json!({
-                        "nodeId": node_id, "output": output,
-                        "tokensUsed": tokens, "filesWritten": files_written,
-                    }),
-                );
-                ctx.chain.push((data.name.clone(), output.clone()));
-                return Ok(output);
-            }
-            Err(e) => {
-                step.completed_at = Some(now());
-                step.status = "error".into();
-                step.error = Some(e.clone());
-                run.steps.push(step);
-                let _ = save_json(&state.runs_dir().join(format!("{}.json", run_id)), run);
-                let _ = app.emit(
-                    &format!("conductor://run/{}/step_error", run_id),
-                    serde_json::json!({ "nodeId": node_id, "error": e }),
-                );
-                return Err(e);
-            }
-        }
-    }
-
-    // ── Agentic tool loop ──
+    // ── Agentic tool loop (single execution path for all models) ──
     let mut messages: Vec<serde_json::Value> = vec![
         serde_json::json!({ "role": "user", "content": user_msg })
     ];
@@ -1861,8 +1387,18 @@ async fn exec_agent(
     step.completed_at = Some(now());
     match tool_loop_result {
         Ok(text_output) => {
-            // If files were written, include their contents in the output so subsequent
-            // agents (and the final result) have full access to the created work.
+            // When no tools are enabled the model outputs fenced code blocks —
+            // parse and write them to the workspace now so the chain has real files.
+            if !use_tools {
+                if let Some(ws_path) = workspace_path {
+                    let blocks = workspace_fs::parse_file_blocks(&text_output);
+                    if !blocks.is_empty() {
+                        if let Ok(written) = workspace_fs::write_files_internal(ws_path, blocks) {
+                            files_written.extend(written);
+                        }
+                    }
+                }
+            }
             let effective_output = build_effective_output(&text_output, &files_written, workspace_path);
             step.status = "done".into();
             step.output = effective_output.clone();
@@ -2215,6 +1751,18 @@ async fn start_run(
 ) -> Result<String, String> {
     let wf_path = state.workflows_dir().join(format!("{}.json", workflow_id));
     let workflow: Workflow = load_json(&wf_path)?;
+
+    // Require a workspace if any agent node has tools enabled.
+    let needs_workspace = workflow.nodes.iter().any(|n| {
+        n.node_type == "agent"
+            && serde_json::from_value::<AgentNodeData>(n.data.clone())
+                .map(|d| !d.tools_enabled.is_empty())
+                .unwrap_or(false)
+    });
+    if needs_workspace && base_path.is_none() {
+        return Err("WORKSPACE_REQUIRED".to_string());
+    }
+
     let run_id = Uuid::new_v4().to_string();
 
     let workspace_config = if let Some(ref mode) = workspace_mode {
@@ -2323,17 +1871,6 @@ fn respond_tool_confirmation(
     let tx = senders.remove(&tool_call_id)
         .ok_or_else(|| format!("No pending confirmation for: {}", tool_call_id))?;
     tx.send(approved).map_err(|_| "Send confirmation failed".to_string())
-}
-
-#[tauri::command]
-async fn call_llm(
-    model: ModelConfig,
-    system: String,
-    messages: Vec<ApiMessage>,
-    state: State<'_, Arc<AppState>>,
-) -> Result<String, String> {
-    let (text, _) = llm_call(&model, &system, &messages, &state.keys_file()).await?;
-    Ok(text)
 }
 
 #[tauri::command]
@@ -2609,8 +2146,6 @@ async fn chamber_provider_stream(
     agent_id: &str,
     cancel: &Arc<AtomicBool>,
 ) -> Result<String, String> {
-    use futures_util::StreamExt;
-
     let api_key: Option<String> = if model.provider == "anthropic" || model.provider == "openai" || model.provider == "custom" {
         let key_name = model.api_key_ref.clone().unwrap_or_else(|| model.provider.clone());
         load_keys(keys_file).remove(&key_name)
@@ -3259,7 +2794,6 @@ fn main() {
             get_runs_for_workflow,
             resume_gate,
             respond_tool_confirmation,
-            call_llm,
             save_api_key,
             delete_api_key,
             has_api_key,

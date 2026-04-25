@@ -4,8 +4,6 @@ import type {
   Workflow,
   Run,
   Template,
-  ModelConfig,
-  LLMMessage,
   FileEntry,
   DirEntry,
   ProjectEntry,
@@ -46,10 +44,6 @@ export const resumeGate = (
   action: 'approve' | 'reject' | 'edit',
   content?: string,
 ) => invoke<void>('resume_gate', { runId, nodeId, action, content })
-
-// LLM call
-export const callLlm = (model: ModelConfig, system: string, messages: LLMMessage[]) =>
-  invoke<string>('call_llm', { model, system, messages })
 
 // API key management
 export const saveApiKey = (provider: string, key: string) =>
