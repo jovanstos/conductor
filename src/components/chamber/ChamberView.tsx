@@ -4,9 +4,6 @@ import ChamberConfigPane from './ChamberConfigPane'
 import ChamberArena from './ChamberArena'
 import ChamberLedger from './ChamberLedger'
 
-const CONFIG_WIDTH = 280
-const LEDGER_WIDTH = 300
-
 export default function ChamberView() {
   const { startRun } = useChamberStore()
   const [startError, setStartError] = useState<string | null>(null)
@@ -21,31 +18,26 @@ export default function ChamberView() {
   }
 
   return (
-    <div className="h-full flex overflow-hidden relative">
-      {/* Left pane — Configuration */}
-      <div className="shrink-0 overflow-hidden" style={{ width: CONFIG_WIDTH }}>
+    <div className="h-full flex overflow-hidden" style={{ background: 'var(--c-base)' }}>
+      {/* Left — Config */}
+      <div className="w-72 shrink-0 overflow-hidden" style={{ borderRight: '1px solid var(--c-border-subtle)' }}>
         <ChamberConfigPane onRun={handleRun} />
       </div>
 
-      {/* Divider */}
-      <div className="w-px bg-white/6 shrink-0" />
-
-      {/* Center pane — Arena */}
+      {/* Center — Arena */}
       <div className="flex-1 overflow-hidden relative">
         {startError && (
-          <div className="absolute top-3 left-3 right-3 z-10 bg-red-500/15 border border-red-500/25 rounded-xl px-3 py-2 text-xs text-red-300 flex items-center justify-between">
-            <span>{startError}</span>
-            <button onClick={() => setStartError(null)} className="ml-2 text-red-400/50 hover:text-red-400">✕</button>
+          <div className="absolute top-3 left-3 right-3 z-10 flex items-center gap-2 px-3 py-2 rounded-xl text-xs border"
+            style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', color: 'rgb(252,165,165)' }}>
+            <span className="flex-1">{startError}</span>
+            <button onClick={() => setStartError(null)}>✕</button>
           </div>
         )}
         <ChamberArena />
       </div>
 
-      {/* Divider */}
-      <div className="w-px bg-white/6 shrink-0" />
-
-      {/* Right pane — Ledger */}
-      <div className="shrink-0 overflow-hidden" style={{ width: LEDGER_WIDTH }}>
+      {/* Right — Ledger */}
+      <div className="w-72 shrink-0 overflow-hidden" style={{ borderLeft: '1px solid var(--c-border-subtle)' }}>
         <ChamberLedger />
       </div>
     </div>

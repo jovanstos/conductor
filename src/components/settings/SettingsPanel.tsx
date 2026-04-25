@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, FolderOpen, Check, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, FolderOpen, Check, Plus, Trash2, ChevronDown, ChevronUp, Moon, Sun } from 'lucide-react'
 import { open as openFolderDialog } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { validateApiKey, validateCustomHost } from '../../lib/tauri'
@@ -22,51 +22,82 @@ function ProjectsFolderSettings() {
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-white/35">
-        Where Conductor saves project files. Existing projects in this folder appear in the sidebar.
-      </p>
-      <div className="bg-white/4 rounded-xl px-4 py-3 flex items-center gap-3">
-        <span className="flex-1 text-xs text-white/50 font-mono truncate" title={defaultProjectsPath}>
-          {defaultProjectsPath}
-        </span>
-        <button
-          onClick={handleBrowse}
-          disabled={saving}
-          className="text-xs text-white/40 hover:text-white/70 border border-white/10 px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 shrink-0 flex items-center gap-1.5"
-        >
-          {saving ? '...' : <><FolderOpen size={12} className="inline mr-1" />Browse</>}
-        </button>
-      </div>
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)' }}>
+      <span className="flex-1 text-xs font-mono truncate" style={{ color: 'var(--c-text-2)' }} title={defaultProjectsPath}>
+        {defaultProjectsPath}
+      </span>
+      <button
+        onClick={handleBrowse}
+        disabled={saving}
+        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 shrink-0"
+        style={{ color: 'var(--c-text-3)', border: '1px solid var(--c-border)' }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
+      >
+        {saving ? '...' : <><FolderOpen size={11} />Browse</>}
+      </button>
     </div>
   )
 }
 
 export default function SettingsPanel() {
-  const { closeSettings, providerStatuses, saveApiKey, deleteApiKey, customHosts } = useSettingsStore()
+  const { closeSettings, providerStatuses, saveApiKey, deleteApiKey, customHosts, theme, setTheme } = useSettingsStore()
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[560px] max-h-[80vh] bg-[#141418] border border-white/10 rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div
+        className="w-[540px] max-h-[82vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden"
+        style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}
+      >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-white/8 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-white/85">Settings</h2>
+        <div className="px-6 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--c-text-1)' }}>Settings</h2>
           <button
             onClick={closeSettings}
-            className="text-white/30 hover:text-white/60 transition-colors"
+            className="transition-colors rounded-md p-1"
+            style={{ color: 'var(--c-text-3)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          {/* API Keys section */}
-          <section>
-            <h3 className="text-sm font-semibold text-white/70 mb-3">API Keys</h3>
-            <p className="text-xs text-white/35 mb-4">
-              Keys are stored locally and never sent anywhere except the respective provider.
-            </p>
-            <div className="space-y-3">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
+
+          {/* Appearance */}
+          <SettingsSection title="Appearance">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm" style={{ color: 'var(--c-text-2)' }}>Theme</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--c-text-dim)' }}>Choose how Conductor looks</p>
+              </div>
+              <div className="flex gap-1.5 p-1 rounded-lg" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border-subtle)' }}>
+                {([
+                  { id: 'dark',  icon: <Moon  size={13} />, label: 'Dark'  },
+                  { id: 'light', icon: <Sun   size={13} />, label: 'Light' },
+                ] as const).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTheme(t.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+                    style={
+                      theme === t.id
+                        ? { background: 'var(--c-surface)', color: 'var(--c-text-1)', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }
+                        : { color: 'var(--c-text-3)' }
+                    }
+                  >
+                    {t.icon}
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </SettingsSection>
+
+          {/* API Keys */}
+          <SettingsSection title="API Keys" description="Keys are stored locally and never sent anywhere except the respective provider.">
+            <div className="space-y-2">
               {providerStatuses
                 .filter((p) => p.provider !== 'ollama')
                 .map((p) => (
@@ -79,37 +110,44 @@ export default function SettingsPanel() {
                   />
                 ))}
             </div>
-          </section>
+          </SettingsSection>
 
-          {/* Ollama section */}
-          <section>
-            <h3 className="text-sm font-semibold text-white/70 mb-3">Ollama (Local)</h3>
+          {/* Ollama */}
+          <SettingsSection title="Ollama" description="Runs locally — no API key needed. Make sure Ollama is running before using local models.">
             <OllamaSettings />
-          </section>
+          </SettingsSection>
 
-          {/* Custom Connections section */}
-          <section>
-            <h3 className="text-sm font-semibold text-white/70 mb-3">Custom Connections</h3>
+          {/* Custom connections */}
+          <SettingsSection title="Custom Connections" description="Connect to any OpenAI-compatible API — DeepSeek, Groq, OpenRouter, and more.">
             <CustomHostsSettings hosts={customHosts} />
-          </section>
+          </SettingsSection>
 
           {/* Projects folder */}
-          <section>
-            <h3 className="text-sm font-semibold text-white/70 mb-3">Default Projects Folder</h3>
+          <SettingsSection title="Projects Folder" description="Where Conductor saves project files. Existing projects in this folder appear in the sidebar.">
             <ProjectsFolderSettings />
-          </section>
+          </SettingsSection>
         </div>
 
-        <div className="px-6 py-4 border-t border-white/8">
+        <div className="px-6 py-4 shrink-0 flex justify-end" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
           <button
             onClick={closeSettings}
-            className="bg-purple-600 hover:bg-purple-500 text-white text-sm px-5 py-2 rounded-lg transition-colors"
+            className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
           >
             Done
           </button>
         </div>
       </div>
     </div>
+  )
+}
+
+function SettingsSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--c-text-2)' }}>{title}</h3>
+      {description && <p className="text-xs mb-3" style={{ color: 'var(--c-text-dim)' }}>{description}</p>}
+      {children}
+    </section>
   )
 }
 
@@ -159,10 +197,10 @@ function ApiKeyRow({
   }
 
   return (
-    <div className="bg-white/4 rounded-xl px-4 py-3 space-y-2">
+    <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)' }}>
       <div className="flex items-center gap-3">
-        <div className={`w-2 h-2 rounded-full shrink-0 ${hasKey ? 'bg-green-500' : 'bg-white/20'}`} />
-        <span className="text-sm text-white/70 w-24">{providerLabel[provider] ?? provider}</span>
+        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: hasKey ? '#22c55e' : 'var(--c-text-dim)' }} />
+        <span className="text-sm w-24" style={{ color: 'var(--c-text-2)' }}>{providerLabel[provider] ?? provider}</span>
 
         {editing ? (
           <>
@@ -170,50 +208,42 @@ function ApiKeyRow({
               type="password"
               autoFocus
               placeholder="Paste API key..."
-              className="flex-1 bg-white/5 border border-white/15 rounded-lg px-3 py-1.5 text-sm text-white/80 outline-none focus:border-purple-500/50"
+              className="flex-1 rounded-lg px-3 py-1.5 text-sm outline-none"
+              style={{ background: 'var(--c-elevated)', border: '1px solid var(--c-border)', color: 'var(--c-text-1)' }}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             />
-            <button
-              onClick={handleSave}
-              disabled={saving || !value.trim()}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-md transition-colors"
-            >
+            <button onClick={handleSave} disabled={saving || !value.trim()}
+              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
               {saving ? '...' : 'Save'}
             </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="text-white/30 hover:text-white/60 text-xs"
-            >
+            <button onClick={() => setEditing(false)} className="text-xs transition-colors" style={{ color: 'var(--c-text-3)' }}>
               Cancel
             </button>
           </>
         ) : (
           <>
-            <span className="flex-1 text-xs text-white/30">
+            <span className="flex-1 text-xs font-mono" style={{ color: 'var(--c-text-dim)' }}>
               {hasKey ? '••••••••••••••••' : 'Not configured'}
             </span>
             {hasKey && (
-              <button
-                onClick={handleTest}
-                disabled={testing}
-                className="text-xs text-white/35 hover:text-white/60 border border-white/10 hover:border-white/20 px-3 py-1 rounded-md transition-colors disabled:opacity-40"
-              >
+              <button onClick={handleTest} disabled={testing}
+                className="text-xs px-3 py-1 rounded-lg transition-colors disabled:opacity-40"
+                style={{ color: 'var(--c-text-3)', border: '1px solid var(--c-border)' }}>
                 {testing ? 'Testing...' : 'Test'}
               </button>
             )}
             <button
               onClick={() => { setEditing(true); setTestResult(null) }}
-              className="text-xs text-white/40 hover:text-white/70 border border-white/10 px-3 py-1 rounded-md transition-colors"
-            >
+              className="text-xs px-3 py-1 rounded-lg transition-colors"
+              style={{ color: 'var(--c-text-3)', border: '1px solid var(--c-border)' }}>
               {hasKey ? 'Update' : 'Add key'}
             </button>
             {hasKey && (
-              <button
-                onClick={onDelete}
-                className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
-              >
+              <button onClick={onDelete} className="text-xs transition-colors" style={{ color: 'rgba(248,113,113,0.6)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'rgb(248,113,113)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'rgba(248,113,113,0.6)')}>
                 Remove
               </button>
             )}
@@ -221,8 +251,8 @@ function ApiKeyRow({
         )}
       </div>
       {testResult && (
-        <p className={`text-xs pl-5 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-          {testResult.ok ? <Check size={11} className="inline mr-1" /> : <X size={11} className="inline mr-1" />}{testResult.msg}
+        <p className={`text-xs pl-5 flex items-center gap-1 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+          {testResult.ok ? <Check size={11} /> : <X size={11} />}{testResult.msg}
         </p>
       )}
     </div>
@@ -232,19 +262,15 @@ function ApiKeyRow({
 function OllamaSettings() {
   const { ollamaUrl, setOllamaUrl } = useSettingsStore()
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-white/35">
-        Ollama runs locally. Make sure it's running before using local models.
-      </p>
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-white/40 uppercase tracking-wider w-20">Base URL</label>
-        <input
-          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50"
-          value={ollamaUrl}
-          onChange={(e) => setOllamaUrl(e.target.value)}
-          placeholder="http://localhost:11434"
-        />
-      </div>
+    <div className="flex items-center gap-3">
+      <label className="text-xs w-20 shrink-0" style={{ color: 'var(--c-text-3)' }}>Base URL</label>
+      <input
+        className="flex-1 rounded-lg px-3 py-2 text-sm outline-none"
+        style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)', color: 'var(--c-text-1)' }}
+        value={ollamaUrl}
+        onChange={(e) => setOllamaUrl(e.target.value)}
+        placeholder="http://localhost:11434"
+      />
     </div>
   )
 }

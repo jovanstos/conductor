@@ -49,12 +49,11 @@ export default function ChamberLedger() {
   const sortedResults = [...results].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[#0e0e13] border-l border-white/6">
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: 'var(--c-surface)' }}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-white/6 shrink-0">
-        <p className="text-sm font-bold text-white/85">The Ledger</p>
-        <p className="text-xs text-white/30 mt-0.5">
-          {isCompleted ? 'Results & final output' : 'Results will appear here after the run'}
+      <div className="px-4 h-12 flex items-center shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+        <p className="text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>
+          {isCompleted ? 'Results' : 'Ledger'}
         </p>
       </div>
 
@@ -129,7 +128,7 @@ export default function ChamberLedger() {
       </div>
 
       {/* Actions */}
-      <div className="px-4 py-3 border-t border-white/6 shrink-0 space-y-2">
+      <div className="px-4 py-3 shrink-0 space-y-2" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
         {isCompleted && finalOutput && (
           <>
             <div className="flex gap-2">

@@ -5,6 +5,7 @@ import * as tauri from '../lib/tauri'
 
 type ProviderStatus = { provider: string; hasKey: boolean }
 export type CustomHostEntry = CustomHostConfig & { hasKey: boolean }
+export type AppTheme = 'dark' | 'light'
 
 interface SettingsStore {
   providerStatuses: ProviderStatus[]
@@ -13,6 +14,7 @@ interface SettingsStore {
   isOpen: boolean
   defaultProjectsPath: string
   customHosts: CustomHostEntry[]
+  theme: AppTheme
 
   loadProviderStatuses: () => Promise<void>
   loadConfig: () => Promise<void>
@@ -28,6 +30,7 @@ interface SettingsStore {
   deleteCustomHost: (id: string) => Promise<void>
   saveCustomHostKey: (hostId: string, key: string) => Promise<void>
   deleteCustomHostKey: (hostId: string) => Promise<void>
+  setTheme: (theme: AppTheme) => void
 }
 
 const platformDefaultPath =
@@ -44,6 +47,15 @@ function loadStoredModel(): ModelConfig {
   }
 }
 
+function loadStoredTheme(): AppTheme {
+  try {
+    const raw = localStorage.getItem('conductor_theme')
+    return raw === 'light' ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
+}
+
 export const useSettingsStore = create<SettingsStore>()((set, get) => ({
   providerStatuses: [
     { provider: 'anthropic', hasKey: false },
@@ -51,6 +63,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
     { provider: 'ollama', hasKey: false },
   ],
   defaultModel: loadStoredModel(),
+  theme: loadStoredTheme(),
   ollamaUrl: 'http://localhost:11434',
   isOpen: false,
   defaultProjectsPath: platformDefaultPath,
@@ -162,6 +175,13 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
   setDefaultModel: (model) => {
     try { localStorage.setItem('conductor_defaultModel', JSON.stringify(model)) } catch { /* ignore */ }
     set({ defaultModel: model })
+  },
+
+  setTheme: (theme) => {
+    try { localStorage.setItem('conductor_theme', theme) } catch { /* ignore */ }
+    document.documentElement.classList.remove('dark', 'light')
+    document.documentElement.classList.add(theme)
+    set({ theme })
   },
   setOllamaUrl: (url) => set({ ollamaUrl: url }),
   openSettings: () => set({ isOpen: true }),

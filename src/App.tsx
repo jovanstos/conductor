@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { History, Play, Square, AlertTriangle, X, Sparkles, Swords } from 'lucide-react'
+import { Play, Square, AlertTriangle, X, Sparkles, Swords } from 'lucide-react'
 import { useWorkflowStore } from './stores/workflowStore'
 import { useRunStore } from './stores/runStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -19,9 +19,9 @@ import ChamberView from './components/chamber/ChamberView'
 
 type MainTab = 'workflow' | 'chamber'
 
-const SIDEBAR_DEFAULT = 192
-const INSPECTOR_DEFAULT = 288
-const DRAWER_DEFAULT = 300
+const SIDEBAR_DEFAULT = 200
+const INSPECTOR_DEFAULT = 300
+const DRAWER_DEFAULT = 280
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
@@ -30,16 +30,22 @@ function clamp(v: number, min: number, max: number) {
 export default function App() {
   const { loadWorkflows, currentWorkflow, taskInput, setTaskInput } = useWorkflowStore()
   const { cancelRun, isRunning, currentRun, gateInfo, toolConfirmRequest, showResultModal, pendingRun, setPendingRun } = useRunStore()
-  const { loadProviderStatuses, loadConfig, isOpen: settingsOpen } = useSettingsStore()
+  const { loadProviderStatuses, loadConfig, isOpen: settingsOpen, theme } = useSettingsStore()
 
-  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
+  const [sidebarWidth, setSidebarWidth]     = useState(SIDEBAR_DEFAULT)
   const [inspectorWidth, setInspectorWidth] = useState(INSPECTOR_DEFAULT)
-  const [drawerHeight, setDrawerHeight] = useState(DRAWER_DEFAULT)
-  const [runError, setRunError] = useState<string | null>(null)
-  const [showHistory, setShowHistory] = useState(false)
-  const [activeTab, setActiveTab] = useState<MainTab>('workflow')
+  const [drawerHeight, setDrawerHeight]     = useState(DRAWER_DEFAULT)
+  const [runError, setRunError]             = useState<string | null>(null)
+  const [showHistory, setShowHistory]       = useState(false)
+  const [activeTab, setActiveTab]           = useState<MainTab>('workflow')
 
   useRun(currentRun?.id)
+
+  // Keep document theme class in sync with store
+  useEffect(() => {
+    document.documentElement.classList.remove('dark', 'light')
+    document.documentElement.classList.add(theme)
+  }, [theme])
 
   useEffect(() => {
     loadWorkflows()
@@ -52,7 +58,7 @@ export default function App() {
 
     const agents = currentWorkflow.nodes.filter(n => n.type === 'agent')
     if (agents.length === 0) {
-      setRunError('Your workforce has no agents yet. Add at least one Agent node to the canvas first.')
+      setRunError('Add at least one Agent node to the canvas first.')
       return
     }
 
@@ -62,16 +68,7 @@ export default function App() {
       return !d.targetNodeId || !d.reviewerNodeId
     })
     if (badLoop) {
-      setRunError("A Loop node isn't fully set up. Click it and assign both a Worker and a Reviewer agent.")
-      return
-    }
-
-    const unconfiguredAll = agents.every(n => {
-      const d = n.data as import('./types').AgentNodeData
-      return !d.systemPrompt?.trim()
-    })
-    if (unconfiguredAll) {
-      setRunError("None of your agents have instructions yet. Click an agent and write a prompt, or load a template.")
+      setRunError("A Loop node isn't fully configured — click it to assign a Worker and Reviewer.")
       return
     }
 
@@ -80,65 +77,50 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen bg-[#0f0f12] text-white overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: 'var(--c-base)', color: 'var(--c-text-1)' }}>
+
       {/* ── Sidebar ── */}
       <div className="shrink-0 h-full" style={{ width: sidebarWidth }}>
         <Sidebar />
       </div>
 
-      <DragHandle
-        direction="h"
-        onDelta={(d) => setSidebarWidth((w) => clamp(w + d, 120, 400))}
-      />
+      <DragHandle direction="h" onDelta={(d) => setSidebarWidth((w) => clamp(w + d, 140, 380))} />
 
       {/* ── Center column ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
-        {/* ── Tab bar ── */}
-        <div className="h-11 bg-[#0a0a0d] border-b border-white/5 flex items-center shrink-0 relative">
-          {/* Tabs */}
-          <div className="flex items-center h-full px-2 gap-0.5">
-            <button
+        {/* Tab bar */}
+        <div className="h-12 shrink-0 flex items-center border-b" style={{ borderColor: 'var(--c-border-subtle)', background: 'var(--c-surface)' }}>
+          <div className="flex items-center h-full px-3 gap-0.5">
+            <TabButton
+              active={activeTab === 'workflow'}
               onClick={() => setActiveTab('workflow')}
-              className={`h-8 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                activeTab === 'workflow'
-                  ? 'bg-white/8 text-white/85'
-                  : 'text-white/35 hover:text-white/60 hover:bg-white/4'
-              }`}
-            >
-              <Sparkles size={12} />
-              Workflow
-              {currentWorkflow && (
-                <span className="text-white/30 font-normal truncate max-w-[120px]">
-                  — {currentWorkflow.name}
-                </span>
-              )}
-            </button>
-            <button
+              icon={<Sparkles size={13} />}
+              label="Workflow"
+            />
+            <TabButton
+              active={activeTab === 'chamber'}
               onClick={() => setActiveTab('chamber')}
-              className={`h-8 px-3 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors ${
-                activeTab === 'chamber'
-                  ? 'bg-amber-500/10 text-amber-300'
-                  : 'text-white/35 hover:text-white/60 hover:bg-white/4'
-              }`}
-            >
-              <Swords size={12} />
-              The Chamber
-            </button>
+              icon={<Swords size={13} />}
+              label="Chamber"
+              accent="amber"
+            />
           </div>
 
-          {/* Workflow controls — only shown on workflow tab */}
+          {/* Workflow task bar — only on workflow tab */}
           {activeTab === 'workflow' && currentWorkflow && (
-            <div className="ml-auto flex items-center gap-2 px-3">
-              <button
-                onClick={() => setShowHistory((v) => !v)}
-                title="View run history"
-                className="text-xs text-white/30 hover:text-white/60 hover:bg-white/5 px-2 py-1 rounded-md transition-colors flex items-center gap-1.5"
-              >
-                <History size={12} /> History
-              </button>
+            <div className="ml-auto flex items-center gap-2 px-4">
+              <span className="text-sm truncate max-w-[160px]" style={{ color: 'var(--c-text-3)' }}>
+                {currentWorkflow.name}
+              </span>
+              <div className="w-px h-4 mx-1" style={{ background: 'var(--c-border)' }} />
               <input
-                className="w-60 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/70 outline-none focus:border-purple-500/50 placeholder:text-white/25"
+                className="w-56 rounded-lg px-3 py-1.5 text-sm outline-none transition-colors"
+                style={{
+                  background: 'var(--c-input)',
+                  border: '1px solid var(--c-border)',
+                  color: 'var(--c-text-1)',
+                }}
                 placeholder="Describe your task..."
                 value={taskInput}
                 onChange={(e) => setTaskInput(e.target.value)}
@@ -148,32 +130,34 @@ export default function App() {
               {isRunning ? (
                 <button
                   onClick={cancelRun}
-                  className="bg-red-700/80 hover:bg-red-600 text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors border border-red-500/20"
                 >
-                  <Square size={12} className="inline mr-1" fill="currentColor" />Cancel
+                  <Square size={11} fill="currentColor" /> Stop
                 </button>
               ) : (
                 <button
                   onClick={handleRun}
                   disabled={!taskInput.trim()}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white"
                 >
-                  <Play size={12} className="inline mr-1" fill="currentColor" />Run
+                  <Play size={11} fill="currentColor" /> Run
                 </button>
               )}
             </div>
           )}
-
-          {runError && activeTab === 'workflow' && (
-            <div className="absolute top-full left-0 right-0 mt-1 mx-4 bg-red-500/15 border border-red-500/25 rounded-lg px-3 py-2 text-xs text-red-300 z-20 flex items-center gap-2">
-              <AlertTriangle size={13} className="shrink-0" />
-              <span>{runError}</span>
-              <button onClick={() => setRunError(null)} className="ml-auto text-red-400/50 hover:text-red-400"><X size={13} /></button>
-            </div>
-          )}
         </div>
 
-        {/* ── Main content area ── */}
+        {/* Error toast */}
+        {runError && activeTab === 'workflow' && (
+          <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs z-20 border"
+            style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', color: 'rgb(252,165,165)' }}>
+            <AlertTriangle size={13} className="shrink-0" />
+            <span className="flex-1">{runError}</span>
+            <button onClick={() => setRunError(null)} style={{ color: 'rgba(252,165,165,0.5)' }} className="hover:opacity-100"><X size={13} /></button>
+          </div>
+        )}
+
+        {/* Main content */}
         {activeTab === 'chamber' ? (
           <div className="flex-1 overflow-hidden">
             <ChamberView />
@@ -186,10 +170,7 @@ export default function App() {
               </div>
               {currentWorkflow && (
                 <>
-                  <DragHandle
-                    direction="h"
-                    onDelta={(d) => setInspectorWidth((w) => clamp(w - d, 200, 520))}
-                  />
+                  <DragHandle direction="h" onDelta={(d) => setInspectorWidth((w) => clamp(w - d, 220, 520))} />
                   <div className="shrink-0 h-full" style={{ width: inspectorWidth }}>
                     <Inspector />
                   </div>
@@ -198,10 +179,7 @@ export default function App() {
             </div>
             {currentRun && (
               <>
-                <DragHandle
-                  direction="v"
-                  onDelta={(d) => setDrawerHeight((h) => clamp(h - d, 80, 640))}
-                />
+                <DragHandle direction="v" onDelta={(d) => setDrawerHeight((h) => clamp(h - d, 80, 600))} />
                 <RunDrawer height={drawerHeight} />
               </>
             )}
@@ -221,28 +199,51 @@ export default function App() {
   )
 }
 
-// ── Drag handle ──────────────────────────────────────────────────
+// ── Tab button ──────────────────────────────────────────────────────
+function TabButton({
+  active, onClick, icon, label, accent = 'purple',
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  accent?: 'purple' | 'amber'
+}) {
+  const activeStyle = accent === 'amber'
+    ? { color: 'rgb(252,176,69)', background: 'rgba(245,158,11,0.1)' }
+    : { color: 'var(--c-text-1)', background: 'var(--c-surface-alt)' }
+
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all"
+      style={active ? activeStyle : { color: 'var(--c-text-3)' }}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+}
+
+// ── Drag handle ─────────────────────────────────────────────────────
 function DragHandle({ direction, onDelta }: { direction: 'h' | 'v'; onDelta: (d: number) => void }) {
   const isH = direction === 'h'
 
   function handleMouseDown(e: React.MouseEvent) {
     e.preventDefault()
     let prev = isH ? e.clientX : e.clientY
-
     function onMove(ev: MouseEvent) {
       const curr = isH ? ev.clientX : ev.clientY
       onDelta(curr - prev)
       prev = curr
     }
-
     function onUp() {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-
-    document.body.style.cursor = isH ? 'col-resize' : 'row-resize'
+    document.body.style.cursor    = isH ? 'col-resize' : 'row-resize'
     document.body.style.userSelect = 'none'
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -250,44 +251,41 @@ function DragHandle({ direction, onDelta }: { direction: 'h' | 'v'; onDelta: (d:
 
   return (
     <div
-      className={`group shrink-0 flex items-center justify-center hover:bg-purple-500/10 transition-colors z-10 ${
-        isH ? 'w-1.5 h-full cursor-col-resize' : 'h-1.5 w-full cursor-row-resize'
+      className={`group shrink-0 flex items-center justify-center transition-colors z-10 ${
+        isH ? 'w-1 h-full cursor-col-resize hover:bg-purple-500/10' : 'h-1 w-full cursor-row-resize hover:bg-purple-500/10'
       }`}
       onMouseDown={handleMouseDown}
     >
       <div
-        className={`bg-white/8 group-hover:bg-purple-400/40 transition-colors rounded-full ${
-          isH ? 'w-px h-10' : 'h-px w-10'
+        className={`rounded-full transition-colors group-hover:bg-purple-400/30 ${
+          isH ? 'w-px h-8' : 'h-px w-8'
         }`}
+        style={{ background: 'var(--c-border-subtle)' }}
       />
     </div>
   )
 }
 
-// ── Empty state ──────────────────────────────────────────────────
+// ── Empty state ─────────────────────────────────────────────────────
 function EmptyState() {
   const [showModal, setShowModal] = useState(false)
-
   return (
-    <div className="flex-1 h-full flex flex-col items-center justify-center gap-6 text-center p-8">
-      <div className="w-16 h-16 rounded-2xl bg-purple-500/10 flex items-center justify-center text-3xl">
-        <Sparkles size={28} className="text-purple-400/60" />
+    <div className="flex-1 h-full flex flex-col items-center justify-center gap-5 text-center p-8">
+      <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(168,85,247,0.1)' }}>
+        <Sparkles size={24} className="text-purple-400/70" />
       </div>
-      <div className="max-w-sm">
-        <p className="text-lg font-semibold text-white/80 mb-2">Build your AI workforce</p>
-        <p className="text-sm text-white/35 leading-relaxed">
-          Create a workflow and fill it with AI agents — each one a specialist employee that does exactly what you tell it to. Chain them together and run any task, start to finish.
+      <div className="max-w-xs">
+        <p className="text-base font-semibold mb-2" style={{ color: 'var(--c-text-1)' }}>Build your AI workforce</p>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
+          Create a workflow and fill it with AI agents. Chain them together and run any task, start to finish.
         </p>
       </div>
-      <div className="flex flex-col items-center gap-2">
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
-        >
-          + Create a Workflow
-        </button>
-        <p className="text-xs text-white/20">Start from a template or build from scratch</p>
-      </div>
+      <button
+        onClick={() => setShowModal(true)}
+        className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-5 py-2 rounded-xl transition-colors"
+      >
+        New Workflow
+      </button>
       {showModal && <NewWorkflowModal onClose={() => setShowModal(false)} />}
     </div>
   )

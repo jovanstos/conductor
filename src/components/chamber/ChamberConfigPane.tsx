@@ -67,11 +67,10 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden bg-[#0e0e13] border-r border-white/6">
+    <div className="h-full flex flex-col overflow-hidden" style={{ background: 'var(--c-surface)' }}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-3 border-b border-white/6 shrink-0">
-        <p className="text-sm font-bold text-white/85">Configure</p>
-        <p className="text-xs text-white/30 mt-0.5">Set up the chamber and start a run</p>
+      <div className="px-4 h-12 flex items-center shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+        <p className="text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>Configure</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-5">
@@ -264,7 +263,7 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
       </div>
 
       {/* Run button */}
-      <div className="px-4 py-3 border-t border-white/6 shrink-0">
+      <div className="px-4 py-3 shrink-0" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
         <button
           onClick={onRun}
           disabled={isRunning || roster.length === 0 || !context.trim()}

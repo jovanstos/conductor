@@ -1,144 +1,155 @@
 import { useEffect, useState } from 'react'
-import { Sparkles, Settings, Upload, Download, Copy, Trash2, RefreshCw, FolderOpen, ArrowRight } from 'lucide-react'
+import { Sparkles, Settings, Upload, Download, Copy, Trash2, RefreshCw, FolderOpen, ChevronRight } from 'lucide-react'
 import { useWorkflowStore } from '../stores/workflowStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import type { Workflow, ProjectEntry } from '../types'
-import type { AgentNodeData } from '../types'
-import { getRoleInfo } from '../lib/defaults'
+import { getProviderColor } from '../lib/defaults'
 import NewWorkflowModal from './workflow/NewWorkflowModal'
 import { listProjects } from '../lib/tauri'
 import ProjectView from './projects/ProjectView'
 
 export default function Sidebar() {
-  const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow, importWorkflow } =
-    useWorkflowStore()
+  const { workflows, currentWorkflow, setCurrentWorkflow, deleteWorkflow, duplicateWorkflow, importWorkflow } = useWorkflowStore()
   const { providerStatuses, customHosts, openSettings, defaultProjectsPath } = useSettingsStore()
-  const [search, setSearch] = useState('')
+  const [search, setSearch]         = useState('')
   const [showNewModal, setShowNewModal] = useState(false)
-  const [projects, setProjects] = useState<ProjectEntry[]>([])
+  const [projects, setProjects]     = useState<ProjectEntry[]>([])
   const [selectedProject, setSelectedProject] = useState<ProjectEntry | null>(null)
 
-  const filtered = workflows.filter((w) =>
-    w.name.toLowerCase().includes(search.toLowerCase()),
-  )
+  const filtered = workflows.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()))
 
   const refreshProjects = () =>
     listProjects(defaultProjectsPath || undefined).then(setProjects).catch(() => {})
 
-  useEffect(() => {
-    refreshProjects()
-  }, [defaultProjectsPath])
+  useEffect(() => { refreshProjects() }, [defaultProjectsPath])
 
   return (
-    <div className="w-full h-full bg-[#0a0a0d] border-r border-white/5 flex flex-col overflow-hidden">
+    <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: 'var(--c-surface)', borderRight: '1px solid var(--c-border-subtle)' }}>
+
       {/* Logo */}
-      <div className="px-4 py-3 border-b border-white/5">
-        <p className="text-base font-semibold text-white/90 tracking-tight flex items-center gap-2">
-          <Sparkles size={16} className="text-purple-400" /> Conductor
-        </p>
+      <div className="px-4 h-12 flex items-center shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+        <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>
+          <Sparkles size={15} className="text-purple-400" />
+          Conductor
+        </span>
       </div>
 
       {/* Search */}
-      <div className="px-3 py-2 border-b border-white/5">
+      <div className="px-3 py-2 shrink-0">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search..."
-          className="w-full bg-white/5 rounded-md px-2.5 py-1.5 text-sm text-white/60 outline-none focus:bg-white/8 placeholder:text-white/25"
+          placeholder="Search workflows..."
+          className="w-full rounded-lg px-3 py-1.5 text-xs outline-none transition-colors"
+          style={{
+            background: 'var(--c-input)',
+            border: '1px solid var(--c-border-subtle)',
+            color: 'var(--c-text-2)',
+          }}
         />
       </div>
 
-      {/* Workflow list */}
-      <div className="flex-1 overflow-y-auto py-2">
-        <SectionLabel label="My Workflows" />
-        {filtered.length === 0 ? (
-          <p className="px-4 py-2 text-xs text-white/25">No workflows yet</p>
-        ) : (
-          filtered.map((w) => (
-            <WorkflowItem
-              key={w.id}
-              workflow={w}
-              active={currentWorkflow?.id === w.id}
-              onSelect={() => setCurrentWorkflow(w)}
-              onDelete={() => deleteWorkflow(w.id)}
-              onDuplicate={() => duplicateWorkflow(w.id)}
-              onExport={() => useWorkflowStore.getState().exportWorkflow(w.id)}
-            />
-          ))
-        )}
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto py-1">
 
-        <div className="mx-3 mt-1 flex gap-1">
-          <button
-            onClick={() => setShowNewModal(true)}
-            className="flex-1 text-left px-2 py-1.5 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
-          >
-            + New
-          </button>
-          <button
-            onClick={() => importWorkflow()}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-white/35 hover:text-white/65 hover:bg-white/5 transition-colors"
-            title="Import workflow from JSON file"
-          >
-            <Upload size={11} /> Import
-          </button>
-        </div>
-
-        {/* Projects section */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between pr-3">
-            <SectionLabel label="My Projects" />
-            <button
-              onClick={refreshProjects}
-              className="text-white/20 hover:text-white/50 transition-colors"
-              title="Refresh projects"
-            >
-              <RefreshCw size={11} />
-            </button>
-          </div>
-          {projects.length === 0 ? (
-            <p className="px-4 py-1 text-xs text-white/20">No saved projects</p>
+        {/* Workflows */}
+        <Section label="Workflows">
+          {filtered.length === 0 ? (
+            <p className="px-4 py-2 text-xs" style={{ color: 'var(--c-text-dim)' }}>No workflows yet</p>
           ) : (
-            projects.map((p) => (
-              <ProjectItem
-                key={p.path}
-                project={p}
-                onOpen={() => setSelectedProject(p)}
+            filtered.map((w) => (
+              <WorkflowItem
+                key={w.id}
+                workflow={w}
+                active={currentWorkflow?.id === w.id}
+                onSelect={() => setCurrentWorkflow(w)}
+                onDelete={() => deleteWorkflow(w.id)}
+                onDuplicate={() => duplicateWorkflow(w.id)}
+                onExport={() => useWorkflowStore.getState().exportWorkflow(w.id)}
               />
             ))
           )}
-        </div>
+          <div className="mx-2 mt-0.5 flex gap-1">
+            <button
+              onClick={() => setShowNewModal(true)}
+              className="flex-1 text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+              style={{ color: 'var(--c-text-dim)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-2)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-dim)')}
+            >
+              + New workflow
+            </button>
+            <button
+              onClick={() => importWorkflow()}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+              title="Import workflow"
+              style={{ color: 'var(--c-text-dim)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-2)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-dim)')}
+            >
+              <Upload size={11} /> Import
+            </button>
+          </div>
+        </Section>
+
+        {/* Projects */}
+        <Section
+          label="Projects"
+          action={
+            <button
+              onClick={refreshProjects}
+              className="transition-colors"
+              title="Refresh"
+              style={{ color: 'var(--c-text-dim)' }}
+            >
+              <RefreshCw size={11} />
+            </button>
+          }
+        >
+          {projects.length === 0 ? (
+            <p className="px-4 py-2 text-xs" style={{ color: 'var(--c-text-dim)' }}>No projects found</p>
+          ) : (
+            projects.map((p) => (
+              <ProjectItem key={p.path} project={p} onOpen={() => setSelectedProject(p)} />
+            ))
+          )}
+        </Section>
       </div>
 
       {selectedProject && (
         <ProjectView project={selectedProject} onClose={() => setSelectedProject(null)} />
       )}
 
-      {/* Model status indicators */}
-      <div className="px-3 py-2 border-t border-white/5">
-        <SectionLabel label="Providers" />
-        {providerStatuses.map((p) => (
-          <div key={p.provider} className="flex items-center gap-2 px-1 py-0.5">
-            <div className={`w-1.5 h-1.5 rounded-full ${p.hasKey ? 'bg-green-500' : 'bg-white/15'}`} />
-            <span className="text-xs text-white/45 capitalize">{p.provider}</span>
-          </div>
-        ))}
-        {customHosts.map((h) => (
-          <div key={h.id} className="flex items-center gap-2 px-1 py-0.5">
-            <div
-              className="w-1.5 h-1.5 rounded-full shrink-0"
-              style={{ background: h.hasKey ? h.color : 'rgba(255,255,255,0.15)' }}
-            />
-            <span className="text-xs text-white/45 truncate">{h.name}</span>
-          </div>
-        ))}
+      {/* Provider dots */}
+      <div className="px-4 py-2 shrink-0" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
+        <div className="flex items-center gap-2 flex-wrap">
+          {providerStatuses.map((p) => (
+            <div key={p.provider} className="flex items-center gap-1.5" title={`${p.provider} ${p.hasKey ? '— connected' : '— no key'}`}>
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: p.hasKey ? getProviderColor(p.provider) : 'var(--c-text-dim)' }}
+              />
+              <span className="text-xs capitalize" style={{ color: 'var(--c-text-dim)' }}>{p.provider}</span>
+            </div>
+          ))}
+          {customHosts.map((h) => (
+            <div key={h.id} className="flex items-center gap-1.5" title={`${h.name} ${h.hasKey ? '— connected' : '— no key'}`}>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: h.hasKey ? h.color : 'var(--c-text-dim)' }} />
+              <span className="text-xs truncate max-w-[60px]" style={{ color: 'var(--c-text-dim)' }}>{h.name}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Settings */}
       <button
         onClick={openSettings}
-        className="px-4 py-3 border-t border-white/5 text-left text-sm text-white/45 hover:text-white/70 hover:bg-white/4 transition-colors flex items-center gap-2"
+        className="flex items-center gap-2 px-4 py-3 text-sm transition-colors shrink-0"
+        style={{ borderTop: '1px solid var(--c-border-subtle)', color: 'var(--c-text-3)' }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
       >
-        <Settings size={15} /> Settings
+        <Settings size={14} /> Settings
       </button>
 
       {showNewModal && <NewWorkflowModal onClose={() => setShowNewModal(false)} />}
@@ -146,32 +157,36 @@ export default function Sidebar() {
   )
 }
 
-function SectionLabel({ label }: { label: string }) {
+function Section({ label, children, action }: { label: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <p className="px-4 mb-1.5 text-xs font-semibold text-white/30 uppercase tracking-widest">{label}</p>
+    <div className="mb-3">
+      <div className="flex items-center justify-between px-4 mb-1">
+        <p className="text-xs font-medium" style={{ color: 'var(--c-text-dim)' }}>{label}</p>
+        {action}
+      </div>
+      {children}
+    </div>
   )
 }
 
 function ProjectItem({ project, onOpen }: { project: ProjectEntry; onOpen: () => void }) {
   return (
     <div
-      className="mx-2 flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer mb-0.5 text-white/45 hover:text-white/70 hover:bg-white/5 transition-colors group"
+      className="mx-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer mb-0.5 group transition-colors"
+      style={{ color: 'var(--c-text-3)' }}
+      onMouseEnter={e => { e.currentTarget.style.color = 'var(--c-text-2)'; e.currentTarget.style.background = 'var(--c-surface-alt)' }}
+      onMouseLeave={e => { e.currentTarget.style.color = 'var(--c-text-3)'; e.currentTarget.style.background = '' }}
       onClick={onOpen}
     >
-      <FolderOpen size={11} className="text-emerald-500/60 shrink-0" />
+      <FolderOpen size={12} className="text-emerald-500/60 shrink-0" />
       <span className="text-xs truncate flex-1">{project.name}</span>
-      <ArrowRight size={11} className="text-white/20 group-hover:text-white/40 transition-colors" />
+      <ChevronRight size={11} className="opacity-0 group-hover:opacity-60 transition-opacity" />
     </div>
   )
 }
 
 function WorkflowItem({
-  workflow,
-  active,
-  onSelect,
-  onDelete,
-  onDuplicate,
-  onExport,
+  workflow, active, onSelect, onDelete, onDuplicate, onExport,
 }: {
   workflow: Workflow
   active: boolean
@@ -181,54 +196,58 @@ function WorkflowItem({
   onExport: () => void
 }) {
   const [hover, setHover] = useState(false)
-  const agentNodes = workflow.nodes.filter((n) => n.type === 'agent')
-  const rosterDots = agentNodes.slice(0, 5).map((n) => getRoleInfo((n.data as AgentNodeData).name || '', (n.data as AgentNodeData).roleDescription || ''))
+
+  const activeStyle: React.CSSProperties = {
+    background: 'rgba(168,85,247,0.1)',
+    color: 'rgb(216,180,254)',
+  }
+  const idleStyle: React.CSSProperties = {
+    color: 'var(--c-text-3)',
+  }
+  const hoverStyle: React.CSSProperties = {
+    background: 'var(--c-surface-alt)',
+    color: 'var(--c-text-2)',
+  }
 
   return (
     <div
-      className={`mx-2 flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer mb-0.5 group ${
-        active ? 'bg-purple-500/15 text-purple-300' : 'text-white/45 hover:text-white/70 hover:bg-white/5'
-      }`}
+      className="mx-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg cursor-pointer mb-0.5 transition-colors"
+      style={active ? activeStyle : hover ? hoverStyle : idleStyle}
       onClick={onSelect}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
       <span className="text-xs truncate flex-1">{workflow.name}</span>
-      {!hover && rosterDots.length > 0 && (
+
+      {hover && (
         <div className="flex items-center gap-0.5 shrink-0">
-          {rosterDots.map((r, i) => (
-            <div key={i} className={`w-1.5 h-1.5 rounded-full ${r.dotColor} opacity-60`} title={r.label} />
-          ))}
-          {agentNodes.length > 5 && <span className="text-xs text-white/20 ml-0.5">+{agentNodes.length - 5}</span>}
+          <ActionBtn onClick={onExport} title="Export"><Download size={11} /></ActionBtn>
+          <ActionBtn onClick={onDuplicate} title="Duplicate"><Copy size={11} /></ActionBtn>
+          {!active && <ActionBtn onClick={onDelete} title="Delete" danger><Trash2 size={11} /></ActionBtn>}
         </div>
       )}
-      {hover && (
-        <>
-          <button
-            onClick={(e) => { e.stopPropagation(); onExport() }}
-            className="text-white/20 hover:text-white/60 transition-colors p-0.5"
-            title="Export as JSON"
-          >
-            <Download size={11} />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDuplicate() }}
-            className="text-white/20 hover:text-white/60 transition-colors p-0.5"
-            title="Duplicate"
-          >
-            <Copy size={11} />
-          </button>
-          {!active && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="text-white/20 hover:text-red-400 transition-colors p-0.5"
-              title="Delete"
-            >
-              <Trash2 size={11} />
-            </button>
-          )}
-        </>
-      )}
     </div>
+  )
+}
+
+function ActionBtn({
+  onClick, title, children, danger = false,
+}: {
+  onClick: () => void
+  title: string
+  children: React.ReactNode
+  danger?: boolean
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      title={title}
+      className="p-1 rounded transition-colors"
+      style={{ color: 'var(--c-text-dim)' }}
+      onMouseEnter={e => { e.currentTarget.style.color = danger ? 'rgb(248,113,113)' : 'var(--c-text-2)' }}
+      onMouseLeave={e => { e.currentTarget.style.color = 'var(--c-text-dim)' }}
+    >
+      {children}
+    </button>
   )
 }

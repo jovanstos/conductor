@@ -5,47 +5,44 @@ import type { ChamberAgentStatus } from '../../types'
 
 const STATUS_LABEL: Record<ChamberAgentStatus, string> = {
   waiting:    'Waiting',
-  thinking:   'Thinking...',
-  typing:     'Typing...',
-  critiquing: 'Critiquing...',
+  thinking:   'Thinking',
+  typing:     'Writing',
+  critiquing: 'Judging',
   done:       'Done',
   error:      'Error',
 }
 
 const STATUS_COLOR: Record<ChamberAgentStatus, string> = {
-  waiting:    'text-white/25',
-  thinking:   'text-amber-300',
-  typing:     'text-emerald-300',
-  critiquing: 'text-blue-300',
-  done:       'text-white/40',
-  error:      'text-red-400',
+  waiting:    'var(--c-text-dim)',
+  thinking:   'rgb(251,191,36)',
+  typing:     'rgb(52,211,153)',
+  critiquing: 'rgb(96,165,250)',
+  done:       'var(--c-text-3)',
+  error:      'rgb(248,113,113)',
 }
 
 const STATUS_DOT: Record<ChamberAgentStatus, string> = {
-  waiting:    'bg-white/15',
+  waiting:    '',
   thinking:   'bg-amber-400 animate-pulse',
   typing:     'bg-emerald-400 animate-pulse',
   critiquing: 'bg-blue-400 animate-pulse',
-  done:       'bg-white/25',
+  done:       'bg-white/20',
   error:      'bg-red-400',
 }
 
 export default function ChamberArena() {
-  const {
-    roster, runStatus, agentStreams,
-    currentPhase, phaseDescription,
-    gateInfo, resumeRun,
-  } = useChamberStore()
-
+  const { roster, runStatus, agentStreams, currentPhase, phaseDescription, gateInfo, resumeRun } = useChamberStore()
   const isActive = runStatus === 'running' || runStatus === 'paused' || runStatus === 'completed'
 
   if (!isActive) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-8 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/8 flex items-center justify-center text-3xl">⚔️</div>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl" style={{ background: 'rgba(245,158,11,0.08)' }}>
+          ⚔️
+        </div>
         <div>
-          <p className="text-sm font-semibold text-white/60">The Arena is quiet</p>
-          <p className="text-xs text-white/25 mt-1">Configure agents on the left and start a run</p>
+          <p className="text-sm font-medium mb-1" style={{ color: 'var(--c-text-2)' }}>The arena is quiet</p>
+          <p className="text-xs" style={{ color: 'var(--c-text-dim)' }}>Configure agents on the left and open the chamber</p>
         </div>
       </div>
     )
@@ -54,29 +51,28 @@ export default function ChamberArena() {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Phase banner */}
-      <div className="shrink-0 px-4 py-2.5 bg-white/2 border-b border-white/6 flex items-center gap-2">
-        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-        <span className="text-xs font-semibold text-amber-300/80 uppercase tracking-wider">
-          {currentPhase || 'starting'}
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2.5" style={{ borderBottom: '1px solid var(--c-border-subtle)', background: 'var(--c-surface)' }}>
+        {runStatus === 'running' && (
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+        )}
+        <span className="text-xs font-medium capitalize" style={{ color: runStatus === 'running' ? 'rgb(251,191,36)' : 'var(--c-text-3)' }}>
+          {currentPhase || 'Starting'}
         </span>
         {phaseDescription && (
-          <span className="text-xs text-white/30 ml-1">{phaseDescription}</span>
-        )}
-        {runStatus === 'running' && (
-          <div className="ml-auto w-3 h-3 rounded-full border-2 border-amber-300/30 border-t-amber-300 animate-spin shrink-0" />
+          <span className="text-xs" style={{ color: 'var(--c-text-dim)' }}>{phaseDescription}</span>
         )}
       </div>
 
-      {/* Agent streams */}
+      {/* Agent panels */}
       <div
-        className={`flex-1 overflow-hidden grid gap-0 ${
-          roster.length <= 1 ? 'grid-cols-1' :
+        className={`flex-1 overflow-hidden grid ${
+          roster.length === 1 ? 'grid-cols-1' :
           roster.length === 2 ? 'grid-cols-2' :
           roster.length === 3 ? 'grid-cols-3' :
           'grid-cols-2'
         }`}
       >
-        {roster.map((agent) => {
+        {roster.map((agent, i) => {
           const stream = agentStreams[agent.id] ?? { text: '', status: 'waiting' as ChamberAgentStatus }
           return (
             <AgentStreamPanel
@@ -86,6 +82,7 @@ export default function ChamberArena() {
               provider={agent.model.provider}
               text={stream.text}
               status={stream.status}
+              isLast={i === roster.length - 1}
             />
           )
         })}
@@ -93,35 +90,29 @@ export default function ChamberArena() {
 
       {/* Review gate overlay */}
       {runStatus === 'paused' && gateInfo && (
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 p-8">
-          <div className="bg-[#141418] border border-white/12 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/8">
-              <p className="text-sm font-bold text-white/85">⏸ Review Gate</p>
-              <p className="text-xs text-white/40 mt-0.5">Phase: {gateInfo.phase}</p>
+        <div className="absolute inset-0 flex items-center justify-center z-20 p-8" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="rounded-2xl w-full max-w-md shadow-2xl overflow-hidden" style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
+            <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+              <p className="text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>⏸ Review Gate</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--c-text-dim)' }}>{gateInfo.phase}</p>
             </div>
             <div className="px-5 py-4">
-              <p className="text-sm text-white/60 leading-relaxed">{gateInfo.message}</p>
-              <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+              <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--c-text-2)' }}>{gateInfo.message}</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
                 {gateInfo.outputs.map((o) => (
-                  <div key={o.agentId} className="bg-white/3 rounded-xl p-3">
-                    <p className="text-xs font-semibold text-white/50 mb-1">{o.agentName}</p>
-                    <p className="text-xs text-white/40 line-clamp-3 leading-relaxed">{o.output}</p>
+                  <div key={o.agentId} className="rounded-xl p-3" style={{ background: 'var(--c-input)' }}>
+                    <p className="text-xs font-medium mb-1" style={{ color: 'var(--c-text-3)' }}>{o.agentName}</p>
+                    <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--c-text-dim)' }}>{o.output}</p>
                   </div>
                 ))}
               </div>
             </div>
             <div className="px-5 pb-4 flex gap-2">
-              <button
-                onClick={() => resumeRun('cancel')}
-                className="flex-1 py-2 rounded-xl border border-white/10 text-xs text-white/40 hover:text-white/60 transition-colors"
-              >
-                Cancel Run
+              <button onClick={() => resumeRun('cancel')} className="flex-1 py-2 rounded-xl text-xs transition-colors" style={{ border: '1px solid var(--c-border)', color: 'var(--c-text-3)' }}>
+                Cancel
               </button>
-              <button
-                onClick={() => resumeRun('approve')}
-                className="flex-1 py-2 rounded-xl bg-amber-500/20 border border-amber-500/30 text-xs text-amber-300 hover:bg-amber-500/30 font-semibold transition-colors"
-              >
-                Continue ↗
+              <button onClick={() => resumeRun('approve')} className="flex-1 py-2 rounded-xl text-xs font-semibold text-amber-300 transition-colors bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25">
+                Continue
               </button>
             </div>
           </div>
@@ -131,33 +122,26 @@ export default function ChamberArena() {
   )
 }
 
-function AgentStreamPanel({
-  agentName, modelId, provider, text, status,
-}: {
+function AgentStreamPanel({ agentName, modelId, provider, text, status, isLast }: {
   agentName: string
   modelId: string
   provider: string
   text: string
   status: ChamberAgentStatus
+  isLast: boolean
 }) {
   const bottomRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [text])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [text])
 
   return (
-    <div className="flex flex-col border-r border-white/5 last:border-r-0 overflow-hidden">
+    <div className="flex flex-col overflow-hidden" style={{ borderRight: isLast ? 'none' : '1px solid var(--c-border-subtle)' }}>
       {/* Agent header */}
-      <div className="shrink-0 flex items-center gap-2 px-3 py-2 bg-white/2 border-b border-white/5">
-        <div
-          className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status]}`}
-        />
-        <span className="text-xs font-semibold text-white/70 truncate">{agentName}</span>
-        <span className="text-xs ml-auto shrink-0 font-mono" style={{ color: getProviderColor(provider) }}>
-          {modelId}
-        </span>
-        <span className={`text-xs ml-2 shrink-0 ${STATUS_COLOR[status]}`}>
+      <div className="shrink-0 flex items-center gap-2 px-3 py-2" style={{ borderBottom: '1px solid var(--c-border-subtle)', background: 'var(--c-surface)' }}>
+        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status] || ''}`}
+          style={!STATUS_DOT[status] ? { background: 'var(--c-text-dim)' } : undefined} />
+        <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--c-text-2)' }}>{agentName}</span>
+        <span className="text-xs font-mono shrink-0" style={{ color: getProviderColor(provider) }}>{modelId.split('-')[0]}</span>
+        <span className="text-xs shrink-0 ml-1" style={{ color: STATUS_COLOR[status] }}>
           {STATUS_LABEL[status]}
         </span>
       </div>
@@ -165,14 +149,14 @@ function AgentStreamPanel({
       {/* Stream text */}
       <div className="flex-1 overflow-y-auto px-3 py-3">
         {text ? (
-          <p className="text-xs text-white/65 whitespace-pre-wrap leading-relaxed font-mono">
+          <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--c-text-2)' }}>
             {text}
             {status === 'typing' && (
-              <span className="inline-block w-1.5 h-3.5 bg-white/40 ml-0.5 animate-pulse align-text-bottom" />
+              <span className="inline-block w-0.5 h-3.5 ml-0.5 align-text-bottom animate-pulse" style={{ background: 'var(--c-text-3)' }} />
             )}
           </p>
         ) : (
-          <p className="text-xs text-white/15 italic">
+          <p className="text-xs italic" style={{ color: 'var(--c-text-dim)' }}>
             {status === 'waiting' ? 'Waiting to start...' : 'Starting...'}
           </p>
         )}
