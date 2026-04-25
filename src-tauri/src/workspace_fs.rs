@@ -268,7 +268,6 @@ pub fn build_workspace_manifest(files: &[FileEntry]) -> String {
 // ─────────────────────────────────────────────
 // Internal filesystem helpers (called from main.rs)
 // ─────────────────────────────────────────────
-
 pub fn read_manifest_internal(workspace_path: &str) -> Result<Vec<FileEntry>, String> {
     let base = PathBuf::from(workspace_path);
     if !base.exists() {
@@ -279,14 +278,15 @@ pub fn read_manifest_internal(workspace_path: &str) -> Result<Vec<FileEntry>, St
 
     for entry in walkdir::WalkDir::new(&base)
         .into_iter()
+        .filter_entry(|e| {
+            let name = e.file_name().to_string_lossy();
+            // Stop walkdir from even entering these directories
+            !should_skip_dir(&name) && name != ".git"
+        })
         .filter_map(|e| e.ok())
         .filter(|e| e.path().is_file())
     {
         let path = entry.path();
-        // Skip .git directories
-        if path.components().any(|c| c.as_os_str() == ".git") {
-            continue;
-        }
         if is_binary(path) {
             continue;
         }
@@ -296,8 +296,7 @@ pub fn read_manifest_internal(workspace_path: &str) -> Result<Vec<FileEntry>, St
             .to_string_lossy()
             .replace('\\', "/");
 
-        let content = std::fs::read_to_string(path)
-            .unwrap_or_default();
+        let content = std::fs::read_to_string(path).unwrap_or_default();
         total_chars += content.len();
         files.push(FileEntry { path: rel, content });
 

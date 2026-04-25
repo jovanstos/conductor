@@ -836,7 +836,7 @@ fn tool_definitions(enabled_names: &[String]) -> Vec<ToolDef> {
         },
         ToolDef {
             name: "edit_file".into(),
-            description: "Replace an exact string in a file. Token-efficient for partial edits. old_str must match exactly (whitespace included) and must appear exactly once in the file.".into(),
+            description: "Replace an exact string in a file. Token-efficient for partial edits. old_str must match exactly (whitespace included) and must appear exactly once in the file. WARNING: old_str must match EXACTLY, including all indentation, leading/trailing spaces, and newlines. If it fails, use read_file first to copy the exact text.".into(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -849,10 +849,10 @@ fn tool_definitions(enabled_names: &[String]) -> Vec<ToolDef> {
         },
         ToolDef {
             name: "list_directory".into(),
-            description: "List files and folders in a directory.".into(),
+            description: "List files and folders in a directory. To list the current root project folder, pass '.' or the absolute path.".into(),
             parameters: serde_json::json!({
                 "type": "object",
-                "properties": { "path": { "type": "string", "description": "Directory path to list" } },
+                "properties": { "path": { "type": "string", "description": "Directory path to list. Use '.' for root." } },
                 "required": ["path"]
             }),
         },
@@ -1159,7 +1159,12 @@ fn resolve_path(path: &str, workspace_path: Option<&str>) -> PathBuf {
     if p.is_absolute() {
         p
     } else if let Some(ws) = workspace_path {
-        PathBuf::from(ws).join(p)
+        // Safely catch "." or empty paths and return the clean workspace root
+        if path == "." || path == "./" || path.is_empty() {
+            PathBuf::from(ws)
+        } else {
+            PathBuf::from(ws).join(p)
+        }
     } else {
         p
     }
@@ -1608,6 +1613,12 @@ async fn exec_agent(
     if use_tools {
         // Tool path: inject only the file tree (paths), not file contents — agents read on demand
         if let Some(ws_path) = workspace_path {
+            // Tell the agent exactly where it lives on the hard drive
+            system_prompt.push_str(&format!(
+                "\n\n## Workspace Location\nYour absolute working directory is: `{}`\nYou can use this absolute path or relative paths (like '.') for your tools.",
+                ws_path
+            ));
+
             if let Ok(files) = workspace_fs::read_manifest_internal(ws_path) {
                 if !files.is_empty() {
                     let tree = files.iter().map(|f| f.path.clone()).collect::<Vec<_>>().join("\n");
@@ -1791,6 +1802,14 @@ async fn exec_agent(
                             Ok(s) => (s, false),
                             Err(e) => (format!("Error: {}", e), true),
                         };
+
+                        // ✨ Append an audit log of the tool call so the next agent sees it
+                        let status = if is_error { "FAILED" } else { "SUCCESS" };
+                        let audit_log = format!("\n> [System Log: Agent ran `{}` with args `{}` -> {}]", tc.name, args_preview, status);
+                        if !accumulated_text.is_empty() {
+                            accumulated_text.push('\n');
+                        }
+                        accumulated_text.push_str(&audit_log);
 
                         if !is_error && (tc.name == "write_file" || tc.name == "edit_file") {
                             had_write = true;
