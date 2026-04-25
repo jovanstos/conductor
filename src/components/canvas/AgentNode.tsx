@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import {
   X, Zap, Check, Code2, Search, PenLine, BookOpen,
-  ClipboardList, TestTube2, Megaphone,
+  ClipboardList, TestTube2, Megaphone, ShieldCheck, ShieldAlert,
 } from 'lucide-react'
 import type { AgentNodeData } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
@@ -102,14 +102,22 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
           {hasRun && <StatusBadge status={status} />}
         </div>
 
-        {/* Model */}
+        {/* Model + tool access */}
         <div className="flex items-center gap-1.5 pb-2 mb-2" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
           <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: getProviderColor(d.model?.provider) }} />
-          <span className="text-xs truncate" style={{ color: 'var(--c-text-dim)' }}>
+          <span className="text-xs truncate flex-1 min-w-0" style={{ color: 'var(--c-text-dim)' }}>
             {d.model?.modelId ?? 'no model'}
           </span>
-          {isDone && step?.tokensUsed && (
-            <span className="ml-auto text-xs tabular-nums" style={{ color: 'var(--c-text-dim)' }}>{step.tokensUsed.toLocaleString()}</span>
+          {isDone && step?.tokensUsed ? (
+            <span className="text-xs tabular-nums shrink-0" style={{ color: 'var(--c-text-dim)' }}>{step.tokensUsed.toLocaleString()}</span>
+          ) : (d.toolsEnabled?.length ?? 0) === 0 ? (
+            <span className="flex items-center gap-0.5 text-emerald-400/70 shrink-0" title="Full tool access">
+              <ShieldCheck size={10} />
+            </span>
+          ) : (
+            <span className="flex items-center gap-0.5 text-amber-400/70 shrink-0" title={`Restricted: ${d.toolsEnabled?.length} tools`}>
+              <ShieldAlert size={10} />
+            </span>
           )}
         </div>
 

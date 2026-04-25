@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { X, Zap, ChevronDown, ChevronRight, Plus, Play, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Wrench, AlertTriangle } from 'lucide-react'
+import { X, Zap, ChevronDown, ChevronRight, Plus, Play, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, ShieldCheck, ShieldAlert, AlertTriangle } from 'lucide-react'
 import type { WorkflowNode, AgentNodeData, Template, ToolNameId } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
-import { BUILT_IN_TEMPLATES, getRoleInfo, TOOL_REGISTRY, TOOL_GROUPS, TOOL_PRESETS, type RoleCategory } from '../../lib/defaults'
+import { BUILT_IN_TEMPLATES, getRoleInfo, TOOL_REGISTRY, TOOL_GROUPS, type RoleCategory } from '../../lib/defaults'
 import { getTemplates, saveTemplate, deleteTemplate } from '../../lib/tauri'
 import ModelPicker from '../shared/ModelPicker'
 import AgentTestModal from './AgentTestModal'
@@ -77,9 +77,21 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
     updateNode(node.id, { data: { ...d, name, roleDescription: role, systemPrompt: prompt, contextMode, maxTokens, toolsEnabled: next } })
   }
 
+  const allToolIds = TOOL_REGISTRY.map((t) => t.id) as ToolNameId[]
+  const isFullAccess = toolsEnabled.length === 0
+  const isChecked = (id: ToolNameId) => isFullAccess || toolsEnabled.includes(id)
+
   function toggleTool(id: ToolNameId) {
-    const next = toolsEnabled.includes(id) ? toolsEnabled.filter((t) => t !== id) : [...toolsEnabled, id]
-    saveTools(next)
+    if (isFullAccess) {
+      // Uncheck one tool → restrict to all-except-this
+      saveTools(allToolIds.filter((t) => t !== id))
+    } else {
+      const next = toolsEnabled.includes(id)
+        ? toolsEnabled.filter((t) => t !== id)
+        : [...toolsEnabled, id]
+      // If everything is now checked, go back to full access (empty = no restriction)
+      saveTools(allToolIds.every((t) => next.includes(t)) ? [] : (next as ToolNameId[]))
+    }
   }
 
   function applyTemplate(t: Template | typeof BUILT_IN_TEMPLATES[number]) {
@@ -336,86 +348,81 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
         </div>
       )}
 
-      {/* Tools section */}
+      {/* Tool access section */}
       <div className="pt-2 border-t border-white/5">
-        <button
-          onClick={() => setShowTools((v) => !v)}
-          className="w-full flex items-center justify-between text-xs text-white/35 hover:text-white/55 transition-colors mb-1"
-        >
-          <span className="flex items-center gap-1.5">
-            <Wrench size={11} />
-            Tools
-            {toolsEnabled.length > 0 && (
-              <span className="bg-purple-500/20 text-purple-300 text-xs px-1.5 py-0.5 rounded-full">
-                {toolsEnabled.length} active
+        {/* Status row */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            {isFullAccess ? (
+              <ShieldCheck size={12} className="text-emerald-400" />
+            ) : (
+              <ShieldAlert size={12} className="text-amber-400" />
+            )}
+            <span className="text-xs font-semibold text-white/50">Tool Access</span>
+            {isFullAccess ? (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+                Full Access
+              </span>
+            ) : (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/12 text-amber-400 border border-amber-500/25">
+                Restricted · {toolsEnabled.length}/{allToolIds.length}
               </span>
             )}
-          </span>
-          {showTools ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </button>
+          </div>
+          <button
+            onClick={() => setShowTools((v) => !v)}
+            className="text-xs text-white/30 hover:text-white/55 flex items-center gap-1 transition-colors"
+          >
+            {showTools ? 'Hide' : 'Restrict'}
+            {showTools ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+          </button>
+        </div>
+
+        {!showTools && isFullAccess && (
+          <p className="text-xs text-white/25 leading-relaxed">
+            All tools are enabled. The agent can read, write, run commands, and fetch URLs.
+            Click <em>Restrict</em> to limit access.
+          </p>
+        )}
 
         {showTools && (
-          <div className="space-y-2">
-            {/* Preset buttons */}
-            <div className="flex flex-wrap gap-1">
-              {TOOL_PRESETS.map((preset) => {
-                const active = preset.tools.length === toolsEnabled.length && preset.tools.every((t) => toolsEnabled.includes(t))
-                return (
-                  <button
-                    key={preset.id}
-                    onClick={() => saveTools(preset.tools as ToolNameId[])}
-                    className={`text-xs px-2 py-1 rounded-lg border transition-colors ${
-                      active
-                        ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
-                        : 'bg-white/4 border-white/10 text-white/40 hover:border-white/25 hover:text-white/60'
-                    }`}
-                  >
-                    {preset.label}
-                  </button>
-                )
-              })}
-            </div>
-
-            {/* Per-group checkboxes */}
-            <div className="space-y-2">
-              {TOOL_GROUPS.map((group) => {
-                const groupTools = TOOL_REGISTRY.filter((t) => t.group === group.id)
-                return (
-                  <div key={group.id}>
-                    <p className="text-xs font-semibold text-white/25 uppercase tracking-wider mb-1">{group.label}</p>
-                    <div className="space-y-0.5">
-                      {groupTools.map((tool) => {
-                        const checked = toolsEnabled.includes(tool.id)
-                        return (
-                          <label key={tool.id} className="flex items-center gap-2 cursor-pointer group">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleTool(tool.id)}
-                              className="w-3 h-3 accent-purple-500 cursor-pointer"
-                            />
-                            <span className="text-xs text-white/55 group-hover:text-white/75 transition-colors flex items-center gap-1 flex-1">
-                              {tool.label}
-                              {tool.requiresConfirmation && (
-                                <span className="text-xs text-amber-400/60 flex items-center gap-0.5 ml-1">
-                                  <AlertTriangle size={10} /> asks permission
-                                </span>
-                              )}
-                            </span>
-                          </label>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {toolsEnabled.length > 0 && (
-              <p className="text-xs text-white/25 leading-relaxed">
-                When tools are active the agent reads files on demand — no large context injections.
-              </p>
+          <div className="space-y-3">
+            {!isFullAccess && (
+              <button
+                onClick={() => saveTools([])}
+                className="text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors flex items-center gap-1"
+              >
+                <ShieldCheck size={11} /> Reset to Full Access
+              </button>
             )}
+            {TOOL_GROUPS.map((group) => {
+              const groupTools = TOOL_REGISTRY.filter((t) => t.group === group.id)
+              return (
+                <div key={group.id}>
+                  <p className="text-xs font-semibold text-white/25 uppercase tracking-wider mb-1">{group.label}</p>
+                  <div className="space-y-0.5">
+                    {groupTools.map((tool) => (
+                      <label key={tool.id} className="flex items-center gap-2 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={isChecked(tool.id)}
+                          onChange={() => toggleTool(tool.id)}
+                          className="w-3 h-3 accent-purple-500 cursor-pointer"
+                        />
+                        <span className="text-xs text-white/55 group-hover:text-white/75 transition-colors flex items-center gap-1 flex-1">
+                          {tool.label}
+                          {tool.requiresConfirmation && (
+                            <span className="text-xs text-amber-400/60 flex items-center gap-0.5 ml-1">
+                              <AlertTriangle size={10} /> asks permission
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

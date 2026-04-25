@@ -36,38 +36,6 @@ pub struct DirEntry {
 }
 
 // ─────────────────────────────────────────────
-// Injected instruction block appended to system
-// prompts when a workspace is active
-// ─────────────────────────────────────────────
-
-pub const FILE_OUTPUT_INSTRUCTIONS: &str = r#"
-
-## File output instructions
-
-When you produce code or files, wrap each file in a fenced code block with the relative file path as a comment on the **first line inside** the block:
-
-```python
-# main.py
-[full file content here]
-```
-
-```typescript
-// src/components/App.tsx
-[full file content here]
-```
-
-```html
-<!-- index.html -->
-[full file content here]
-```
-
-Rules:
-- Always output **complete** files — never partial files, never diffs, never "add this line" instructions.
-- If modifying an existing file, output the entire updated file.
-- The system reads your code blocks and writes them to disk automatically — you do not need to describe the writes.
-- Use relative paths from the project root (e.g. `src/main.py`, not `/home/user/project/src/main.py`)."#;
-
-// ─────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────
 
@@ -82,187 +50,12 @@ fn default_projects_base() -> PathBuf {
     platform_home().join("conductor_projects")
 }
 
-fn sanitize_name(name: &str) -> String {
-    name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' { c } else { '_' })
-        .collect()
-}
-
 fn is_binary(path: &Path) -> bool {
     let Ok(mut f) = std::fs::File::open(path) else { return false };
     let mut buf = [0u8; 512];
     use std::io::Read;
     let n = f.read(&mut buf).unwrap_or(0);
     buf[..n].contains(&0u8)
-}
-
-// ─────────────────────────────────────────────
-// File block parsing — extracts files from LLM output
-// ─────────────────────────────────────────────
-
-fn try_extract_path(line: &str) -> Option<String> {
-    let line = line.trim();
-    // Try common comment styles
-    let candidate = if let Some(s) = line.strip_prefix("// ") {
-        s.trim()
-    } else if let Some(s) = line.strip_prefix("# ") {
-        s.trim()
-    } else if let Some(s) = line.strip_prefix("-- ") {
-        s.trim()
-    } else if line.starts_with("<!-- ") && line.ends_with(" -->") {
-        line[5..line.len() - 4].trim()
-    } else if line.starts_with("/* ") && line.ends_with(" */") {
-        line[3..line.len() - 3].trim()
-    } else {
-        // bare path (no comment wrapper)
-        line
-    };
-
-    if is_valid_file_path(candidate) {
-        Some(candidate.to_string())
-    } else {
-        None
-    }
-}
-
-fn is_valid_file_path(s: &str) -> bool {
-    if s.is_empty() || s.len() > 260 { return false; }
-    // Must not contain spaces and must have an extension
-    if s.contains(' ') || s.contains('\t') { return false; }
-    // Must not start with / or contain .. to prevent traversal in output
-    if s.starts_with('/') || s.starts_with("..") { return false; }
-    // Must have a recognisable extension
-    if let Some(dot) = s.rfind('.') {
-        let ext = &s[dot + 1..].to_lowercase();
-        matches!(
-            ext.as_str(),
-            "py" | "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs"
-                | "rs" | "go" | "java" | "kt" | "swift" | "rb" | "php" | "dart"
-                | "cpp" | "c" | "h" | "hpp" | "cc"
-                | "css" | "scss" | "less" | "html" | "htm" | "xml" | "svg"
-                | "json" | "jsonc" | "toml" | "yaml" | "yml" | "env"
-                | "md" | "txt" | "rst" | "tex" | "csv"
-                | "sh" | "bash" | "zsh" | "fish" | "ps1" | "bat" | "cmd"
-                | "sql" | "graphql" | "proto" | "r" | "jl"
-                | "vue" | "svelte" | "astro"
-                | "lock" | "conf" | "cfg" | "ini" | "gitignore" | "dockerignore"
-                | "dockerfile" | "makefile"
-        )
-    } else {
-        // Allow files without extension only if they look like known config files
-        matches!(s.to_lowercase().as_str(), "dockerfile" | "makefile" | "jenkinsfile" | "procfile")
-    }
-}
-
-/// Parse all fenced code blocks in an LLM response that have a file path comment
-/// as their first content line. Returns a list of (path, content) pairs.
-pub fn parse_file_blocks(response: &str) -> Vec<FileEntry> {
-    let mut results = Vec::new();
-    let lines: Vec<&str> = response.lines().collect();
-    let mut i = 0;
-
-    while i < lines.len() {
-        let trimmed = lines[i].trim_start();
-        if trimmed.starts_with("```") {
-            // Opening fence — skip the language tag
-            i += 1;
-
-            // Check if next line is a file path comment
-            if i < lines.len() {
-                if let Some(file_path) = try_extract_path(lines[i]) {
-                    i += 1; // skip the path comment line
-                    let content_start = i;
-
-                    // Collect lines until closing fence
-                    while i < lines.len() {
-                        let l = lines[i].trim_start();
-                        if l.starts_with("```") && l.trim() == "```" {
-                            break;
-                        }
-                        // Also catch ``` with trailing whitespace
-                        if l.starts_with("```") && l.trim_end_matches('`').trim().is_empty() {
-                            break;
-                        }
-                        i += 1;
-                    }
-
-                    let content = lines[content_start..i].join("\n");
-                    results.push(FileEntry { path: file_path, content });
-                    i += 1; // skip closing fence
-                    continue;
-                }
-            }
-
-            // Not a file block — scan to closing fence
-            while i < lines.len() {
-                let l = lines[i].trim_start();
-                if l.starts_with("```") {
-                    i += 1;
-                    break;
-                }
-                i += 1;
-            }
-        } else {
-            i += 1;
-        }
-    }
-
-    results
-}
-
-/// Render the directory tree from a flat file list for agent context.
-fn build_tree_display_from_files(files: &[FileEntry]) -> String {
-    let mut sorted_paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
-    sorted_paths.sort();
-
-    let mut out = String::new();
-    let mut shown_dirs: std::collections::HashSet<String> = std::collections::HashSet::new();
-
-    for path in sorted_paths {
-        let parts: Vec<&str> = path.split('/').collect();
-
-        // Show intermediate directories before the file
-        for i in 0..parts.len().saturating_sub(1) {
-            let dir_path = parts[..=i].join("/");
-            if shown_dirs.insert(dir_path) {
-                let indent = "  ".repeat(i);
-                out.push_str(&format!("{}{}/\n", indent, parts[i]));
-            }
-        }
-
-        // The file itself
-        let depth = parts.len().saturating_sub(1);
-        let indent = "  ".repeat(depth);
-        if let Some(name) = parts.last() {
-            out.push_str(&format!("{}{}\n", indent, name));
-        }
-    }
-
-    out
-}
-
-/// Build the workspace manifest string to inject before the user message.
-pub fn build_workspace_manifest(files: &[FileEntry]) -> String {
-    let total_chars: usize = files.iter().map(|f| f.content.len()).sum();
-    let mut out = String::from("## Project directory structure\n\n```\n");
-    out.push_str(&build_tree_display_from_files(files));
-    out.push_str("```\n\n");
-    out.push_str("## Current workspace files\n\n");
-
-    if total_chars > 100_000 {
-        // Over limit — list names + sizes only
-        out.push_str("*(File contents truncated — too large to include in full. See directory structure above.)*\n\n");
-        for f in files {
-            out.push_str(&format!("- `{}` ({} chars)\n", f.path, f.content.len()));
-        }
-    } else {
-        for f in files {
-            out.push_str(&format!("### {}\n```\n{}\n```\n\n---\n\n", f.path, f.content));
-        }
-    }
-
-    out.push_str("## End of workspace context\n");
-    out
 }
 
 // ─────────────────────────────────────────────
@@ -336,39 +129,6 @@ pub fn write_files_internal(workspace_path: &str, files: Vec<FileEntry>) -> Resu
 // ─────────────────────────────────────────────
 // Tauri commands
 // ─────────────────────────────────────────────
-
-#[tauri::command]
-pub fn create_run_workspace(
-    run_id: String,
-    mode: String,
-    project_name: Option<String>,
-    base_path: Option<String>,
-) -> Result<String, String> {
-    let workspace = if mode == "existing" {
-        // Use an existing project directory as-is — don't create anything new
-        let path = base_path.ok_or_else(|| "base_path required for existing mode".to_string())?;
-        let p = PathBuf::from(&path);
-        if !p.exists() {
-            return Err(format!("Project path does not exist: {}", path));
-        }
-        p
-    } else if mode == "project" {
-        let base = base_path
-            .map(PathBuf::from)
-            .unwrap_or_else(default_projects_base);
-        let name = project_name.ok_or_else(|| "Project name is required".to_string())?;
-        base.join(sanitize_name(&name))
-    } else {
-        std::env::temp_dir()
-            .join("conductor_runs")
-            .join(&run_id)
-    };
-
-    std::fs::create_dir_all(&workspace)
-        .map_err(|e| format!("Create workspace dir: {}", e))?;
-
-    Ok(workspace.to_string_lossy().replace('\\', "/"))
-}
 
 #[tauri::command]
 pub fn read_workspace_manifest(workspace_path: String) -> Result<Vec<FileEntry>, String> {

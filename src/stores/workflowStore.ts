@@ -47,6 +47,7 @@ interface WorkflowStore {
   setAllAgentModels: (model: ModelConfig) => void
   importWorkflow: () => Promise<void>
   exportWorkflow: (id: string) => Promise<void>
+  setWorkspacePath: (path: string) => void
   setSelectedNode: (id: string | null) => void
   setViewMode: (mode: ViewMode) => void
   setTaskInput: (input: string) => void
@@ -435,6 +436,21 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
     await tauri.writeTextFile(dest, JSON.stringify(workflow, null, 2))
   },
 
+  setWorkspacePath: (path) => {
+    set((s) => {
+      if (!s.currentWorkflow) return s
+      const updated = {
+        ...s.currentWorkflow,
+        settings: { ...s.currentWorkflow.settings, workspacePath: path },
+        updatedAt: new Date().toISOString(),
+      }
+      tauri.saveWorkflow(updated).catch(() => {})
+      return {
+        currentWorkflow: updated,
+        workflows: s.workflows.map((w) => (w.id === updated.id ? updated : w)),
+      }
+    })
+  },
   setSelectedNode: (id) => set({ selectedNodeId: id }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setTaskInput: (input) => set({ taskInput: input }),

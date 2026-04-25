@@ -81,6 +81,7 @@ export type WorkflowSettings = {
   defaultModel: ModelConfig
   inputMode: 'text' | 'file'
   saveHistory: boolean
+  workspacePath?: string
 }
 
 export type Workflow = {

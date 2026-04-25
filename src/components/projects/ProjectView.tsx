@@ -3,7 +3,6 @@ import { FolderOpen, Folder, FolderOpenIcon, Download, Play, X, ChevronRight, Fi
 import { save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { openProjectTree, zipAndSaveWorkspace } from '../../lib/tauri'
 import type { DirEntry, ProjectEntry } from '../../types'
-import { useRunStore } from '../../stores/runStore'
 import { useWorkflowStore } from '../../stores/workflowStore'
 
 interface Props {
@@ -119,8 +118,7 @@ export default function ProjectView({ project, onClose }: Props) {
   const [exporting, setExporting] = useState(false)
   const [exportMsg, setExportMsg] = useState<string | null>(null)
   const [showWorkflowPicker, setShowWorkflowPicker] = useState(false)
-  const { setPendingRun } = useRunStore()
-  const { workflows, currentWorkflow, setCurrentWorkflow } = useWorkflowStore()
+  const { workflows, currentWorkflow, setCurrentWorkflow, setWorkspacePath } = useWorkflowStore()
 
   useEffect(() => {
     setLoading(true)
@@ -160,22 +158,17 @@ export default function ProjectView({ project, onClose }: Props) {
     }
   }
 
-  function launchRun(workflowId: string) {
-    setPendingRun({
-      workflowId,
-      input: '',
-      presetProjectPath: project.path,
-      presetProjectName: project.name,
-    })
+  function launchWithWorkflow(wf: typeof workflows[number]) {
+    setCurrentWorkflow(wf)
+    setWorkspacePath(project.path)
     onClose()
   }
 
   function handleContinue() {
     if (currentWorkflow) {
-      launchRun(currentWorkflow.id)
+      launchWithWorkflow(currentWorkflow)
     } else if (workflows.length === 1) {
-      setCurrentWorkflow(workflows[0])
-      launchRun(workflows[0].id)
+      launchWithWorkflow(workflows[0])
     } else {
       setShowWorkflowPicker(true)
     }
@@ -229,7 +222,7 @@ export default function ProjectView({ project, onClose }: Props) {
                 workflows.map((w) => (
                   <button
                     key={w.id}
-                    onClick={() => { setCurrentWorkflow(w); launchRun(w.id) }}
+                    onClick={() => launchWithWorkflow(w)}
                     className="text-xs text-white/70 bg-white/8 hover:bg-emerald-500/15 hover:text-emerald-300 border border-white/10 hover:border-emerald-500/30 px-3 py-1.5 rounded-lg transition-colors"
                   >
                     {w.name}

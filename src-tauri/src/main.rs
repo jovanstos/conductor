@@ -67,6 +67,8 @@ struct WorkflowSettings {
     default_model: ModelConfig,
     input_mode: String,
     save_history: bool,
+    #[serde(default)]
+    workspace_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -460,6 +462,10 @@ fn tool_definitions(enabled_names: &[String]) -> Vec<ToolDef> {
             }),
         },
     ];
+    // Empty list means all tools enabled (no restriction)
+    if enabled_names.is_empty() {
+        return all;
+    }
     all.into_iter()
         .filter(|d| enabled_names.iter().any(|n| n == &d.name))
         .collect()
@@ -895,7 +901,8 @@ async fn execute_tool(
     node_id: &str,
     state: &Arc<AppState>,
 ) -> Result<String, String> {
-    if !enabled_tools.iter().any(|n| n == &tc.name) {
+    // Empty list = full access (no restriction); non-empty = explicit allowlist
+    if !enabled_tools.is_empty() && !enabled_tools.iter().any(|n| n == &tc.name) {
         return Err(format!("Tool '{}' is not enabled for this agent", tc.name));
     }
     let args = &tc.arguments;
@@ -1176,39 +1183,23 @@ async fn exec_agent(
     }
 
     let tool_defs = tool_definitions(&data.tools_enabled);
-    let use_tools = !tool_defs.is_empty();
 
     let mut system_prompt = data.system_prompt.clone();
 
-    if use_tools {
-        // Tool path: inject only the file tree (paths), not file contents — agents read on demand
-        if let Some(ws_path) = workspace_path {
-            // Tell the agent exactly where it lives on the hard drive
-            system_prompt.push_str(&format!(
-                "\n\n## Workspace Location\nYour absolute working directory is: `{}`\nYou can use this absolute path or relative paths (like '.') for your tools.",
-                ws_path
-            ));
-
-            if let Ok(files) = workspace_fs::read_manifest_internal(ws_path) {
-                if !files.is_empty() {
-                    let tree = files.iter().map(|f| f.path.clone()).collect::<Vec<_>>().join("\n");
-                    user_msg = format!("Project file tree:\n{}\n\n{}", tree, user_msg);
-                }
+    // Inject workspace location and file tree so the agent knows where it operates
+    if let Some(ws_path) = workspace_path {
+        system_prompt.push_str(&format!(
+            "\n\n## Workspace Location\nYour absolute working directory is: `{}`\nUse this absolute path or relative paths (like '.') with your tools.",
+            ws_path
+        ));
+        if let Ok(files) = workspace_fs::read_manifest_internal(ws_path) {
+            if !files.is_empty() {
+                let tree = files.iter().map(|f| f.path.clone()).collect::<Vec<_>>().join("\n");
+                user_msg = format!("Project file tree:\n{}\n\n{}", tree, user_msg);
             }
-        }
-        system_prompt.push_str(TOOL_EDIT_INSTRUCTIONS);
-    } else {
-        // Legacy path: inject full workspace manifest (file contents)
-        if let Some(ws_path) = workspace_path {
-            if let Ok(files) = workspace_fs::read_manifest_internal(ws_path) {
-                if !files.is_empty() {
-                    let manifest = workspace_fs::build_workspace_manifest(&files);
-                    user_msg = format!("{}\n\n{}", manifest, user_msg);
-                }
-            }
-            system_prompt.push_str(workspace_fs::FILE_OUTPUT_INSTRUCTIONS);
         }
     }
+    system_prompt.push_str(TOOL_EDIT_INSTRUCTIONS);
 
     let mut step = RunStep {
         node_id: node_id.into(),
@@ -1387,18 +1378,6 @@ async fn exec_agent(
     step.completed_at = Some(now());
     match tool_loop_result {
         Ok(text_output) => {
-            // When no tools are enabled the model outputs fenced code blocks —
-            // parse and write them to the workspace now so the chain has real files.
-            if !use_tools {
-                if let Some(ws_path) = workspace_path {
-                    let blocks = workspace_fs::parse_file_blocks(&text_output);
-                    if !blocks.is_empty() {
-                        if let Ok(written) = workspace_fs::write_files_internal(ws_path, blocks) {
-                            files_written.extend(written);
-                        }
-                    }
-                }
-            }
             let effective_output = build_effective_output(&text_output, &files_written, workspace_path);
             step.status = "done".into();
             step.output = effective_output.clone();
@@ -1743,34 +1722,33 @@ fn delete_workflow(id: String, state: State<'_, Arc<AppState>>) -> Result<(), St
 async fn start_run(
     workflow_id: String,
     input: String,
-    workspace_mode: Option<String>,
-    project_name: Option<String>,
-    base_path: Option<String>,
+    workspace_path: Option<String>,
     state: State<'_, Arc<AppState>>,
     app: AppHandle,
 ) -> Result<String, String> {
     let wf_path = state.workflows_dir().join(format!("{}.json", workflow_id));
     let workflow: Workflow = load_json(&wf_path)?;
 
-    // Require a workspace if any agent node has tools enabled.
-    let needs_workspace = workflow.nodes.iter().any(|n| {
-        n.node_type == "agent"
-            && serde_json::from_value::<AgentNodeData>(n.data.clone())
-                .map(|d| !d.tools_enabled.is_empty())
-                .unwrap_or(false)
-    });
-    if needs_workspace && base_path.is_none() {
+    // Resolve workspace: explicit arg overrides the workflow's saved setting.
+    let resolved_ws = workspace_path
+        .or_else(|| workflow.settings.workspace_path.clone())
+        .filter(|p| !p.is_empty());
+
+    if resolved_ws.is_none() {
         return Err("WORKSPACE_REQUIRED".to_string());
     }
+    let ws_path = resolved_ws.unwrap();
+
+    // Ensure the workspace directory exists (create if the user typed a new path)
+    std::fs::create_dir_all(&ws_path)
+        .map_err(|e| format!("Cannot create workspace directory '{}': {}", ws_path, e))?;
 
     let run_id = Uuid::new_v4().to_string();
-
-    let workspace_config = if let Some(ref mode) = workspace_mode {
-        let ws_path = workspace_fs::create_run_workspace(
-            run_id.clone(), mode.clone(), project_name.clone(), base_path.clone(),
-        )?;
-        Some(WorkspaceConfig { mode: mode.clone(), workspace_path: ws_path, project_name })
-    } else { None };
+    let workspace_config = Some(WorkspaceConfig {
+        mode: "workspace".into(),
+        workspace_path: ws_path,
+        project_name: None,
+    });
 
     let run = Run {
         id: run_id.clone(),
@@ -2804,7 +2782,6 @@ fn main() {
             get_ollama_models,
             validate_api_key,
             validate_custom_host,
-            workspace_fs::create_run_workspace,
             workspace_fs::read_workspace_manifest,
             workspace_fs::write_workspace_files,
             workspace_fs::delete_workspace,

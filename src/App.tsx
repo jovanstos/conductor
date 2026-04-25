@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Play, Square, AlertTriangle, X, Sparkles, Swords } from 'lucide-react'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { useWorkflowStore } from './stores/workflowStore'
 import { useRunStore } from './stores/runStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -9,13 +10,13 @@ import NewWorkflowModal from './components/workflow/NewWorkflowModal'
 import WorkflowCanvas from './components/canvas/WorkflowCanvas'
 import Inspector from './components/inspector/Inspector'
 import RunDrawer from './components/run/RunDrawer'
-import RunStartModal from './components/run/RunStartModal'
 import RunHistoryDrawer from './components/run/RunHistoryDrawer'
 import ReviewGateModal from './components/run/ReviewGateModal'
 import ToolConfirmModal from './components/run/ToolConfirmModal'
 import ResultModal from './components/run/ResultModal'
 import SettingsPanel from './components/settings/SettingsPanel'
 import ChamberView from './components/chamber/ChamberView'
+import WorkspaceBar from './components/workspace/WorkspaceBar'
 
 type MainTab = 'workflow' | 'chamber'
 
@@ -28,8 +29,8 @@ function clamp(v: number, min: number, max: number) {
 }
 
 export default function App() {
-  const { loadWorkflows, currentWorkflow, taskInput, setTaskInput } = useWorkflowStore()
-  const { cancelRun, isRunning, currentRun, gateInfo, toolConfirmRequest, showResultModal, pendingRun, setPendingRun } = useRunStore()
+  const { loadWorkflows, currentWorkflow, taskInput, setTaskInput, setWorkspacePath } = useWorkflowStore()
+  const { cancelRun, startRun, isRunning, currentRun, gateInfo, toolConfirmRequest, showResultModal } = useRunStore()
   const { loadProviderStatuses, loadConfig, isOpen: settingsOpen, theme } = useSettingsStore()
 
   const [sidebarWidth, setSidebarWidth]     = useState(SIDEBAR_DEFAULT)
@@ -38,10 +39,10 @@ export default function App() {
   const [runError, setRunError]             = useState<string | null>(null)
   const [showHistory, setShowHistory]       = useState(false)
   const [activeTab, setActiveTab]           = useState<MainTab>('workflow')
+  const [isStarting, setIsStarting]         = useState(false)
 
   useRun(currentRun?.id)
 
-  // Keep document theme class in sync with store
   useEffect(() => {
     document.documentElement.classList.remove('dark', 'light')
     document.documentElement.classList.add(theme)
@@ -54,7 +55,7 @@ export default function App() {
   }, [loadWorkflows, loadProviderStatuses, loadConfig])
 
   async function handleRun() {
-    if (!currentWorkflow || !taskInput.trim() || isRunning) return
+    if (!currentWorkflow || !taskInput.trim() || isRunning || isStarting) return
 
     const agents = currentWorkflow.nodes.filter(n => n.type === 'agent')
     if (agents.length === 0) {
@@ -72,8 +73,29 @@ export default function App() {
       return
     }
 
+    // Ensure we have a workspace — open picker if not set
+    let workspace = currentWorkflow.settings?.workspacePath
+    if (!workspace) {
+      const selected = await openDialog({ directory: true, multiple: false, title: 'Select Workspace Directory' })
+      if (!selected || typeof selected !== 'string') return
+      setWorkspacePath(selected)
+      workspace = selected
+    }
+
     setRunError(null)
-    setPendingRun({ workflowId: currentWorkflow.id, input: taskInput })
+    setIsStarting(true)
+    try {
+      await startRun(currentWorkflow.id, taskInput, workspace)
+    } catch (e: unknown) {
+      const msg = String(e)
+      if (msg.includes('WORKSPACE_REQUIRED')) {
+        setRunError('Please select a workspace directory before running.')
+      } else {
+        setRunError(msg)
+      }
+    } finally {
+      setIsStarting(false)
+    }
   }
 
   return (
@@ -125,7 +147,7 @@ export default function App() {
                 value={taskInput}
                 onChange={(e) => setTaskInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleRun()}
-                disabled={isRunning}
+                disabled={isRunning || isStarting}
               />
               {isRunning ? (
                 <button
@@ -137,15 +159,19 @@ export default function App() {
               ) : (
                 <button
                   onClick={handleRun}
-                  disabled={!taskInput.trim()}
+                  disabled={!taskInput.trim() || isStarting}
                   className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white"
                 >
-                  <Play size={11} fill="currentColor" /> Run
+                  <Play size={11} fill="currentColor" />
+                  {isStarting ? 'Starting…' : 'Run'}
                 </button>
               )}
             </div>
           )}
         </div>
+
+        {/* Workspace anchor bar — visible on workflow tab whenever a workflow is open */}
+        {activeTab === 'workflow' && <WorkspaceBar />}
 
         {/* Error toast */}
         {runError && activeTab === 'workflow' && (
@@ -190,7 +216,6 @@ export default function App() {
       {showHistory && currentWorkflow && (
         <RunHistoryDrawer workflowId={currentWorkflow.id} onClose={() => setShowHistory(false)} />
       )}
-      {pendingRun && <RunStartModal />}
       {gateInfo && <ReviewGateModal />}
       {toolConfirmRequest && <ToolConfirmModal />}
       {showResultModal && <ResultModal />}
@@ -277,7 +302,7 @@ function EmptyState() {
       <div className="max-w-xs">
         <p className="text-base font-semibold mb-2" style={{ color: 'var(--c-text-1)' }}>Build your AI workforce</p>
         <p className="text-sm leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
-          Create a workflow and fill it with AI agents. Chain them together and run any task, start to finish.
+          Create a workflow, fill it with AI agents, and point it at a directory. Agents read and write files directly on your machine.
         </p>
       </div>
       <button

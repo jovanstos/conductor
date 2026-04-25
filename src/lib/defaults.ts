@@ -46,6 +46,7 @@ export const DEFAULT_WORKFLOW_SETTINGS: WorkflowSettings = {
   defaultModel: DEFAULT_MODEL,
   inputMode: "text",
   saveHistory: true,
+  workspacePath: undefined,
 };
 
 export const ANTHROPIC_MODELS = [
@@ -1011,47 +1012,6 @@ export const TOOL_GROUPS: { id: ToolGroup; label: string }[] = [
   { id: "web", label: "Web" },
 ];
 
-export const TOOL_PRESETS: {
-  id: string;
-  label: string;
-  tools: ToolNameId[];
-}[] = [
-  { id: "none", label: "No Tools", tools: [] },
-  {
-    id: "readonly",
-    label: "Read-Only",
-    tools: ["read_file", "list_directory", "search_files"],
-  },
-  {
-    id: "file-editor",
-    label: "File Editor",
-    tools: [
-      "read_file",
-      "write_file",
-      "edit_file",
-      "list_directory",
-      "search_files",
-      "create_directory",
-      "move_file",
-    ],
-  },
-  {
-    id: "full-dev",
-    label: "Full Dev",
-    tools: [
-      "read_file",
-      "write_file",
-      "edit_file",
-      "list_directory",
-      "search_files",
-      "create_directory",
-      "move_file",
-      "delete_file",
-      "run_shell_command",
-      "fetch_url",
-    ],
-  },
-];
 
 // ── Workflow templates ───────────────────────────────────
 
@@ -1198,7 +1158,6 @@ export function researchLabWorkflow(preferredModel?: ModelConfig): Workflow {
         data: agentFromTemplate("analyst", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: ["fetch_url"] as ToolNameId[],
         }),
       },
       {
@@ -1291,11 +1250,6 @@ export function softwareFactoryWorkflow(
         data: agentFromTemplate("software-planner", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: [
-            "read_file",
-            "list_directory",
-            "search_files",
-          ] as ToolNameId[],
         }),
       },
       {
@@ -1339,14 +1293,6 @@ export function softwareFactoryWorkflow(
         data: agentFromTemplate("full-stack-developer", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: [
-            "read_file",
-            "write_file",
-            "edit_file",
-            "list_directory",
-            "search_files",
-            "create_directory",
-          ] as ToolNameId[],
         }),
       },
       {
@@ -1358,12 +1304,6 @@ export function softwareFactoryWorkflow(
         data: agentFromTemplate("unit-test-writer", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: [
-            "read_file",
-            "list_directory",
-            "search_files",
-            "run_shell_command",
-          ] as ToolNameId[],
         }),
       },
       { id: endId, type: "end", position: { x: 1720, y: 270 }, data: {} },
@@ -1425,11 +1365,6 @@ export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
         data: agentFromTemplate("codebase-explorer", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: [
-            "read_file",
-            "list_directory",
-            "search_files",
-          ] as ToolNameId[],
         }),
       },
       {
@@ -1439,7 +1374,6 @@ export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
         data: agentFromTemplate("bug-analyzer", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: ["read_file", "search_files"] as ToolNameId[],
         }),
       },
       {
@@ -1462,13 +1396,6 @@ export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
         data: agentFromTemplate("full-stack-developer", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: [
-            "read_file",
-            "write_file",
-            "edit_file",
-            "list_directory",
-            "search_files",
-          ] as ToolNameId[],
         }),
       },
       {
@@ -1480,7 +1407,6 @@ export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
         data: agentFromTemplate("code-reviewer", {
           model: { ...model },
           contextMode: "full_chain",
-          toolsEnabled: ["read_file", "search_files"] as ToolNameId[],
         }),
       },
       { id: endId, type: "end", position: { x: 1400, y: 230 }, data: {} },

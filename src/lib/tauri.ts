@@ -25,13 +25,8 @@ export const saveWorkflow = (workflow: Workflow) => invoke<void>('save_workflow'
 export const deleteWorkflow = (id: string) => invoke<void>('delete_workflow', { id })
 
 // Run management
-export const startRun = (
-  workflowId: string,
-  input: string,
-  workspaceMode?: string,
-  projectName?: string,
-  basePath?: string,
-) => invoke<string>('start_run', { workflowId, input, workspaceMode, projectName, basePath })
+export const startRun = (workflowId: string, input: string, workspacePath?: string) =>
+  invoke<string>('start_run', { workflowId, input, workspacePath })
 export const cancelRun = (runId: string) => invoke<void>('cancel_run', { runId })
 export const getRun = (runId: string) => invoke<Run | null>('get_run', { runId })
 export const getRunsForWorkflow = (workflowId: string) =>
