@@ -8,31 +8,31 @@ import type {
 } from "../types";
 
 export const PROVIDER_COLORS: Record<string, string> = {
-  anthropic: '#f97316', // orange — Anthropic brand
-  openai:    '#d1d5db', // near-white — OpenAI brand
-  ollama:    '#3b82f6', // blue — Ollama brand
-  custom:    '#8b5cf6', // purple — fallback
-}
+  anthropic: "#f97316", // orange — Anthropic brand
+  openai: "#d1d5db", // near-white — OpenAI brand
+  ollama: "#3b82f6", // blue — Ollama brand
+  custom: "#8b5cf6", // purple — fallback
+};
 
 const CUSTOM_HOST_PALETTE = [
-  '#8b5cf6', // violet
-  '#06b6d4', // cyan
-  '#f59e0b', // amber
-  '#10b981', // emerald
-  '#ec4899', // pink
-  '#f97316', // orange
-  '#84cc16', // lime
-  '#6366f1', // indigo
-  '#e11d48', // rose
-  '#0ea5e9', // sky
-]
+  "#8b5cf6", // violet
+  "#06b6d4", // cyan
+  "#f59e0b", // amber
+  "#10b981", // emerald
+  "#ec4899", // pink
+  "#f97316", // orange
+  "#84cc16", // lime
+  "#6366f1", // indigo
+  "#e11d48", // rose
+  "#0ea5e9", // sky
+];
 
 export function pickHostColor(index: number): string {
-  return CUSTOM_HOST_PALETTE[index % CUSTOM_HOST_PALETTE.length]
+  return CUSTOM_HOST_PALETTE[index % CUSTOM_HOST_PALETTE.length];
 }
 
 export function getProviderColor(provider: string | undefined): string {
-  return PROVIDER_COLORS[provider ?? ''] ?? PROVIDER_COLORS.custom
+  return PROVIDER_COLORS[provider ?? ""] ?? PROVIDER_COLORS.custom;
 }
 
 export const DEFAULT_MODEL: ModelConfig = {
@@ -49,26 +49,26 @@ export const DEFAULT_WORKFLOW_SETTINGS: WorkflowSettings = {
 };
 
 export const ANTHROPIC_MODELS = [
-  { id: 'claude-opus-4-7', name: 'Claude Opus 4.7' },
-  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
-  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+  { id: "claude-opus-4-7", name: "Claude Opus 4.7" },
+  { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
 ];
 
 export const OPENAI_MODELS = [
-  { id: 'gpt-4o', name: 'GPT-4o' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+  { id: "gpt-4o", name: "GPT-4o" },
+  { id: "gpt-4o-mini", name: "GPT-4o mini" },
 ];
 
 export const OLLAMA_MODELS = [
-  { id: 'llama3.2', name: 'Llama 3.2' },
-  { id: 'mistral', name: 'Mistral' },
-  { id: 'codellama', name: 'Code Llama' },
-  { id: 'qwen2.5-coder', name: 'Qwen 2.5 Coder' },
+  { id: "llama3.2", name: "Llama 3.2" },
+  { id: "mistral", name: "Mistral" },
+  { id: "codellama", name: "Code Llama" },
+  { id: "qwen2.5-coder", name: "Qwen 2.5 Coder" },
 ];
 
 export function newWorkflow(name: string): Workflow {
-  const startId = uuidv4()
-  const endId = uuidv4()
+  const startId = uuidv4();
+  const endId = uuidv4();
   return {
     id: uuidv4(),
     name,
@@ -76,8 +76,8 @@ export function newWorkflow(name: string): Workflow {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 200 }, data: {} },
-      { id: endId, type: 'end', position: { x: 700, y: 200 }, data: {} },
+      { id: startId, type: "start", position: { x: 60, y: 200 }, data: {} },
+      { id: endId, type: "end", position: { x: 700, y: 200 }, data: {} },
     ],
     edges: [],
     settings: DEFAULT_WORKFLOW_SETTINGS,
@@ -117,9 +117,9 @@ A structured markdown document covering:
 6. **Open Questions** — blockers or decisions that need clarification
 
 ## Constraints
+- If file tools are available, use the \`write_file\` tool to save the SDD to disk. Do NOT output the entire markdown document in the chat.
 - Be specific and actionable — avoid vague statements like "use best practices"
 - No actual code, only design and plans
-- Flag any requirements that conflict or are ambiguous
 - Estimate complexity (Low / Medium / High) for each major component`,
   },
   {
@@ -169,13 +169,11 @@ You are a senior full-stack developer.
 
 ## Objective
 Implement production-quality code based on the design document or task.
-If file tools are available, read existing files before making changes and write your output directly to the correct file paths.
 
 ## Workflow (when file tools are available)
-1. Read the relevant existing files to understand current structure and conventions
-2. Implement the required changes or new code
-3. Write each modified or created file to the correct path
-4. List all files created or modified
+1. Read the relevant existing files to understand current structure and conventions.
+2. Implement the required changes using the \`write_file\` or \`edit_file\` tools.
+3. You MUST use tools to save code. Do NOT output raw code blocks in your text response.
 
 ## Input
 - The original task
@@ -183,21 +181,22 @@ If file tools are available, read existing files before making changes and write
 - Reviewer or tester feedback (if revising)
 
 ## Output format
-- If writing files directly: list each file path with a brief summary of changes made
-- If outputting code in chat: complete code blocks with file path as the header for each file
+- Your text response should ONLY be a brief summary of what you did and the files you modified.
+- Do NOT output the actual code in the chat.
 
 ## Constraints
-- Write complete, runnable code — no pseudocode, no TODO placeholders
-- Follow the tech stack and patterns specified in the SDD exactly
-- Match the existing code style when modifying existing files
-- Every file must have all required imports — do not leave any undefined
-- Do not add features or refactors beyond the scope of the task`,
+- Write complete, runnable code using the tools — no pseudocode, no TODO placeholders.
+- Follow the tech stack and patterns specified in the SDD exactly.
+- Match the existing code style when modifying existing files.
+- Every file must have all required imports.
+- Do not add features or refactors beyond the scope of the task.`,
   },
   {
     id: "unit-test-writer",
     name: "Tester / QA Engineer",
     category: "Software",
-    roleDescription: "Tests and validates the implementation against requirements",
+    roleDescription:
+      "Tests and validates the implementation against requirements",
     systemPrompt: `## Role
 You are a QA engineer and software tester.
 
@@ -267,31 +266,31 @@ You are a debugging specialist.
 
 ## Objective
 Diagnose the reported bug and produce a complete, working fix.
-If file tools are available, read the affected files directly to get full context before forming a diagnosis — do not assume.
 
 ## Workflow (when file tools are available)
-1. List the project directory to understand the structure
-2. Read the files most likely to contain the bug
-3. Search for relevant patterns or function names if the location is unclear
-4. Trace the actual execution path to find the root cause
+1. List the project directory to understand the structure.
+2. Read the files most likely to contain the bug.
+3. Trace the actual execution path to find the root cause.
+4. Use the \`write_file\` or \`edit_file\` tools to apply the fix directly. You MUST use tools to save code. Do NOT output raw code blocks in your text response.
 
 ## Output format
+Your text response should ONLY contain:
 1. **Root Cause** — precise explanation of why the bug occurs
 2. **Affected Code** — file paths, function names, and line numbers
-3. **Fix** — complete, working corrected code
-4. **Prevention** — what pattern caused this and how to avoid it in future
-5. **Files Changed** — list of files written (if you applied the fix directly)
+3. **Prevention** — what pattern caused this and how to avoid it in future
+4. **Files Changed** — list of files modified using tools
 
 ## Constraints
-- Do not guess — trace the actual execution path
-- Provide a complete working fix, not a partial suggestion or pseudocode
-- Fix only the diagnosed issue — do not refactor unrelated code`,
+- Do not guess — trace the actual execution path.
+- Use tools to write the complete working fix.
+- Fix only the diagnosed issue — do not refactor unrelated code.`,
   },
   {
     id: "codebase-explorer",
     name: "Codebase Explorer",
     category: "Software",
-    roleDescription: "Reads and maps an existing codebase to build a clear understanding",
+    roleDescription:
+      "Reads and maps an existing codebase to build a clear understanding",
     systemPrompt: `## Role
 You are a codebase analysis specialist.
 
@@ -319,6 +318,7 @@ Structured markdown covering:
 
 ## Constraints
 - Read actual files — do not guess based on names alone
+- Keep your summary concise. Do NOT copy-paste large blocks of source code into your response.
 - Flag anything unusual, inconsistent, or potentially problematic
 - Be specific: cite file paths when describing components`,
   },
@@ -326,7 +326,8 @@ Structured markdown covering:
     id: "refactoring-specialist",
     name: "Refactoring Specialist",
     category: "Software",
-    roleDescription: "Reads existing code and improves structure, clarity, and performance",
+    roleDescription:
+      "Reads existing code and improves structure, clarity, and performance",
     systemPrompt: `## Role
 You are a refactoring specialist and clean code expert.
 
@@ -334,11 +335,10 @@ You are a refactoring specialist and clean code expert.
 Read the target code, identify the highest-value structural and readability improvements, and implement them without changing external behavior.
 
 ## Workflow
-1. Read the target files in full
-2. Identify refactoring opportunities ranked by value
-3. Implement the changes while preserving all existing behavior
-4. Write the refactored files back to disk
-5. Confirm (or run) tests to verify nothing broke
+1. Read the target files in full.
+2. Identify refactoring opportunities ranked by value.
+3. Implement the changes using the \`write_file\` or \`edit_file\` tools. You MUST use tools to save changes. Do NOT output refactored code in the chat.
+4. Confirm (or run) tests to verify nothing broke.
 
 ## Refactoring priorities (in order)
 1. Remove duplicated logic (DRY violations)
@@ -349,21 +349,22 @@ Read the target code, identify the highest-value structural and readability impr
 6. Performance improvements (only when safe and measurable)
 
 ## Output format
+Your text response should only contain:
 - **Changes Made** — numbered list of what was refactored and the specific reason
 - **Files Modified** — list of all written file paths
-- **Behavior Preserved** — confirmation that no external interfaces changed, or explicit note of any intentional behavior changes
+- **Behavior Preserved** — confirmation that no external interfaces changed
 
 ## Constraints
-- Do NOT change external interfaces, public APIs, or function signatures unless explicitly instructed
-- Do NOT add new features
-- Preserve all existing tests — they should still pass after your changes
-- If shell tools are available, run the test suite to confirm`,
+- Do NOT change external interfaces, public APIs, or function signatures unless explicitly instructed.
+- Do NOT add new features.
+- Preserve all existing tests — they should still pass after your changes.`,
   },
   {
     id: "security-auditor",
     name: "Security Auditor",
     category: "Software",
-    roleDescription: "Audits code for security vulnerabilities and attack vectors",
+    roleDescription:
+      "Audits code for security vulnerabilities and attack vectors",
     systemPrompt: `## Role
 You are an application security specialist.
 
@@ -399,7 +400,8 @@ End with a **Summary** section covering: overall risk level, top 3 priorities, a
     id: "devops-engineer",
     name: "DevOps Engineer",
     category: "DevOps",
-    roleDescription: "Automates builds, tests, and deployments via shell and config",
+    roleDescription:
+      "Automates builds, tests, and deployments via shell and config",
     systemPrompt: `## Role
 You are a DevOps engineer and automation specialist.
 
@@ -452,12 +454,8 @@ If file tools are available, read the source files directly to ensure accuracy �
 4. Save the documentation file to the appropriate location
 
 ## Output format
-Markdown documentation covering:
-- **Overview** — what it does and when you'd use it
-- **Installation / Setup** — how to get it running from scratch
-- **Usage Examples** — practical, copy-paste-ready code examples
-- **API Reference** — every public function with: parameters, return values, types, and error conditions
-- **Configuration** — environment variables, config files, and their defaults
+- If file tools are available, use \`write_file\` to save the documentation directly to the disk.
+- Do NOT output the full documentation text in the chat if you used a tool to save it. Your text response should just summarize what you wrote.
 
 ## Constraints
 - Write for developers who are new to this codebase
@@ -469,7 +467,8 @@ Markdown documentation covering:
     id: "content-writer",
     name: "Content Writer",
     category: "Writing",
-    roleDescription: "Writes engaging, audience-appropriate content from a brief",
+    roleDescription:
+      "Writes engaging, audience-appropriate content from a brief",
     systemPrompt: `## Role
 You are a skilled content writer.
 
@@ -525,7 +524,8 @@ Each feedback point should state: what the issue is, where it occurs, and how to
     id: "analyst",
     name: "Research Analyst",
     category: "Analysis",
-    roleDescription: "Analyzes material and produces structured, evidence-based insights",
+    roleDescription:
+      "Analyzes material and produces structured, evidence-based insights",
     systemPrompt: `## Role
 You are a research analyst.
 
@@ -581,7 +581,8 @@ Your response MUST end with exactly one of:
     id: "executive-summarizer",
     name: "Executive Summarizer",
     category: "Analysis",
-    roleDescription: "Distills lengthy content into a concise, actionable summary",
+    roleDescription:
+      "Distills lengthy content into a concise, actionable summary",
     systemPrompt: `## Role
 You are an expert at condensing complex information.
 
@@ -634,7 +635,8 @@ Gather accurate, current information from the provided web sources using URL-fet
     id: "product-manager",
     name: "Product Manager",
     category: "Business",
-    roleDescription: "Translates ideas into clear requirements and user stories",
+    roleDescription:
+      "Translates ideas into clear requirements and user stories",
     systemPrompt: `## Role
 You are an experienced product manager.
 
@@ -787,48 +789,119 @@ export function agentFromTemplate(
   templateId: string,
   overrides?: Partial<AgentNodeData>,
 ): AgentNodeData {
-  const tpl = BUILT_IN_TEMPLATES.find((t) => t.id === templateId)
+  const tpl = BUILT_IN_TEMPLATES.find((t) => t.id === templateId);
   return {
-    name: tpl?.name ?? 'Agent',
-    roleDescription: tpl?.roleDescription ?? 'Completes its part of the workflow',
-    systemPrompt: tpl?.systemPrompt ?? '## Role\nYou are a helpful AI agent.\n\n## Objective\nComplete the given task.\n\n## Output format\nPlain text response.',
+    name: tpl?.name ?? "Agent",
+    roleDescription:
+      tpl?.roleDescription ?? "Completes its part of the workflow",
+    systemPrompt:
+      tpl?.systemPrompt ??
+      "## Role\nYou are a helpful AI agent.\n\n## Objective\nComplete the given task.\n\n## Output format\nPlain text response.",
     model: { ...DEFAULT_MODEL },
-    contextMode: 'full_chain',
+    contextMode: "full_chain",
     maxTokens: 999999,
     toolsEnabled: [],
     templateId,
     ...overrides,
-  }
+  };
 }
 
-export type RoleCategory = 'developer' | 'reviewer' | 'writer' | 'researcher' | 'planner' | 'tester' | 'marketer' | 'default'
+export type RoleCategory =
+  | "developer"
+  | "reviewer"
+  | "writer"
+  | "researcher"
+  | "planner"
+  | "tester"
+  | "marketer"
+  | "default";
 
 export interface RoleInfo {
-  category: RoleCategory
-  label: string
-  borderColor: string
-  bgColor: string
-  textColor: string
-  dotColor: string
+  category: RoleCategory;
+  label: string;
+  borderColor: string;
+  bgColor: string;
+  textColor: string;
+  dotColor: string;
 }
 
 export function getRoleInfo(name: string, roleDescription: string): RoleInfo {
-  const text = `${name} ${roleDescription}`.toLowerCase()
-  if (/develop|engineer|cod|implement|build|program|refactor|devops|deploy/.test(text))
-    return { category: 'developer', label: 'Developer', borderColor: 'border-blue-500/40', bgColor: 'bg-blue-500/15', textColor: 'text-blue-400', dotColor: 'bg-blue-400' }
+  const text = `${name} ${roleDescription}`.toLowerCase();
+  if (
+    /develop|engineer|cod|implement|build|program|refactor|devops|deploy/.test(
+      text,
+    )
+  )
+    return {
+      category: "developer",
+      label: "Developer",
+      borderColor: "border-blue-500/40",
+      bgColor: "bg-blue-500/15",
+      textColor: "text-blue-400",
+      dotColor: "bg-blue-400",
+    };
   if (/review|check|critic|audit|verif|secur/.test(text))
-    return { category: 'reviewer', label: 'Reviewer', borderColor: 'border-amber-500/40', bgColor: 'bg-amber-500/15', textColor: 'text-amber-400', dotColor: 'bg-amber-400' }
+    return {
+      category: "reviewer",
+      label: "Reviewer",
+      borderColor: "border-amber-500/40",
+      bgColor: "bg-amber-500/15",
+      textColor: "text-amber-400",
+      dotColor: "bg-amber-400",
+    };
   if (/writ|edit|content|copy|draft|author|document/.test(text))
-    return { category: 'writer', label: 'Writer', borderColor: 'border-emerald-500/40', bgColor: 'bg-emerald-500/15', textColor: 'text-emerald-400', dotColor: 'bg-emerald-400' }
+    return {
+      category: "writer",
+      label: "Writer",
+      borderColor: "border-emerald-500/40",
+      bgColor: "bg-emerald-500/15",
+      textColor: "text-emerald-400",
+      dotColor: "bg-emerald-400",
+    };
   if (/research|analys|fact|data|investigat|explorer|explor/.test(text))
-    return { category: 'researcher', label: 'Researcher', borderColor: 'border-cyan-500/40', bgColor: 'bg-cyan-500/15', textColor: 'text-cyan-400', dotColor: 'bg-cyan-400' }
+    return {
+      category: "researcher",
+      label: "Researcher",
+      borderColor: "border-cyan-500/40",
+      bgColor: "bg-cyan-500/15",
+      textColor: "text-cyan-400",
+      dotColor: "bg-cyan-400",
+    };
   if (/plan|architect|design|strateg|roadmap|product|manag/.test(text))
-    return { category: 'planner', label: 'Planner', borderColor: 'border-purple-500/40', bgColor: 'bg-purple-500/15', textColor: 'text-purple-400', dotColor: 'bg-purple-400' }
+    return {
+      category: "planner",
+      label: "Planner",
+      borderColor: "border-purple-500/40",
+      bgColor: "bg-purple-500/15",
+      textColor: "text-purple-400",
+      dotColor: "bg-purple-400",
+    };
   if (/test|qa|quality|bug|debug/.test(text))
-    return { category: 'tester', label: 'Tester', borderColor: 'border-rose-500/40', bgColor: 'bg-rose-500/15', textColor: 'text-rose-400', dotColor: 'bg-rose-400' }
+    return {
+      category: "tester",
+      label: "Tester",
+      borderColor: "border-rose-500/40",
+      bgColor: "bg-rose-500/15",
+      textColor: "text-rose-400",
+      dotColor: "bg-rose-400",
+    };
   if (/market|sales|social|campaign|promot/.test(text))
-    return { category: 'marketer', label: 'Marketer', borderColor: 'border-orange-500/40', bgColor: 'bg-orange-500/15', textColor: 'text-orange-400', dotColor: 'bg-orange-400' }
-  return { category: 'default', label: 'Agent', borderColor: 'border-purple-500/30', bgColor: 'bg-purple-500/12', textColor: 'text-purple-400', dotColor: 'bg-purple-400' }
+    return {
+      category: "marketer",
+      label: "Marketer",
+      borderColor: "border-orange-500/40",
+      bgColor: "bg-orange-500/15",
+      textColor: "text-orange-400",
+      dotColor: "bg-orange-400",
+    };
+  return {
+    category: "default",
+    label: "Agent",
+    borderColor: "border-purple-500/30",
+    bgColor: "bg-purple-500/12",
+    textColor: "text-purple-400",
+    dotColor: "bg-purple-400",
+  };
 }
 
 export function newAgentNodeData(
@@ -849,59 +922,142 @@ export function newAgentNodeData(
 
 // ── Tool registry ────────────────────────────────────────
 
-export type ToolGroup = 'filesystem' | 'shell' | 'web'
+export type ToolGroup = "filesystem" | "shell" | "web";
 
 export type ToolRegistryEntry = {
-  id: ToolNameId
-  label: string
-  description: string
-  group: ToolGroup
-  requiresConfirmation: boolean
-}
+  id: ToolNameId;
+  label: string;
+  description: string;
+  group: ToolGroup;
+  requiresConfirmation: boolean;
+};
 
 export const TOOL_REGISTRY: ToolRegistryEntry[] = [
-  { id: 'read_file',         label: 'Read File',          description: 'Read the contents of a file',                          group: 'filesystem', requiresConfirmation: false },
-  { id: 'write_file',        label: 'Write File',         description: 'Create or overwrite a file with new content',          group: 'filesystem', requiresConfirmation: false },
-  { id: 'edit_file',         label: 'Edit File',          description: 'Replace a specific string in a file (token-efficient)', group: 'filesystem', requiresConfirmation: false },
-  { id: 'list_directory',    label: 'List Directory',     description: 'List files and folders in a directory',                group: 'filesystem', requiresConfirmation: false },
-  { id: 'search_files',      label: 'Search Files',       description: 'Search for a pattern across files recursively',        group: 'filesystem', requiresConfirmation: false },
-  { id: 'create_directory',  label: 'Create Directory',   description: 'Create a new directory (including parent dirs)',       group: 'filesystem', requiresConfirmation: false },
-  { id: 'move_file',         label: 'Move / Rename File', description: 'Move or rename a file or directory',                  group: 'filesystem', requiresConfirmation: false },
-  { id: 'delete_file',       label: 'Delete File',        description: 'Permanently delete a file',                           group: 'filesystem', requiresConfirmation: true  },
-  { id: 'run_shell_command', label: 'Run Shell Command',  description: 'Execute a shell command on the system',               group: 'shell',      requiresConfirmation: true  },
-  { id: 'fetch_url',         label: 'Fetch URL',          description: 'Download and read content from a URL',                group: 'web',        requiresConfirmation: false },
-]
+  {
+    id: "read_file",
+    label: "Read File",
+    description: "Read the contents of a file",
+    group: "filesystem",
+    requiresConfirmation: false,
+  },
+  {
+    id: "write_file",
+    label: "Write File",
+    description: "Create or overwrite a file with new content",
+    group: "filesystem",
+    requiresConfirmation: false,
+  },
+  {
+    id: "edit_file",
+    label: "Edit File",
+    description: "Replace a specific string in a file (token-efficient)",
+    group: "filesystem",
+    requiresConfirmation: false,
+  },
+  {
+    id: "list_directory",
+    label: "List Directory",
+    description: "List files and folders in a directory",
+    group: "filesystem",
+    requiresConfirmation: false,
+  },
+  {
+    id: "search_files",
+    label: "Search Files",
+    description: "Search for a pattern across files recursively",
+    group: "filesystem",
+    requiresConfirmation: false,
+  },
+  {
+    id: "create_directory",
+    label: "Create Directory",
+    description: "Create a new directory (including parent dirs)",
+    group: "filesystem",
+    requiresConfirmation: false,
+  },
+  {
+    id: "move_file",
+    label: "Move / Rename File",
+    description: "Move or rename a file or directory",
+    group: "filesystem",
+    requiresConfirmation: false,
+  },
+  {
+    id: "delete_file",
+    label: "Delete File",
+    description: "Permanently delete a file",
+    group: "filesystem",
+    requiresConfirmation: true,
+  },
+  {
+    id: "run_shell_command",
+    label: "Run Shell Command",
+    description: "Execute a shell command on the system",
+    group: "shell",
+    requiresConfirmation: true,
+  },
+  {
+    id: "fetch_url",
+    label: "Fetch URL",
+    description: "Download and read content from a URL",
+    group: "web",
+    requiresConfirmation: false,
+  },
+];
 
 export const TOOL_GROUPS: { id: ToolGroup; label: string }[] = [
-  { id: 'filesystem', label: 'File System' },
-  { id: 'shell',      label: 'Shell' },
-  { id: 'web',        label: 'Web' },
-]
+  { id: "filesystem", label: "File System" },
+  { id: "shell", label: "Shell" },
+  { id: "web", label: "Web" },
+];
 
-export const TOOL_PRESETS: { id: string; label: string; tools: ToolNameId[] }[] = [
-  { id: 'none',        label: 'No Tools',    tools: [] },
+export const TOOL_PRESETS: {
+  id: string;
+  label: string;
+  tools: ToolNameId[];
+}[] = [
+  { id: "none", label: "No Tools", tools: [] },
   {
-    id: 'readonly',
-    label: 'Read-Only',
-    tools: ['read_file', 'list_directory', 'search_files'],
+    id: "readonly",
+    label: "Read-Only",
+    tools: ["read_file", "list_directory", "search_files"],
   },
   {
-    id: 'file-editor',
-    label: 'File Editor',
-    tools: ['read_file', 'write_file', 'edit_file', 'list_directory', 'search_files', 'create_directory', 'move_file'],
+    id: "file-editor",
+    label: "File Editor",
+    tools: [
+      "read_file",
+      "write_file",
+      "edit_file",
+      "list_directory",
+      "search_files",
+      "create_directory",
+      "move_file",
+    ],
   },
   {
-    id: 'full-dev',
-    label: 'Full Dev',
-    tools: ['read_file', 'write_file', 'edit_file', 'list_directory', 'search_files', 'create_directory', 'move_file', 'delete_file', 'run_shell_command', 'fetch_url'],
+    id: "full-dev",
+    label: "Full Dev",
+    tools: [
+      "read_file",
+      "write_file",
+      "edit_file",
+      "list_directory",
+      "search_files",
+      "create_directory",
+      "move_file",
+      "delete_file",
+      "run_shell_command",
+      "fetch_url",
+    ],
   },
-]
+];
 
 // ── Workflow templates ───────────────────────────────────
 
 // Content Factory: Start → [Loop: Content Writer + Editor] → Editor (Final Polish) → End
 export function contentFactoryWorkflow(preferredModel?: ModelConfig): Workflow {
-  const model = preferredModel ?? DEFAULT_MODEL
+  const model = preferredModel ?? DEFAULT_MODEL;
   const startId = uuidv4();
   const writerId = uuidv4();
   const editorId = uuidv4();
@@ -912,11 +1068,12 @@ export function contentFactoryWorkflow(preferredModel?: ModelConfig): Workflow {
   return {
     id: uuidv4(),
     name: "Content Factory",
-    description: "Writes and refines content through a writer-editor review loop",
+    description:
+      "Writes and refines content through a writer-editor review loop",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 230 }, data: {} },
+      { id: startId, type: "start", position: { x: 60, y: 230 }, data: {} },
       {
         id: writerLoopId,
         type: "loop",
@@ -934,7 +1091,10 @@ export function contentFactoryWorkflow(preferredModel?: ModelConfig): Workflow {
         position: { x: 30, y: 70 },
         parentId: writerLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('content-writer', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("content-writer", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
       {
         id: editorId,
@@ -942,18 +1102,22 @@ export function contentFactoryWorkflow(preferredModel?: ModelConfig): Workflow {
         position: { x: 274, y: 70 },
         parentId: writerLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('editor', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("editor", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
       {
         id: polisherId,
         type: "agent",
         position: { x: 880, y: 210 },
-        data: agentFromTemplate('editor', {
+        data: agentFromTemplate("editor", {
           model: { ...model },
-          contextMode: 'full_chain',
+          contextMode: "full_chain",
           // Override name/role to distinguish Final Polish from the loop Editor
-          name: 'Final Polish',
-          roleDescription: 'Applies final copyediting and formatting before publication',
+          name: "Final Polish",
+          roleDescription:
+            "Applies final copyediting and formatting before publication",
           systemPrompt: `## Role
 You are a professional copyeditor.
 
@@ -969,12 +1133,27 @@ The finalized, publication-ready version of the content — nothing else.
 - Do not rewrite or restructure — this is polish, not revision`,
         }),
       },
-      { id: endId, type: 'end', position: { x: 1140, y: 210 }, data: {} },
+      { id: endId, type: "end", position: { x: 1140, y: 210 }, data: {} },
     ],
     edges: [
-      { id: uuidv4(), sourceNodeId: startId, targetNodeId: writerLoopId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: writerLoopId, targetNodeId: polisherId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: polisherId, targetNodeId: endId, contextMode: "full" },
+      {
+        id: uuidv4(),
+        sourceNodeId: startId,
+        targetNodeId: writerLoopId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: writerLoopId,
+        targetNodeId: polisherId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: polisherId,
+        targetNodeId: endId,
+        contextMode: "full",
+      },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
@@ -982,7 +1161,7 @@ The finalized, publication-ready version of the content — nothing else.
 
 // Research Lab: Start → [Loop: Research Analyst + Fact Checker] → Documentation Writer → End
 export function researchLabWorkflow(preferredModel?: ModelConfig): Workflow {
-  const model = preferredModel ?? DEFAULT_MODEL
+  const model = preferredModel ?? DEFAULT_MODEL;
   const startId = uuidv4();
   const researcherId = uuidv4();
   const factCheckerId = uuidv4();
@@ -993,11 +1172,12 @@ export function researchLabWorkflow(preferredModel?: ModelConfig): Workflow {
   return {
     id: uuidv4(),
     name: "Research Lab",
-    description: "Researches a topic and produces a fact-checked, polished report",
+    description:
+      "Researches a topic and produces a fact-checked, polished report",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 230 }, data: {} },
+      { id: startId, type: "start", position: { x: 60, y: 230 }, data: {} },
       {
         id: researchLoopId,
         type: "loop",
@@ -1015,10 +1195,10 @@ export function researchLabWorkflow(preferredModel?: ModelConfig): Workflow {
         position: { x: 30, y: 70 },
         parentId: researchLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('analyst', {
+        data: agentFromTemplate("analyst", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['fetch_url'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: ["fetch_url"] as ToolNameId[],
         }),
       },
       {
@@ -1027,28 +1207,51 @@ export function researchLabWorkflow(preferredModel?: ModelConfig): Workflow {
         position: { x: 274, y: 70 },
         parentId: researchLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('fact-checker', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("fact-checker", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
       {
         id: reportWriterId,
         type: "agent",
         position: { x: 880, y: 210 },
-        data: agentFromTemplate('documentation-writer', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("documentation-writer", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
-      { id: endId, type: 'end', position: { x: 1140, y: 210 }, data: {} },
+      { id: endId, type: "end", position: { x: 1140, y: 210 }, data: {} },
     ],
     edges: [
-      { id: uuidv4(), sourceNodeId: startId, targetNodeId: researchLoopId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: researchLoopId, targetNodeId: reportWriterId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: reportWriterId, targetNodeId: endId, contextMode: "full" },
+      {
+        id: uuidv4(),
+        sourceNodeId: startId,
+        targetNodeId: researchLoopId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: researchLoopId,
+        targetNodeId: reportWriterId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: reportWriterId,
+        targetNodeId: endId,
+        contextMode: "full",
+      },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
 }
 
 // Software Factory: Start → [Loop: Software Planner + Architecture Reviewer] → Gate → [Loop: Full-Stack Developer + Tester / QA Engineer] → End
-export function softwareFactoryWorkflow(preferredModel?: ModelConfig): Workflow {
-  const model = preferredModel ?? DEFAULT_MODEL
+export function softwareFactoryWorkflow(
+  preferredModel?: ModelConfig,
+): Workflow {
+  const model = preferredModel ?? DEFAULT_MODEL;
   const startId = uuidv4();
   const plannerId = uuidv4();
   const planReviewerId = uuidv4();
@@ -1062,11 +1265,12 @@ export function softwareFactoryWorkflow(preferredModel?: ModelConfig): Workflow 
   return {
     id: uuidv4(),
     name: "Software Factory",
-    description: "Plans, develops, and tests software from a single description",
+    description:
+      "Plans, develops, and tests software from a single description",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 270 }, data: {} },
+      { id: startId, type: "start", position: { x: 60, y: 270 }, data: {} },
       {
         id: plannerLoopId,
         type: "loop",
@@ -1084,10 +1288,14 @@ export function softwareFactoryWorkflow(preferredModel?: ModelConfig): Workflow 
         position: { x: 30, y: 70 },
         parentId: plannerLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('software-planner', {
+        data: agentFromTemplate("software-planner", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['read_file', 'list_directory', 'search_files'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: [
+            "read_file",
+            "list_directory",
+            "search_files",
+          ] as ToolNameId[],
         }),
       },
       {
@@ -1096,7 +1304,10 @@ export function softwareFactoryWorkflow(preferredModel?: ModelConfig): Workflow 
         position: { x: 274, y: 70 },
         parentId: plannerLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('architecture-reviewer', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("architecture-reviewer", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
       {
         id: reviewGateId,
@@ -1125,10 +1336,17 @@ export function softwareFactoryWorkflow(preferredModel?: ModelConfig): Workflow 
         position: { x: 30, y: 70 },
         parentId: devLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('full-stack-developer', {
+        data: agentFromTemplate("full-stack-developer", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['read_file', 'write_file', 'edit_file', 'list_directory', 'search_files', 'create_directory'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_directory",
+            "search_files",
+            "create_directory",
+          ] as ToolNameId[],
         }),
       },
       {
@@ -1137,19 +1355,44 @@ export function softwareFactoryWorkflow(preferredModel?: ModelConfig): Workflow 
         position: { x: 274, y: 70 },
         parentId: devLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('unit-test-writer', {
+        data: agentFromTemplate("unit-test-writer", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['read_file', 'list_directory', 'search_files', 'run_shell_command'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: [
+            "read_file",
+            "list_directory",
+            "search_files",
+            "run_shell_command",
+          ] as ToolNameId[],
         }),
       },
-      { id: endId, type: 'end', position: { x: 1720, y: 270 }, data: {} },
+      { id: endId, type: "end", position: { x: 1720, y: 270 }, data: {} },
     ],
     edges: [
-      { id: uuidv4(), sourceNodeId: startId, targetNodeId: plannerLoopId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: plannerLoopId, targetNodeId: reviewGateId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: reviewGateId, targetNodeId: devLoopId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: devLoopId, targetNodeId: endId, contextMode: "full" },
+      {
+        id: uuidv4(),
+        sourceNodeId: startId,
+        targetNodeId: plannerLoopId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: plannerLoopId,
+        targetNodeId: reviewGateId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: reviewGateId,
+        targetNodeId: devLoopId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: devLoopId,
+        targetNodeId: endId,
+        contextMode: "full",
+      },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
@@ -1157,7 +1400,7 @@ export function softwareFactoryWorkflow(preferredModel?: ModelConfig): Workflow 
 
 // Bug Fix Pipeline: Start → Codebase Explorer → Bug Analyzer → [Loop: Full-Stack Developer + Code Reviewer] → End
 export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
-  const model = preferredModel ?? DEFAULT_MODEL
+  const model = preferredModel ?? DEFAULT_MODEL;
   const startId = uuidv4();
   const explorerId = uuidv4();
   const analyzerId = uuidv4();
@@ -1169,29 +1412,34 @@ export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
   return {
     id: uuidv4(),
     name: "Bug Fix Pipeline",
-    description: "Reads your codebase, diagnoses a bug, implements a fix, and verifies it",
+    description:
+      "Reads your codebase, diagnoses a bug, implements a fix, and verifies it",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 230 }, data: {} },
+      { id: startId, type: "start", position: { x: 60, y: 230 }, data: {} },
       {
         id: explorerId,
         type: "agent",
         position: { x: 280, y: 190 },
-        data: agentFromTemplate('codebase-explorer', {
+        data: agentFromTemplate("codebase-explorer", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['read_file', 'list_directory', 'search_files'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: [
+            "read_file",
+            "list_directory",
+            "search_files",
+          ] as ToolNameId[],
         }),
       },
       {
         id: analyzerId,
         type: "agent",
         position: { x: 560, y: 190 },
-        data: agentFromTemplate('bug-analyzer', {
+        data: agentFromTemplate("bug-analyzer", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['read_file', 'search_files'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: ["read_file", "search_files"] as ToolNameId[],
         }),
       },
       {
@@ -1211,10 +1459,16 @@ export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
         position: { x: 30, y: 70 },
         parentId: devLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('full-stack-developer', {
+        data: agentFromTemplate("full-stack-developer", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['read_file', 'write_file', 'edit_file', 'list_directory', 'search_files'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: [
+            "read_file",
+            "write_file",
+            "edit_file",
+            "list_directory",
+            "search_files",
+          ] as ToolNameId[],
         }),
       },
       {
@@ -1223,27 +1477,49 @@ export function bugFixWorkflow(preferredModel?: ModelConfig): Workflow {
         position: { x: 274, y: 70 },
         parentId: devLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('code-reviewer', {
+        data: agentFromTemplate("code-reviewer", {
           model: { ...model },
-          contextMode: 'full_chain',
-          toolsEnabled: ['read_file', 'search_files'] as ToolNameId[],
+          contextMode: "full_chain",
+          toolsEnabled: ["read_file", "search_files"] as ToolNameId[],
         }),
       },
-      { id: endId, type: 'end', position: { x: 1400, y: 230 }, data: {} },
+      { id: endId, type: "end", position: { x: 1400, y: 230 }, data: {} },
     ],
     edges: [
-      { id: uuidv4(), sourceNodeId: startId, targetNodeId: explorerId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: explorerId, targetNodeId: analyzerId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: analyzerId, targetNodeId: devLoopId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: devLoopId, targetNodeId: endId, contextMode: "full" },
+      {
+        id: uuidv4(),
+        sourceNodeId: startId,
+        targetNodeId: explorerId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: explorerId,
+        targetNodeId: analyzerId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: analyzerId,
+        targetNodeId: devLoopId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: devLoopId,
+        targetNodeId: endId,
+        contextMode: "full",
+      },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
 }
 
 // Marketing Campaign: Start → [Loop: Marketing Copywriter + Editor] → Social Media Manager → Email Writer → End
-export function marketingCampaignWorkflow(preferredModel?: ModelConfig): Workflow {
-  const model = preferredModel ?? DEFAULT_MODEL
+export function marketingCampaignWorkflow(
+  preferredModel?: ModelConfig,
+): Workflow {
+  const model = preferredModel ?? DEFAULT_MODEL;
   const startId = uuidv4();
   const copywriterId = uuidv4();
   const editorId = uuidv4();
@@ -1255,11 +1531,12 @@ export function marketingCampaignWorkflow(preferredModel?: ModelConfig): Workflo
   return {
     id: uuidv4(),
     name: "Marketing Campaign",
-    description: "Creates reviewed copy, platform-specific social posts, and a campaign email from one brief",
+    description:
+      "Creates reviewed copy, platform-specific social posts, and a campaign email from one brief",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
-      { id: startId, type: 'start', position: { x: 60, y: 230 }, data: {} },
+      { id: startId, type: "start", position: { x: 60, y: 230 }, data: {} },
       {
         id: copyLoopId,
         type: "loop",
@@ -1277,7 +1554,10 @@ export function marketingCampaignWorkflow(preferredModel?: ModelConfig): Workflo
         position: { x: 30, y: 70 },
         parentId: copyLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('marketing-copywriter', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("marketing-copywriter", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
       {
         id: editorId,
@@ -1285,27 +1565,56 @@ export function marketingCampaignWorkflow(preferredModel?: ModelConfig): Workflo
         position: { x: 274, y: 70 },
         parentId: copyLoopId,
         extent: "parent" as const,
-        data: agentFromTemplate('editor', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("editor", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
       {
         id: socialId,
         type: "agent",
         position: { x: 880, y: 175 },
-        data: agentFromTemplate('social-media-manager', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("social-media-manager", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
       {
         id: emailId,
         type: "agent",
         position: { x: 1140, y: 175 },
-        data: agentFromTemplate('email-writer', { model: { ...model }, contextMode: 'full_chain' }),
+        data: agentFromTemplate("email-writer", {
+          model: { ...model },
+          contextMode: "full_chain",
+        }),
       },
-      { id: endId, type: 'end', position: { x: 1400, y: 230 }, data: {} },
+      { id: endId, type: "end", position: { x: 1400, y: 230 }, data: {} },
     ],
     edges: [
-      { id: uuidv4(), sourceNodeId: startId, targetNodeId: copyLoopId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: copyLoopId, targetNodeId: socialId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: socialId, targetNodeId: emailId, contextMode: "full" },
-      { id: uuidv4(), sourceNodeId: emailId, targetNodeId: endId, contextMode: "full" },
+      {
+        id: uuidv4(),
+        sourceNodeId: startId,
+        targetNodeId: copyLoopId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: copyLoopId,
+        targetNodeId: socialId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: socialId,
+        targetNodeId: emailId,
+        contextMode: "full",
+      },
+      {
+        id: uuidv4(),
+        sourceNodeId: emailId,
+        targetNodeId: endId,
+        contextMode: "full",
+      },
     ],
     settings: DEFAULT_WORKFLOW_SETTINGS,
   };
