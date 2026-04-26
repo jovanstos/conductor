@@ -42,7 +42,7 @@ export default function ChamberArena() {
         </div>
         <div>
           <p className="text-sm font-medium mb-1" style={{ color: 'var(--c-text-2)' }}>The arena is quiet</p>
-          <p className="text-xs" style={{ color: 'var(--c-text-dim)' }}>Configure agents on the left and open the chamber</p>
+          <p className="text-xs" style={{ color: 'var(--c-text-dim)' }}>Add models on the left, set a task, and open the chamber</p>
         </div>
       </div>
     )
@@ -140,7 +140,7 @@ function AgentStreamPanel({ agentName, modelId, provider, text, status, isLast }
         <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status] || ''}`}
           style={!STATUS_DOT[status] ? { background: 'var(--c-text-dim)' } : undefined} />
         <span className="text-xs font-medium truncate flex-1" style={{ color: 'var(--c-text-2)' }}>{agentName}</span>
-        <span className="text-xs font-mono shrink-0" style={{ color: getProviderColor(provider) }}>{modelId.split('-')[0]}</span>
+        <span className="text-xs font-mono shrink-0 truncate max-w-[80px]" style={{ color: getProviderColor(provider) }}>{modelId}</span>
         <span className="text-xs shrink-0 ml-1" style={{ color: STATUS_COLOR[status] }}>
           {STATUS_LABEL[status]}
         </span>

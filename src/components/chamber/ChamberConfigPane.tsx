@@ -3,7 +3,6 @@ import { Plus, Trash2, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import { useChamberStore } from '../../stores/chamberStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { BUILT_IN_TEMPLATES } from '../../lib/defaults'
 import ModelPicker from '../shared/ModelPicker'
 import type { ChamberMode, ChamberAgent } from '../../types'
 
@@ -12,19 +11,19 @@ const MODES: { id: ChamberMode; label: string; icon: string; description: string
     id: 'audition',
     label: 'Blind Audition',
     icon: '🏆',
-    description: 'Agents generate independent solutions, then anonymously score each other. Best score wins.',
+    description: 'Models generate independent solutions, then anonymously score each other. Best score wins.',
   },
   {
     id: 'war_room',
     label: 'War Room',
     icon: '⚔️',
-    description: 'Two agents debate: one proposes, one critiques. Iterates until the solution is hardened.',
+    description: 'Two models debate: one proposes, one critiques. Iterates until the solution is hardened.',
   },
   {
     id: 'syndicate',
     label: 'Syndicate',
     icon: '🔗',
-    description: 'Agents act in sequence by specialty, each building on the previous. Produces a unified document.',
+    description: 'Models act in sequence, each building on the previous output. Produces a unified document.',
   },
 ]
 
@@ -40,30 +39,19 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
   } = useChamberStore()
 
   const { defaultModel } = useSettingsStore()
-  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null)
 
   const isRunning = runStatus === 'running' || runStatus === 'paused'
 
-  function addBlankAgent() {
+  function addModel() {
+    const id = uuidv4()
     addAgent({
-      id: uuidv4(),
-      name: 'New Agent',
-      systemPrompt: '## Role\nYou are a helpful AI agent.\n\n## Objective\nComplete the given task accurately.',
+      id,
+      name: defaultModel.modelId,
+      systemPrompt: '',
       model: { ...defaultModel },
     })
-  }
-
-  function addFromTemplate(templateId: string) {
-    const tpl = BUILT_IN_TEMPLATES.find((t) => t.id === templateId)
-    if (!tpl) return
-    addAgent({
-      id: uuidv4(),
-      name: tpl.name,
-      systemPrompt: tpl.systemPrompt,
-      model: { ...defaultModel },
-    })
-    setShowTemplatePicker(false)
+    setExpandedAgent(id)
   }
 
   return (
@@ -139,7 +127,7 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
             value={context}
             onChange={(e) => !isRunning && setContext(e.target.value)}
             disabled={isRunning}
-            placeholder="Describe the task, question, or problem for the agents to work on..."
+            placeholder="Describe the task, question, or problem for the models to work on..."
             rows={4}
             className="w-full bg-white/4 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white/75 placeholder:text-white/20 outline-none focus:border-white/20 resize-none transition-colors leading-relaxed"
           />
@@ -170,7 +158,7 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <div
               onClick={() => !isRunning && setReviewGateEnabled(!reviewGateEnabled)}
-              className={`w-8 h-4.5 rounded-full relative transition-colors cursor-pointer ${
+              className={`relative rounded-full transition-colors cursor-pointer ${
                 reviewGateEnabled ? 'bg-amber-500/70' : 'bg-white/10'
               }`}
               style={{ height: '18px', width: '32px' }}
@@ -188,26 +176,27 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
           </p>
         </section>
 
-        {/* Roster */}
+        {/* Models roster */}
         <section>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-semibold text-white/40 uppercase tracking-wider">
-              Roster ({roster.length})
+              Models ({roster.length})
             </label>
             {mode === 'war_room' && (
-              <span className="text-xs text-amber-400/50">Requires exactly 2 agents</span>
+              <span className="text-xs text-amber-400/50">Requires exactly 2</span>
             )}
           </div>
 
           {roster.length === 0 && (
-            <div className="text-xs text-white/25 py-3 text-center border border-dashed border-white/8 rounded-xl">
-              No agents added yet
+            <div className="text-xs text-white/25 py-4 text-center border border-dashed border-white/8 rounded-xl leading-relaxed">
+              No models added yet.<br />
+              <span className="text-white/15">Click + Add Model to get started.</span>
             </div>
           )}
 
           <div className="space-y-2">
             {roster.map((agent) => (
-              <AgentCard
+              <ModelCard
                 key={agent.id}
                 agent={agent}
                 expanded={expandedAgent === agent.id}
@@ -219,45 +208,13 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
             ))}
           </div>
 
-          {/* Add Agent */}
           {!isRunning && (
-            <div className="mt-2 flex gap-1.5">
-              <button
-                onClick={addBlankAgent}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-white/12 text-xs text-white/35 hover:border-white/25 hover:text-white/60 transition-colors"
-              >
-                <Plus size={12} /> Blank Agent
-              </button>
-              <button
-                onClick={() => setShowTemplatePicker((v) => !v)}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-white/12 text-xs text-white/35 hover:border-amber-500/30 hover:text-amber-300/60 transition-colors"
-              >
-                <Plus size={12} /> From Template
-              </button>
-            </div>
-          )}
-
-          {/* Template picker dropdown */}
-          {showTemplatePicker && (
-            <div className="mt-2 bg-[#1a1a22] border border-white/10 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-              {Array.from(new Set(BUILT_IN_TEMPLATES.map((t) => t.category))).map((cat) => (
-                <div key={cat}>
-                  <div className="px-3 py-1.5 bg-white/3 text-xs text-white/35 uppercase tracking-wider font-semibold">
-                    {cat}
-                  </div>
-                  {BUILT_IN_TEMPLATES.filter((t) => t.category === cat).map((tpl) => (
-                    <button
-                      key={tpl.id}
-                      onClick={() => addFromTemplate(tpl.id)}
-                      className="w-full text-left px-3 py-2 hover:bg-white/6 transition-colors"
-                    >
-                      <p className="text-xs text-white/70 font-medium">{tpl.name}</p>
-                      <p className="text-xs text-white/30 truncate">{tpl.roleDescription}</p>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
+            <button
+              onClick={addModel}
+              className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-white/12 text-xs text-white/35 hover:border-amber-500/30 hover:text-amber-300/70 transition-colors"
+            >
+              <Plus size={12} /> Add Model
+            </button>
           )}
         </section>
       </div>
@@ -266,7 +223,7 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
       <div className="px-4 py-3 shrink-0" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
         <button
           onClick={onRun}
-          disabled={isRunning || roster.length === 0 || !context.trim()}
+          disabled={isRunning || roster.length === 0 || !context.trim() || (mode === 'war_room' && roster.length !== 2)}
           className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isRunning ? (
@@ -275,12 +232,17 @@ export default function ChamberConfigPane({ onRun }: { onRun: () => void }) {
             <>⚡ Open the Chamber</>
           )}
         </button>
+        {mode === 'war_room' && roster.length > 0 && roster.length !== 2 && !isRunning && (
+          <p className="text-xs text-amber-400/50 text-center mt-1.5">
+            War Room needs exactly 2 models ({roster.length} added)
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-function AgentCard({
+function ModelCard({
   agent, expanded, onToggle, onUpdate, onRemove, disabled,
 }: {
   agent: ChamberAgent
@@ -292,11 +254,14 @@ function AgentCard({
 }) {
   return (
     <div className="border border-white/8 rounded-xl overflow-hidden bg-white/2">
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className="flex items-center gap-2 px-3 py-2.5">
         <button onClick={onToggle} className="flex-1 flex items-center gap-2 text-left min-w-0">
           <span className="text-xs font-medium text-white/70 truncate">{agent.name}</span>
-          <span className="text-xs text-white/25 truncate hidden sm:block">{agent.model.modelId}</span>
-          {expanded ? <ChevronUp size={12} className="text-white/25 shrink-0 ml-auto" /> : <ChevronDown size={12} className="text-white/25 shrink-0 ml-auto" />}
+          <span className="text-xs text-white/25 font-mono truncate hidden sm:block shrink-0">{agent.model.provider}</span>
+          {expanded
+            ? <ChevronUp size={12} className="text-white/25 shrink-0 ml-auto" />
+            : <ChevronDown size={12} className="text-white/25 shrink-0 ml-auto" />
+          }
         </button>
         {!disabled && (
           <button onClick={onRemove} className="text-white/20 hover:text-red-400 transition-colors shrink-0">
@@ -306,31 +271,24 @@ function AgentCard({
       </div>
 
       {expanded && (
-        <div className="px-3 pb-3 space-y-2.5 border-t border-white/6">
-          <div className="pt-2.5">
-            <label className="text-xs text-white/30 mb-1 block">Name</label>
-            <input
-              value={agent.name}
-              onChange={(e) => onUpdate({ name: e.target.value })}
-              disabled={disabled}
-              className="w-full bg-white/5 border border-white/8 rounded-lg px-2.5 py-1.5 text-xs text-white/70 outline-none focus:border-white/20"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-white/30 mb-1 block">System Prompt</label>
-            <textarea
-              value={agent.systemPrompt}
-              onChange={(e) => onUpdate({ systemPrompt: e.target.value })}
-              disabled={disabled}
-              rows={4}
-              className="w-full bg-white/5 border border-white/8 rounded-lg px-2.5 py-1.5 text-xs text-white/70 outline-none focus:border-white/20 resize-none leading-relaxed font-mono"
-            />
-          </div>
+        <div className="px-3 pb-3 space-y-3 border-t border-white/6 pt-3">
           <div>
             <label className="text-xs text-white/30 mb-1 block">Model</label>
             <ModelPicker
               value={agent.model}
-              onChange={(m) => onUpdate({ model: m })}
+              onChange={(m) => onUpdate({ model: m, name: m.modelId })}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/30 mb-1 block">
+              Label <span className="text-white/20 font-normal">(optional — shown in the arena)</span>
+            </label>
+            <input
+              value={agent.name}
+              onChange={(e) => onUpdate({ name: e.target.value })}
+              disabled={disabled}
+              placeholder={agent.model.modelId}
+              className="w-full bg-white/5 border border-white/8 rounded-lg px-2.5 py-1.5 text-xs text-white/70 outline-none focus:border-white/20 placeholder:text-white/20"
             />
           </div>
         </div>
