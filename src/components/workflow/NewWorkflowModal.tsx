@@ -1,93 +1,148 @@
-import type { ReactNode } from 'react'
-import { Sparkles, Settings, PenLine, FlaskConical, Wrench, Megaphone, X, ArrowRight } from 'lucide-react'
-import { useWorkflowStore } from '../../stores/workflowStore'
-import { useSettingsStore } from '../../stores/settingsStore'
-import { softwareFactoryWorkflow, contentFactoryWorkflow, researchLabWorkflow, bugFixWorkflow, marketingCampaignWorkflow } from '../../lib/defaults'
-import * as tauri from '../../lib/tauri'
+import type { ReactNode } from "react";
+import {
+  Sparkles,
+  Settings,
+  Archive,
+  BookOpen,
+  PenLine,
+  CheckSquare,
+  X,
+  ArrowRight,
+} from "lucide-react";
+import { useWorkflowStore } from "../../stores/workflowStore";
+import { useSettingsStore } from "../../stores/settingsStore";
+import {
+  softwareFactoryWorkflow,
+  digitalJanitorWorkflow,
+  examPrepWorkflow,
+  creatorsEchoWorkflow,
+  lifeAdminWorkflow,
+} from "../../lib/defaults";
+import * as tauri from "../../lib/tauri";
 
-type StarterIcon = 'blank' | 'software' | 'content' | 'research' | 'bugfix' | 'marketing'
+type StarterIcon =
+  | "blank"
+  | "software"
+  | "janitor"
+  | "education"
+  | "creative"
+  | "productivity";
 
-const STARTERS: { id: string; iconKey: StarterIcon; name: string; description: string; agentCount: number; color: string; iconBg: string; iconColor: string }[] = [
+const STARTERS: {
+  id: string;
+  iconKey: StarterIcon;
+  name: string;
+  description: string;
+  agentCount: number;
+  color: string;
+  iconBg: string;
+  iconColor: string;
+}[] = [
   {
-    id: 'blank', iconKey: 'blank',
-    name: 'Blank Canvas',
-    description: 'Start with an empty workflow. Add AI agents and connect them however you like.',
+    id: "blank",
+    iconKey: "blank",
+    name: "Blank Canvas",
+    description:
+      "Start with an empty workflow. Add AI agents and connect them however you like.",
     agentCount: 0,
-    color: 'border-white/10 hover:border-white/20',
-    iconBg: 'bg-white/8', iconColor: 'text-white/50',
+    color: "border-white/10 hover:border-white/20",
+    iconBg: "bg-white/8",
+    iconColor: "text-white/50",
   },
   {
-    id: 'software-factory', iconKey: 'software',
-    name: 'Software Factory',
-    description: 'Planner, reviewer, developer, and tester. Describe what to build — the team handles the rest.',
+    id: "software-factory",
+    iconKey: "software",
+    name: "Software Factory",
+    description:
+      "Planner, reviewer, developer, and tester. Describe what to build — the team handles the rest.",
     agentCount: 4,
-    color: 'border-purple-500/25 hover:border-purple-500/50',
-    iconBg: 'bg-purple-500/12', iconColor: 'text-purple-300',
+    color: "border-blue-500/25 hover:border-blue-500/50",
+    iconBg: "bg-blue-500/12",
+    iconColor: "text-blue-300",
   },
   {
-    id: 'bug-fix', iconKey: 'bugfix',
-    name: 'Bug Fix Pipeline',
-    description: 'Reads your codebase, diagnoses the bug, implements a fix, and verifies it with a code review loop.',
-    agentCount: 4,
-    color: 'border-rose-500/25 hover:border-rose-500/50',
-    iconBg: 'bg-rose-500/12', iconColor: 'text-rose-300',
-  },
-  {
-    id: 'content-factory', iconKey: 'content',
-    name: 'Content Factory',
-    description: 'Writer and editor that iterate until the content is polished and publish-ready.',
+    id: "digital-janitor",
+    iconKey: "janitor",
+    name: "Digital Janitor",
+    description:
+      "Scans messy folders and organizes files into a clean, logical structure automatically.",
     agentCount: 3,
-    color: 'border-emerald-500/25 hover:border-emerald-500/50',
-    iconBg: 'bg-emerald-500/12', iconColor: 'text-emerald-300',
+    color: "border-teal-500/25 hover:border-teal-500/50",
+    iconBg: "bg-teal-500/12",
+    iconColor: "text-teal-300",
   },
   {
-    id: 'research-lab', iconKey: 'research',
-    name: 'Research Lab',
-    description: 'Researcher and fact-checker that dig deep, then produce a verified polished report.',
+    id: "exam-prep",
+    iconKey: "education",
+    name: "Exam Prep Engine",
+    description:
+      "Turns your notes into a structured study guide and generates a multiple-choice practice test.",
     agentCount: 3,
-    color: 'border-blue-500/25 hover:border-blue-500/50',
-    iconBg: 'bg-blue-500/12', iconColor: 'text-blue-300',
+    color: "border-yellow-500/25 hover:border-yellow-500/50",
+    iconBg: "bg-yellow-500/12",
+    iconColor: "text-yellow-300",
   },
   {
-    id: 'marketing-campaign', iconKey: 'marketing',
-    name: 'Marketing Campaign',
-    description: 'Reviewed copy, platform-optimized social posts, and a campaign email — all from one brief.',
-    agentCount: 4,
-    color: 'border-orange-500/25 hover:border-orange-500/50',
-    iconBg: 'bg-orange-500/12', iconColor: 'text-orange-300',
+    id: "creators-echo",
+    iconKey: "creative",
+    name: "Creator's Echo",
+    description:
+      "Turns long-form content into a packaged week of tailored social media posts.",
+    agentCount: 3,
+    color: "border-rose-500/25 hover:border-rose-500/50",
+    iconBg: "bg-rose-500/12",
+    iconColor: "text-rose-300",
   },
-]
+  {
+    id: "life-admin",
+    iconKey: "productivity",
+    name: "Life Admin Assistant",
+    description:
+      "Processes messy notes and receipts into actionable CSVs and weekly Action Plans.",
+    agentCount: 2,
+    color: "border-indigo-500/25 hover:border-indigo-500/50",
+    iconBg: "bg-indigo-500/12",
+    iconColor: "text-indigo-300",
+  },
+];
 
 const STARTER_ICON: Record<StarterIcon, ReactNode> = {
   blank: <Sparkles size={18} />,
   software: <Settings size={18} />,
-  bugfix: <Wrench size={18} />,
-  content: <PenLine size={18} />,
-  research: <FlaskConical size={18} />,
-  marketing: <Megaphone size={18} />,
-}
+  janitor: <Archive size={18} />,
+  education: <BookOpen size={18} />,
+  creative: <PenLine size={18} />,
+  productivity: <CheckSquare size={18} />,
+};
 
 export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
-  const { createWorkflow, loadWorkflows, setCurrentWorkflow } = useWorkflowStore()
-  const { defaultModel } = useSettingsStore()
+  const { createWorkflow, loadWorkflows, setCurrentWorkflow } =
+    useWorkflowStore();
+  const { defaultModel } = useSettingsStore();
 
   async function handleSelect(id: string) {
-    if (id === 'blank') {
-      await createWorkflow('New Workflow')
+    if (id === "blank") {
+      await createWorkflow("New Workflow");
     } else {
       const wf =
-        id === 'software-factory'    ? softwareFactoryWorkflow(defaultModel) :
-        id === 'bug-fix'             ? bugFixWorkflow(defaultModel) :
-        id === 'content-factory'     ? contentFactoryWorkflow(defaultModel) :
-        id === 'research-lab'        ? researchLabWorkflow(defaultModel) :
-        id === 'marketing-campaign'  ? marketingCampaignWorkflow(defaultModel) :
-        null
-      if (!wf) return
-      await tauri.saveWorkflow(wf)
-      await loadWorkflows()
-      setCurrentWorkflow(wf)
+        id === "software-factory"
+          ? softwareFactoryWorkflow(defaultModel)
+          : id === "digital-janitor"
+            ? digitalJanitorWorkflow(defaultModel)
+            : id === "exam-prep"
+              ? examPrepWorkflow(defaultModel)
+              : id === "creators-echo"
+                ? creatorsEchoWorkflow(defaultModel)
+                : id === "life-admin"
+                  ? lifeAdminWorkflow(defaultModel)
+                  : null;
+
+      if (!wf) return;
+      await tauri.saveWorkflow(wf);
+      await loadWorkflows();
+      setCurrentWorkflow(wf);
     }
-    onClose()
+    onClose();
   }
 
   return (
@@ -100,7 +155,9 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
           <div>
             <p className="text-base font-bold text-white/90">New Workflow</p>
-            <p className="text-xs text-white/35 mt-0.5">Choose a starting template or begin from scratch</p>
+            <p className="text-xs text-white/35 mt-0.5">
+              Choose a starting template or begin from scratch
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -111,7 +168,7 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Starter cards */}
-        <div className="p-6 space-y-2.5">
+        <div className="p-6 space-y-2.5 max-h-[70vh] overflow-y-auto">
           {STARTERS.map((s) => (
             <button
               key={s.id}
@@ -125,14 +182,18 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-sm font-semibold text-white/90">{s.name}</p>
+                  <p className="text-sm font-semibold text-white/90">
+                    {s.name}
+                  </p>
                   {s.agentCount > 0 && (
                     <span className="text-xs text-white/30 bg-white/6 px-2 py-0.5 rounded-full">
                       {s.agentCount} agents
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-white/45 leading-relaxed">{s.description}</p>
+                <p className="text-xs text-white/45 leading-relaxed">
+                  {s.description}
+                </p>
               </div>
               <ArrowRight size={16} className="text-white/20 shrink-0 mt-0.5" />
             </button>
@@ -140,5 +201,5 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
-  )
+  );
 }
