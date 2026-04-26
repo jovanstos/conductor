@@ -20,10 +20,11 @@ I kindly ask that you respect the integrity of this work. If you find the code h
 
 **Local AI agents that work directly on your computer. Chain them together. Run any task, start to finish.**
 
-Conductor is an agent-first desktop platform for building and running multi-agent AI workflows. Two modes of operation in a single app:
+Conductor is an agent-first desktop platform for building and running multi-agent AI workflows. Three modes of operation in a single app:
 
 - **Workflow Canvas** — a visual, node-based pipeline builder where specialist AI agents read, write, and modify real files on your local machine, handing work to each other in sequence with configurable loops, human review gates, and a strict security sandbox.
 - **The Chamber** — a multi-agent thinking room where models compete, debate, or collaborate on the same task simultaneously, with live streaming output, peer scoring, and a ranked final result.
+- **Studio** — an interactive brainstorming space where you talk through any idea with an AI consultant, refine it collaboratively, and generate a comprehensive, downloadable plan document.
 
 Built with Tauri 2, React 19, and Rust — fully local, no cloud dependency, no subscription. Your API keys stay on your machine.
 
@@ -50,6 +51,14 @@ Built with Tauri 2, React 19, and Rust — fully local, no cloud dependency, no 
 - **Live streaming arena** — see every agent's output stream in real time, side by side, with status indicators (Thinking / Typing / Critiquing / Done)
 - **Review gate** — optionally pause between the generation and scoring phases for human inspection before scoring begins
 - **Ranked ledger** — final scores, rankings, and the winning output displayed in the results panel; copy or save to file with one click
+
+### Studio
+
+- **Blank-page cure** — describe any idea in plain language (a trip to plan, a product to build, a goal to reach) and Studio handles the rest
+- **Collaborative AI consultant** — Studio asks 1–2 focused questions at a time to draw out scope, constraints, goals, and resources; when you ask *it* a question it answers directly with its own recommendation and reasoning, rather than deflecting
+- **Self-aware pacing** — Studio decides when it has enough context and generates the final document on its own, or you can trigger it any time with the "Generate Document" button
+- **Comprehensive plan output** — the final document is rendered in clean Markdown with full heading hierarchy, bullet lists, tables, and code blocks; readable in-app
+- **One-click download** — save the plan as a `.txt` file to your machine for use anywhere
 
 ### Shared capabilities
 
@@ -130,6 +139,7 @@ conductor/
 │   ├── components/
 │   │   ├── canvas/                 # WorkflowCanvas, node components, DataEdge
 │   │   ├── chamber/                # ChamberView, ChamberConfigPane, ChamberArena, ChamberLedger
+│   │   ├── studio/                 # StudioView (chat, streaming, markdown renderer, download)
 │   │   ├── inspector/              # Agent inspector, template picker, tool access controls
 │   │   ├── run/                    # RunDrawer, modals (gate, tool confirm, result, history)
 │   │   ├── workspace/              # WorkspaceBar (path anchor, directory picker)
@@ -141,6 +151,7 @@ conductor/
 │   │   ├── workflowStore.ts        # Workflow CRUD, canvas state, undo/redo, workspace path
 │   │   ├── runStore.ts             # Run lifecycle, gate state, tool confirmations
 │   │   ├── chamberStore.ts         # Chamber config, run state, live streams, event listeners
+│   │   ├── studioStore.ts          # Studio session state, chat history, streaming, document
 │   │   └── settingsStore.ts        # API key status, default model (localStorage), project path
 │   ├── hooks/
 │   │   └── useRun.ts               # Attaches all workflow run event listeners
@@ -151,7 +162,7 @@ conductor/
 │
 ├── src-tauri/
 │   ├── src/
-│   │   ├── main.rs                 # Tauri commands, workflow engine, security jail, Chamber engine
+│   │   ├── main.rs                 # Tauri commands, workflow engine, security jail, Chamber engine, Studio streaming
 │   │   └── workspace_fs.rs         # File system ops, directory tree builder
 │   ├── capabilities/
 │   │   └── default.json            # Tauri permission grants
@@ -286,6 +297,27 @@ Shell commands and file deletions always pause execution and surface a blocking 
 
 ---
 
+## Studio — usage
+
+Switch to the **Studio** tab (lightbulb icon) at the top of the main area.
+
+### How a session works
+
+1. **Describe your idea** — type anything into the input field and press Enter or Send. It can be rough: "I want to plan a ski trip" or "I need to build a user authentication system" or "I'm thinking about starting a newsletter."
+2. **Collaborate** — Studio asks 1–2 targeted questions per turn to uncover goals, constraints, timeline, audience, and resources. If you are unsure about something, ask Studio for its opinion — it will give you a direct recommendation with reasoning, not just another question back.
+3. **Keep going until it feels complete** — typically 4–8 exchanges is enough for a solid plan. Studio will tell you when it thinks it has enough context, or it may generate the document on its own if it is confident.
+4. **Generate the document** — click **Done with plan — Generate Document** at any time to trigger final document generation, regardless of where the conversation is.
+5. **Read and download** — the final plan renders in-app as formatted Markdown. Click **Download .txt** to save it to your machine.
+6. **Start over** — click **New Session** to clear everything and begin fresh.
+
+### Tips
+
+- You do not need a polished prompt to start. The more rough and unfiltered the better — that is what Studio is for.
+- If Studio asks a question you are not sure about, say so and ask what it would recommend. It will give you its expert take and move forward.
+- The model picker in the top-right corner of Studio lets you switch providers mid-session without losing your conversation.
+
+---
+
 ## The Chamber — usage
 
 Switch to The Chamber tab at the top of the main area.
@@ -374,6 +406,9 @@ The agent tried to access a path outside its workspace directory. This is the sa
 
 **Shell command approval modal appears and I'm not sure what to allow**
 Read the exact command shown in the red box before clicking Allow. If you don't recognise it, click Deny — the agent will receive an error and can try an alternative approach.
+
+**Studio says "Generate Document" but the document is empty or shows raw `[STUDIO_FINAL_DOCUMENT]` text**
+The model did not follow the output format. This occasionally happens with smaller or fine-tuned models. Switch to a stronger model (Claude Sonnet or GPT-4o) and start a new session.
 
 **The Chamber doesn't score / shows 0.0**
 The scoring LLM call failed silently. Check the console for errors and confirm the agent's model is configured and reachable. If using Ollama, ensure the server is running.
