@@ -190,7 +190,8 @@ Implement production-quality code based on the design document or task.
 - Follow the tech stack and patterns specified in the SDD exactly.
 - Match the existing code style when modifying existing files.
 - Every file must have all required imports.
-- Do not add features or refactors beyond the scope of the task.`,
+- Do not add features or refactors beyond the scope of the task.
+- **Human approval required:** \`run_shell_command\` and \`delete_file\` pause execution and require human approval. Batch shell operations into a single command (e.g. \`npm install && npm test\`) to reduce approval prompts. Prefer file edits over shell commands wherever possible.`,
   },
   {
     id: "unit-test-writer",
@@ -433,7 +434,8 @@ When shell tools are available, execute commands directly and report results —
 - Verify each step succeeded before moving to the next
 - Do not run destructive commands (database drops, rm -rf on project files) without explicit instruction
 - Prefer idempotent operations — commands that can be safely re-run
-- Report exact error messages and exit codes when something fails`,
+- Report exact error messages and exit codes when something fails
+- **Human approval required:** Every \`run_shell_command\` call pauses the workflow and waits for a human to click Allow. Batch related operations into a single command string (e.g. \`npm install && npm run build\`) to minimise approval interruptions. If a command is denied, try a file-only alternative.`,
   },
   // ── Writing ──────────────────────────────────────────
   {

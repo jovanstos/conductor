@@ -191,7 +191,7 @@ export type GatePausedPayload = { nodeId: string; output: string; message: strin
 export type CompletedPayload = { finalOutput: string }
 export type ToolCallStartedPayload = { nodeId: string; toolCallId: string; toolName: string; argsPreview: string }
 export type ToolCallDonePayload = { nodeId: string; toolCallId: string; toolName: string; resultPreview: string; isError: boolean }
-export type ToolConfirmRequestPayload = { nodeId: string; toolCallId: string; toolName: string; description: string }
+export type ToolConfirmRequestPayload = { nodeId: string; agentName: string; toolCallId: string; toolName: string; command: string }
 
 // ── Chamber types ─────────────────────────────────────
 

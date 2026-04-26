@@ -31,4 +31,5 @@ uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 walkdir = "2"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
+dunce = "1"
 

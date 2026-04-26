@@ -5,7 +5,7 @@ mod workspace_fs;
 
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -337,6 +337,16 @@ You have file system tools available. Use them purposefully:
 - `write_file` — create new files (plans, specs, code, etc.)
 - `edit_file` — make targeted changes to existing files (replace an exact string)
 - `run_shell_command` — run commands like tests, builds, installs
+- `delete_file` — permanently delete a file
+- `fetch_url` — download and read content from a URL
+
+## Security sandbox
+
+You are running inside a strict security sandbox:
+- All file paths are restricted to the workspace directory. You cannot access files outside it.
+- `run_shell_command` and `delete_file` require explicit human approval before executing. The workflow will PAUSE and wait for the user to click Allow or Deny. You will receive an error if the user denies.
+- To minimise approval interruptions, batch related shell operations into a single `run_shell_command` call rather than making many separate calls.
+- If a command is denied, try an alternative approach that does not require shell execution.
 
 ## Critical output rule
 
@@ -699,12 +709,13 @@ async fn llm_call_with_tools(
 // Tool execution helpers
 // ─────────────────────────────────────────────
 
+/// Build the raw (un-canonicalized) candidate path from an agent-supplied string.
+/// Relative paths are joined to the workspace root; absolute paths are taken as-is.
 fn resolve_path(path: &str, workspace_path: Option<&str>) -> PathBuf {
     let p = PathBuf::from(path);
     if p.is_absolute() {
         p
     } else if let Some(ws) = workspace_path {
-        // Safely catch "." or empty paths and return the clean workspace root
         if path == "." || path == "./" || path.is_empty() {
             PathBuf::from(ws)
         } else {
@@ -722,44 +733,69 @@ fn platform_home() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("."))
 }
 
-/// Normalize a path by resolving `.` and `..` components without touching the filesystem.
-fn normalize_path(path: &PathBuf) -> PathBuf {
-    let mut out = PathBuf::new();
-    for component in path.components() {
-        match component {
-            std::path::Component::ParentDir => { out.pop(); }
-            std::path::Component::CurDir => {}
-            c => out.push(c),
+/// Canonicalize a path that may not yet exist on disk.
+/// Works by walking up to the deepest existing ancestor, canonicalizing it,
+/// then re-appending the non-existent suffix.  Resolves all symlinks.
+fn canonicalize_or_parent(path: &Path) -> std::io::Result<PathBuf> {
+    if path.exists() {
+        return dunce::canonicalize(path);
+    }
+    let mut current = path.to_path_buf();
+    let mut suffix: Vec<std::ffi::OsString> = Vec::new();
+    loop {
+        match current.file_name() {
+            Some(name) => suffix.push(name.to_os_string()),
+            None => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("No existing ancestor found for '{}'", path.display()),
+                ))
+            }
+        }
+        current = match current.parent() {
+            Some(p) => p.to_path_buf(),
+            None => return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Reached filesystem root without finding an existing directory",
+            )),
+        };
+        if current.exists() {
+            let mut canonical = dunce::canonicalize(&current)?;
+            for component in suffix.into_iter().rev() {
+                canonical.push(component);
+            }
+            return Ok(canonical);
         }
     }
-    out
 }
 
-/// Enforce that `path` stays inside `workspace_path` and is not in any denied list.
-fn check_path_safe(
-    path: &PathBuf,
-    workspace_path: Option<&str>,
-    permissions: &ToolPermissionConfig,
-) -> Result<(), String> {
-    let normalized = normalize_path(path);
+/// Jail check: resolve both paths with full canonicalization (symlinks included),
+/// then enforce that the target is strictly inside the workspace.
+/// Returns the canonical target path on success so callers can use it directly.
+fn jail_path(path: &Path, workspace: &str) -> Result<PathBuf, String> {
+    let ws_canon = dunce::canonicalize(workspace)
+        .map_err(|e| format!("Cannot access workspace '{}': {}", workspace, e))?;
 
-    // Workspace boundary: resolved path must be a child of the workspace root.
-    if let Some(ws) = workspace_path {
-        let ws_norm = normalize_path(&PathBuf::from(ws));
-        if !normalized.starts_with(&ws_norm) {
-            return Err(format!(
-                "Path '{}' is outside the allowed workspace — traversal outside the target directory is not permitted.",
-                normalized.display()
-            ));
-        }
+    let path_canon = canonicalize_or_parent(path)
+        .map_err(|e| format!("Cannot resolve path '{}': {}", path.display(), e))?;
+
+    if !path_canon.starts_with(&ws_canon) {
+        return Err(format!(
+            "SECURITY VIOLATION: '{}' is outside the workspace. Access denied.",
+            path_canon.display()
+        ));
     }
+    Ok(path_canon)
+}
 
-    let path_str = normalized.to_string_lossy();
+/// Secondary deny-list check (belt-and-suspenders on top of jail_path).
+fn check_denied(path: &Path, permissions: &ToolPermissionConfig) -> Result<(), String> {
+    let path_str = path.to_string_lossy();
     let home = platform_home();
     for denied in &permissions.denied_paths {
         let expanded = denied.replace('~', &home.to_string_lossy());
         if path_str.starts_with(&expanded) {
-            return Err(format!("Access to '{}' is denied", normalized.display()));
+            return Err(format!("Access to '{}' is denied by policy", path.display()));
         }
     }
     Ok(())
@@ -864,9 +900,10 @@ async fn request_tool_confirmation(
     app: &AppHandle,
     run_id: &str,
     node_id: &str,
+    agent_name: &str,
     tool_call_id: &str,
     tool_name: &str,
-    description: &str,
+    command: &str,
     state: &Arc<AppState>,
 ) -> Result<bool, String> {
     let (tx, rx) = oneshot::channel::<bool>();
@@ -883,9 +920,10 @@ async fn request_tool_confirmation(
         &format!("conductor://run/{}/tool_confirm_request", run_id),
         serde_json::json!({
             "nodeId": node_id,
+            "agentName": agent_name,
             "toolCallId": tool_call_id,
             "toolName": tool_name,
-            "description": description,
+            "command": command,
         }),
     );
     rx.await.map_err(|_| "Confirmation channel closed (run cancelled)".into())
@@ -899,6 +937,7 @@ async fn execute_tool(
     app: &AppHandle,
     run_id: &str,
     node_id: &str,
+    agent_name: &str,
     state: &Arc<AppState>,
 ) -> Result<String, String> {
     // Empty list = full access (no restriction); non-empty = explicit allowlist
@@ -907,12 +946,18 @@ async fn execute_tool(
     }
     let args = &tc.arguments;
 
+    // Require a workspace for all file-system tools
+    let ws = workspace_path.ok_or_else(|| {
+        "No workspace directory is set. Select a workspace before running file tools.".to_string()
+    });
+
     match tc.name.as_str() {
         "read_file" => {
             let path = args["path"].as_str().ok_or("missing path")?;
-            let resolved = resolve_path(path, workspace_path);
-            check_path_safe(&resolved, workspace_path, permissions)?;
-            let content = std::fs::read_to_string(&resolved)
+            let raw = resolve_path(path, workspace_path);
+            let canonical = jail_path(&raw, ws?)?;
+            check_denied(&canonical, permissions)?;
+            let content = std::fs::read_to_string(&canonical)
                 .map_err(|e| format!("Cannot read '{}': {}", path, e))?;
             if content.len() > 200_000 {
                 Ok(format!("{}...\n[truncated — file is {} bytes]", safe_truncate(&content, 200_000), content.len()))
@@ -924,12 +969,13 @@ async fn execute_tool(
         "write_file" => {
             let path = args["path"].as_str().ok_or("missing path")?;
             let content = args["content"].as_str().ok_or("missing content")?;
-            let resolved = resolve_path(path, workspace_path);
-            check_path_safe(&resolved, workspace_path, permissions)?;
-            if let Some(parent) = resolved.parent() {
+            let raw = resolve_path(path, workspace_path);
+            let canonical = jail_path(&raw, ws?)?;
+            check_denied(&canonical, permissions)?;
+            if let Some(parent) = canonical.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| format!("mkdir: {}", e))?;
             }
-            std::fs::write(&resolved, content)
+            std::fs::write(&canonical, content)
                 .map_err(|e| format!("Cannot write '{}': {}", path, e))?;
             Ok(format!("Written {} bytes to {}", content.len(), path))
         }
@@ -938,12 +984,12 @@ async fn execute_tool(
             let path = args["path"].as_str().ok_or("missing path")?;
             let old_str = args["old_str"].as_str().ok_or("missing old_str")?;
             let new_str = args["new_str"].as_str().ok_or("missing new_str")?;
-            let resolved = resolve_path(path, workspace_path);
-            check_path_safe(&resolved, workspace_path, permissions)?;
-            let current = std::fs::read_to_string(&resolved)
+            let raw = resolve_path(path, workspace_path);
+            let canonical = jail_path(&raw, ws?)?;
+            check_denied(&canonical, permissions)?;
+            let current = std::fs::read_to_string(&canonical)
                 .map_err(|e| format!("Cannot read '{}': {}", path, e))?;
             if !current.contains(old_str) {
-                // Give the agent a snippet so it can see what the file actually contains
                 let snippet = safe_truncate(&current, 600);
                 return Err(format!(
                     "old_str not found in '{}'.\n\nFile content (first 600 chars):\n{}\n\nUse read_file to see the exact content, then retry with a string that matches exactly (including whitespace and newlines).",
@@ -958,15 +1004,17 @@ async fn execute_tool(
                 ));
             }
             let updated = current.replacen(old_str, new_str, 1);
-            std::fs::write(&resolved, &updated)
+            std::fs::write(&canonical, &updated)
                 .map_err(|e| format!("Cannot write '{}': {}", path, e))?;
             Ok(format!("Edited {} — replaced {} chars with {} chars", path, old_str.len(), new_str.len()))
         }
 
         "list_directory" => {
             let path = args["path"].as_str().ok_or("missing path")?;
-            let resolved = resolve_path(path, workspace_path);
-            let mut entries: Vec<String> = std::fs::read_dir(&resolved)
+            let raw = resolve_path(path, workspace_path);
+            let canonical = jail_path(&raw, ws?)?;
+            check_denied(&canonical, permissions)?;
+            let mut entries: Vec<String> = std::fs::read_dir(&canonical)
                 .map_err(|e| format!("Cannot list '{}': {}", path, e))?
                 .filter_map(|e| e.ok())
                 .map(|e| {
@@ -982,11 +1030,13 @@ async fn execute_tool(
             let path = args["path"].as_str().ok_or("missing path")?;
             let pattern = args["pattern"].as_str().ok_or("missing pattern")?;
             let file_glob = args["file_glob"].as_str().unwrap_or("");
-            let resolved = resolve_path(path, workspace_path);
+            let raw = resolve_path(path, workspace_path);
+            let canonical = jail_path(&raw, ws?)?;
+            check_denied(&canonical, permissions)?;
             let pattern_lower = pattern.to_lowercase();
             let mut matches: Vec<String> = vec![];
 
-            for entry in walkdir::WalkDir::new(&resolved)
+            for entry in walkdir::WalkDir::new(&canonical)
                 .max_depth(20)
                 .into_iter()
                 .filter_map(|e| e.ok())
@@ -996,17 +1046,14 @@ async fn execute_tool(
                 let fname = entry.file_name().to_string_lossy().to_string();
                 if !file_glob.is_empty() {
                     let glob = file_glob.trim();
-                    let matches = if let Some(ext) = glob.strip_prefix("*.") {
-                        // "*.ts" → must end with ".ts" (dot-inclusive to avoid false matches)
+                    let hit = if let Some(ext) = glob.strip_prefix("*.") {
                         fname.ends_with(&format!(".{}", ext))
                     } else if glob.starts_with('*') {
-                        // "*foo" → suffix match
                         fname.ends_with(&glob[1..])
                     } else {
-                        // exact filename match (e.g. ".gitignore")
                         fname == glob
                     };
-                    if !matches { continue; }
+                    if !hit { continue; }
                 }
                 if entry.metadata().map(|m| m.len()).unwrap_or(0) > 1_000_000 { continue; }
                 let content = match std::fs::read_to_string(entry.path()) {
@@ -1014,7 +1061,7 @@ async fn execute_tool(
                 };
                 for (lineno, line) in content.lines().enumerate() {
                     if line.to_lowercase().contains(&pattern_lower) {
-                        let rel = entry.path().strip_prefix(&resolved)
+                        let rel = entry.path().strip_prefix(&canonical)
                             .unwrap_or(entry.path())
                             .to_string_lossy().replace('\\', "/");
                         matches.push(format!("{}:{}: {}", rel, lineno + 1, line.trim()));
@@ -1034,23 +1081,25 @@ async fn execute_tool(
 
         "create_directory" => {
             let path = args["path"].as_str().ok_or("missing path")?;
-            let resolved = resolve_path(path, workspace_path);
-            check_path_safe(&resolved, workspace_path, permissions)?;
-            std::fs::create_dir_all(&resolved)
+            let raw = resolve_path(path, workspace_path);
+            let canonical = jail_path(&raw, ws?)?;
+            check_denied(&canonical, permissions)?;
+            std::fs::create_dir_all(&canonical)
                 .map_err(|e| format!("Cannot create '{}': {}", path, e))?;
             Ok(format!("Created directory: {}", path))
         }
 
         "delete_file" => {
             let path = args["path"].as_str().ok_or("missing path")?;
-            let resolved = resolve_path(path, workspace_path);
-            check_path_safe(&resolved, workspace_path, permissions)?;
+            let raw = resolve_path(path, workspace_path);
+            let canonical = jail_path(&raw, ws?)?;
+            check_denied(&canonical, permissions)?;
             let confirmed = request_tool_confirmation(
-                app, run_id, node_id, &tc.id, "delete_file",
-                &format!("Delete file: {}", path), state,
+                app, run_id, node_id, agent_name, &tc.id, "delete_file",
+                path, state,
             ).await?;
-            if !confirmed { return Err("File deletion rejected by user".into()); }
-            std::fs::remove_file(&resolved)
+            if !confirmed { return Err("File deletion rejected by user.".into()); }
+            std::fs::remove_file(&canonical)
                 .map_err(|e| format!("Cannot delete '{}': {}", path, e))?;
             Ok(format!("Deleted: {}", path))
         }
@@ -1060,9 +1109,12 @@ async fn execute_tool(
             let dst = args["dst"].as_str().ok_or("missing dst")?;
             let src_r = resolve_path(src, workspace_path);
             let dst_r = resolve_path(dst, workspace_path);
-            check_path_safe(&src_r, workspace_path, permissions)?;
-            check_path_safe(&dst_r, workspace_path, permissions)?;
-            std::fs::rename(&src_r, &dst_r)
+            let ws_str = ws?;
+            let src_c = jail_path(&src_r, ws_str)?;
+            let dst_c = jail_path(&dst_r, ws_str)?;
+            check_denied(&src_c, permissions)?;
+            check_denied(&dst_c, permissions)?;
+            std::fs::rename(&src_c, &dst_c)
                 .map_err(|e| format!("Cannot move '{}' to '{}': {}", src, dst, e))?;
             Ok(format!("Moved {} → {}", src, dst))
         }
@@ -1070,10 +1122,10 @@ async fn execute_tool(
         "run_shell_command" => {
             let command = args["command"].as_str().ok_or("missing command")?;
             let confirmed = request_tool_confirmation(
-                app, run_id, node_id, &tc.id, "run_shell_command",
-                &format!("Run command: {}", command), state,
+                app, run_id, node_id, agent_name, &tc.id, "run_shell_command",
+                command, state,
             ).await?;
-            if !confirmed { return Err("Shell command rejected by user".into()); }
+            if !confirmed { return Err("Shell command rejected by user.".into()); }
 
             let working_dir = args["working_dir"].as_str()
                 .map(|d| resolve_path(d, workspace_path))
@@ -1312,7 +1364,7 @@ async fn exec_agent(
 
                         let result = execute_tool(
                             tc, workspace_path, &data.tools_enabled,
-                            &permissions, app, run_id, node_id, state,
+                            &permissions, app, run_id, node_id, &data.name, state,
                         ).await;
 
                         let (content, is_error) = match result {
