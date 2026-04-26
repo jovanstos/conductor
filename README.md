@@ -18,12 +18,12 @@ I kindly ask that you respect the integrity of this work. If you find the code h
 
 # Conductor
 
-**Build your AI workforce. Chain agents together. Run any task, start to finish.**
+**Local AI agents that work directly on your computer. Chain them together. Run any task, start to finish.**
 
-Conductor is a local-first desktop application for building and running multi-agent AI workflows. Two modes of operation in a single app:
+Conductor is an agent-first desktop platform for building and running multi-agent AI workflows. Two modes of operation in a single app:
 
-- **Workflow Canvas** — a visual, node-based pipeline builder where specialist AI agents hand work to each other in sequence, with configurable loops, review gates, and real file output to disk.
-- **The Chamber** — a multi-agent arena where agents compete, debate, or collaborate on the same task simultaneously, with live streaming output, peer scoring, and a ranked final result.
+- **Workflow Canvas** — a visual, node-based pipeline builder where specialist AI agents read, write, and modify real files on your local machine, handing work to each other in sequence with configurable loops, human review gates, and a strict security sandbox.
+- **The Chamber** — a multi-agent thinking room where models compete, debate, or collaborate on the same task simultaneously, with live streaming output, peer scoring, and a ranked final result.
 
 Built with Tauri 2, React 19, and Rust — fully local, no cloud dependency, no subscription. Your API keys stay on your machine.
 
@@ -34,14 +34,13 @@ Built with Tauri 2, React 19, and Rust — fully local, no cloud dependency, no 
 ### Workflow Canvas
 
 - **Visual pipeline builder** — drag-and-drop nodes onto a canvas, connect them left-to-right, build arbitrarily complex agent pipelines
-- **Agent nodes** — each agent has its own name, role description, system prompt, model, tools, and context mode; load from the built-in template library or save your own
+- **Agent nodes** — each agent has its own name, role description, system prompt, model, and context mode; load from the built-in template library or write your own
+- **Full tool access by default** — every agent can read, write, edit, search, and create files, run shell commands, and fetch URLs out of the box; restrict specific tools per-agent in the inspector's Advanced section
 - **Loop nodes** — wire a worker agent and a reviewer agent into a feedback loop; the loop exits when the reviewer approves or max retries is reached
-- **Review gates** — pause execution mid-run for human inspection; approve, reject, provide feedback, or edit the output before continuing
+- **Review gates** — pause execution mid-run for human inspection; review the files your agents created in the workspace, then approve to continue or send feedback back to the worker
 - **Start / End nodes** — anchor points for task input and final output capture
-- **File system tools** — agents can read, write, edit, search, and create files on your local machine; shell command execution and URL fetching also available
-- **Persistent project workspaces** — agents write real files to a named project folder you choose; pick up where you left off
-- **Existing project integration** — point Conductor at any folder and agents receive the full file tree as context before making changes
-- **Default model preference** — set a preferred LLM once in the toolbar; all new agents use it automatically, and one click applies it to every agent in the current workflow
+- **Workspace anchoring** — every workflow is anchored to a real directory on your machine; the workspace bar is always visible so you know exactly where agents are operating; click it to change the directory at any time
+- **Security sandbox** — all file operations are restricted to the workspace via canonicalized path checks (symlink-safe); shell commands and file deletions require explicit human approval before executing
 
 ### The Chamber
 
@@ -55,9 +54,9 @@ Built with Tauri 2, React 19, and Rust — fully local, no cloud dependency, no 
 ### Shared capabilities
 
 - **Multi-provider support** — Anthropic (Claude 4.x), OpenAI (GPT-4o), Ollama (local models), and any custom OpenAI-compatible API endpoint
-- **23 built-in agent templates** — covering Software, DevOps, Writing, Analysis, Business, and Marketing roles; all with production-quality system prompts
-- **5 ready-to-run workflow templates** — Software Factory, Bug Fix Pipeline, Content Factory, Research Lab, Marketing Campaign; each pre-wires the right agents and tools
-- **Native file dialogs** — save outputs as `.txt` or `.md`, export projects as `.zip`, browse folders — all through OS-native dialogs
+- **24 built-in agent templates** — covering Software, DevOps, Writing, Analysis, Business, and Marketing roles; all with production-quality system prompts tuned for agentic file-system work
+- **5 ready-to-run workflow templates** — Software Factory, Bug Fix Pipeline, Content Factory, Research Lab, Marketing Campaign; each pre-wires the right agents with full tool access
+- **Native file dialogs** — save outputs as `.txt` or `.md`, export workspaces as `.zip`, browse folders — all through OS-native dialogs
 
 ---
 
@@ -74,7 +73,7 @@ Built with Tauri 2, React 19, and Rust — fully local, no cloud dependency, no 
 | Build tool | Vite 7 |
 | HTTP / AI calls | reqwest (Rust, streaming SSE) |
 | Concurrency | tokio (Rust async runtime) |
-| File system | walkdir, zip (Rust) |
+| File system | walkdir, zip, dunce (Rust) |
 | Dialogs | tauri-plugin-dialog |
 
 ---
@@ -127,18 +126,19 @@ The first `tauri dev` takes a few minutes while Cargo downloads and compiles Rus
 ```
 conductor/
 ├── src/                            # React / TypeScript frontend
-│   ├── App.tsx                     # Root layout, tab switching, run trigger
+│   ├── App.tsx                     # Root layout, tab switching, workspace-aware run trigger
 │   ├── components/
 │   │   ├── canvas/                 # WorkflowCanvas, node components, DataEdge
 │   │   ├── chamber/                # ChamberView, ChamberConfigPane, ChamberArena, ChamberLedger
-│   │   ├── inspector/              # Agent inspector, template picker, test modal
-│   │   ├── run/                    # RunDrawer, modals (start, gate, tool confirm, result, history)
-│   │   ├── projects/               # ProjectView (file browser + run launcher)
+│   │   ├── inspector/              # Agent inspector, template picker, tool access controls
+│   │   ├── run/                    # RunDrawer, modals (gate, tool confirm, result, history)
+│   │   ├── workspace/              # WorkspaceBar (path anchor, directory picker)
+│   │   ├── projects/               # ProjectView (file browser + workspace launcher)
 │   │   ├── settings/               # SettingsPanel (API keys, custom hosts, projects folder)
-│   │   ├── shared/                 # ModelPicker (portal-based, escape-hatch from overflow clipping)
+│   │   ├── shared/                 # ModelPicker
 │   │   └── Sidebar.tsx             # Workflow list + project list
 │   ├── stores/
-│   │   ├── workflowStore.ts        # Workflow CRUD, canvas state, undo/redo, copy/paste
+│   │   ├── workflowStore.ts        # Workflow CRUD, canvas state, undo/redo, workspace path
 │   │   ├── runStore.ts             # Run lifecycle, gate state, tool confirmations
 │   │   ├── chamberStore.ts         # Chamber config, run state, live streams, event listeners
 │   │   └── settingsStore.ts        # API key status, default model (localStorage), project path
@@ -146,13 +146,13 @@ conductor/
 │   │   └── useRun.ts               # Attaches all workflow run event listeners
 │   ├── lib/
 │   │   ├── tauri.ts                # All invoke() wrappers + event listeners
-│   │   └── defaults.ts             # Models, 23 built-in templates, agentFromTemplate(), 5 workflow factories
+│   │   └── defaults.ts             # Models, 24 built-in templates, agentFromTemplate(), 5 workflow factories
 │   └── types/index.ts              # All shared TypeScript types (workflow, run, chamber)
 │
 ├── src-tauri/
 │   ├── src/
-│   │   ├── main.rs                 # Tauri commands, workflow engine, Chamber engine (3 modes)
-│   │   └── workspace_fs.rs         # File system ops, manifest builder, file-block parser
+│   │   ├── main.rs                 # Tauri commands, workflow engine, security jail, Chamber engine
+│   │   └── workspace_fs.rs         # File system ops, directory tree builder
 │   ├── capabilities/
 │   │   └── default.json            # Tauri permission grants
 │   └── tauri.conf.json             # App config (name, window size, bundle targets)
@@ -185,8 +185,6 @@ Subdirectories: `workflows/`, `runs/`, `templates/`, `config.json`, `keys.json`
 
 > API keys are stored in `keys.json` inside the app data directory, scoped to your OS user account. For a production-hardened deployment, replace this with the OS keychain via `tauri-plugin-keychain`.
 
-The default model preference is stored in `localStorage` in the embedded WebView (survives app restarts, no backend changes required).
-
 ---
 
 ## Production build
@@ -218,20 +216,20 @@ No environment variables are baked into the binary. API keys are entered at runt
 ## Workflow Canvas — usage
 
 1. **Add an API key** — open Settings (bottom of the sidebar), paste your key, click Save, then Test.
-2. **Create a workflow** — click `+ New Workflow` in the sidebar, pick a template or start blank.
-3. **Set your default model** — the model selector in the canvas toolbar sets the model for all new agents; click **Apply to all** to update every existing agent in the current workflow.
+2. **Create a workflow** — click `+ New Workflow` in the sidebar, pick a starter template or start blank.
+3. **Set your workspace directory** — the workspace bar below the tab bar shows where agents will read and write files. Click it to select a folder, or the Run button will prompt you automatically if none is set.
 4. **Build the pipeline** — add nodes from the toolbar, connect them by dragging from one node's output handle to the next node's input handle.
-5. **Configure each agent** — click a node to open the inspector. Set the name, system prompt, and model; load a built-in template as a starting point; enable file or shell tools if the agent needs to read/write files.
-6. **Run** — type a task in the header bar and press Run. Choose Temporary (discarded on close) or Project (saved to disk).
+5. **Configure each agent** — click a node to open the inspector. Set the name, system prompt, and model; load a built-in template as a starting point. All tools are enabled by default — expand **Advanced: Restrict tool access** to limit specific tools if needed.
+6. **Run** — type a task in the header bar and press **Run**. If a workspace directory isn't set, a folder picker opens automatically first.
 
 ### Node types
 
 | Node | Purpose |
 |---|---|
 | **Start** | Entry point — passes the task input downstream |
-| **Agent** | Calls an LLM with a system prompt and accumulated context |
+| **Agent** | Calls an LLM with a system prompt and accumulated context; operates directly on the workspace |
 | **Loop** | Worker ↔ Reviewer feedback loop; exits on approval or max retries |
-| **Review Gate** | Human checkpoint — approve, reject, or edit before continuing |
+| **Review Gate** | Human checkpoint — open your workspace, review what was created, then approve to continue or send feedback back to the worker |
 | **End** | Captures and displays the final output |
 
 ### Agent context modes
@@ -244,7 +242,9 @@ No environment variables are baked into the binary. API keys are entered at runt
 
 ### Agent tools
 
-| Tool | Group | Requires confirmation |
+All tools are enabled by default. Use the **Advanced: Restrict tool access** section in the agent inspector to limit an agent to a subset.
+
+| Tool | Group | Requires human approval |
 |---|---|---|
 | Read File | Filesystem | No |
 | Write File | Filesystem | No |
@@ -253,9 +253,15 @@ No environment variables are baked into the binary. API keys are entered at runt
 | Search Files | Filesystem | No |
 | Create Directory | Filesystem | No |
 | Move / Rename File | Filesystem | No |
-| Delete File | Filesystem | **Yes** |
-| Run Shell Command | Shell | **Yes** |
+| Delete File | Filesystem | **Yes — blocking modal** |
+| Run Shell Command | Shell | **Yes — blocking modal** |
 | Fetch URL | Web | No |
+
+### Security sandbox
+
+All file operations are enforced in Rust using canonicalized path resolution (`dunce::canonicalize`), which resolves symlinks before checking workspace containment. An agent cannot escape the workspace directory through `../` sequences or symbolic links — any path that resolves outside the workspace is rejected with a security error before touching disk.
+
+Shell commands and file deletions always pause execution and surface a blocking approval modal in the UI showing the agent's name, the exact command or file path, and Allow / Deny buttons. The Rust backend holds a `oneshot` channel open until the user responds.
 
 ### Built-in workflow templates
 
@@ -298,6 +304,8 @@ Switch to The Chamber tab at the top of the main area.
 - Expand any agent card to edit its name, system prompt, and model independently.
 - War Room requires exactly 2 agents (Proposer + Critic). Blind Audition and Syndicate support any number.
 
+> The Chamber uses direct LLM calls for idea generation and debate — it is intentionally separate from the file-system agentic workflow. Chamber agents do not have file-system tools or workspace access.
+
 ### 3. Set context and rubric
 
 - **Task / Context** — the prompt all agents work on.
@@ -317,12 +325,13 @@ The right panel shows the final rankings with averaged scores (Audition), the co
 
 ## Working with existing projects
 
-1. In Settings, set **Default Projects Folder** to the directory containing your code.
+1. In Settings, set **Default Projects Folder** to the directory containing your projects.
 2. Projects appear in the **My Projects** section of the sidebar.
 3. Click a project to open the file browser.
-4. Click **▶ Run with agents** — select a workflow, enter a task, and start.
+4. Click **▶ Run with agents** — select a workflow. The project's path becomes the workflow's workspace directory automatically.
+5. Type a task in the header bar and press **Run**.
 
-Agents with file tools enabled receive the project's full file tree as context and can read, modify, and create files directly on disk. Agents without tools receive the file tree as read-only context in their prompt.
+Agents receive the project's file tree as context and can read, modify, and create files directly on disk, all within the security sandbox.
 
 ---
 
@@ -357,6 +366,15 @@ The app data directory couldn't be created. Verify `%APPDATA%` is writable (Wind
 **Agents return errors about the API key**
 Open Settings → click **Test** next to your key. Common causes: trailing whitespace in the pasted key, expired key, quota exceeded, or wrong key for the selected model (e.g. an OpenAI key used for an Anthropic model).
 
+**Run button says "No workspace" or immediately shows folder picker**
+The current workflow has no workspace directory set. Click the workspace bar below the tab bar, or just press Run — the folder picker opens automatically.
+
+**Agent gets a "SECURITY VIOLATION" error**
+The agent tried to access a path outside its workspace directory. This is the sandbox working correctly. Check the agent's system prompt or tool arguments — it may be using an absolute path that points outside the workspace.
+
+**Shell command approval modal appears and I'm not sure what to allow**
+Read the exact command shown in the red box before clicking Allow. If you don't recognise it, click Deny — the agent will receive an error and can try an alternative approach.
+
 **The Chamber doesn't score / shows 0.0**
 The scoring LLM call failed silently. Check the console for errors and confirm the agent's model is configured and reachable. If using Ollama, ensure the server is running.
 
@@ -365,9 +383,6 @@ Capabilities may not be compiled in. Run `npm run tauri build` (production) or c
 
 **Ollama agents fail immediately**
 Ollama is not running. Execute `ollama serve` in a terminal, then retry. Confirm the model is pulled: `ollama list`.
-
-**Model picker dropdown is invisible or clipped**
-The picker uses a React portal with `position: fixed` coordinates — it should always render above other content. If it doesn't appear, resize the window slightly to force a layout recalculation.
 
 **Canvas is blank after opening a workflow**
 ReactFlow initialisation timing issue on slow machines. Resize the window slightly or close and reopen the workflow from the sidebar.
