@@ -6,6 +6,7 @@ import {
   BookOpen,
   PenLine,
   CheckSquare,
+  Briefcase,
   X,
   ArrowRight,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import {
   examPrepWorkflow,
   creatorsEchoWorkflow,
   lifeAdminWorkflow,
+  jobApplicationWorkflow,
 } from "../../lib/defaults";
 import * as tauri from "../../lib/tauri";
 
@@ -26,7 +28,8 @@ type StarterIcon =
   | "janitor"
   | "education"
   | "creative"
-  | "productivity";
+  | "productivity"
+  | "job";
 
 const STARTERS: {
   id: string;
@@ -104,6 +107,17 @@ const STARTERS: {
     iconBg: "bg-indigo-500/12",
     iconColor: "text-indigo-300",
   },
+  {
+    id: "job-application",
+    iconKey: "job",
+    name: "Job Application Suite",
+    description:
+      "Tailors your resume, writes a cover letter, and builds a personalised interview prep guide.",
+    agentCount: 3,
+    color: "border-violet-500/25 hover:border-violet-500/50",
+    iconBg: "bg-violet-500/12",
+    iconColor: "text-violet-300",
+  },
 ];
 
 const STARTER_ICON: Record<StarterIcon, ReactNode> = {
@@ -113,6 +127,7 @@ const STARTER_ICON: Record<StarterIcon, ReactNode> = {
   education: <BookOpen size={18} />,
   creative: <PenLine size={18} />,
   productivity: <CheckSquare size={18} />,
+  job: <Briefcase size={18} />,
 };
 
 export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
@@ -135,7 +150,9 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
                 ? creatorsEchoWorkflow(defaultModel)
                 : id === "life-admin"
                   ? lifeAdminWorkflow(defaultModel)
-                  : null;
+                  : id === "job-application"
+                    ? jobApplicationWorkflow(defaultModel)
+                    : null;
 
       if (!wf) return;
       await tauri.saveWorkflow(wf);

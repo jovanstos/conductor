@@ -80,16 +80,33 @@ pub fn read_manifest_internal(workspace_path: &str) -> Result<Vec<FileEntry>, St
         .filter(|e| e.path().is_file())
     {
         let path = entry.path();
-        if is_binary(path) {
+        let ext = path.extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        // Known document types: readable by the read_file tool via text extraction.
+        // Include them in the manifest so agents know they exist, but don't attempt
+        // to read their raw bytes here — that would produce garbage or fail.
+        let is_doc = matches!(ext.as_str(), "pdf" | "docx" | "doc" | "pptx" | "ppt" | "xlsx" | "xls");
+
+        if !is_doc && is_binary(path) {
             continue;
         }
+
         let rel = path
             .strip_prefix(&base)
             .map_err(|e| e.to_string())?
             .to_string_lossy()
             .replace('\\', "/");
 
-        let content = std::fs::read_to_string(path).unwrap_or_default();
+        let content = if is_doc {
+            // Don't embed raw document bytes — agents should call read_file to extract text
+            format!("[{} document — call read_file to extract text]", ext.to_uppercase())
+        } else {
+            std::fs::read_to_string(path).unwrap_or_default()
+        };
+
         total_chars += content.len();
         files.push(FileEntry { path: rel, content });
 

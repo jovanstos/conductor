@@ -333,7 +333,7 @@ const TOOL_EDIT_INSTRUCTIONS: &str = r#"
 ## How to use your tools
 
 You have file system tools available. Use them purposefully:
-- `list_directory` / `read_file` — explore and understand the codebase. Limit yourself to reading what you actually need.
+- `list_directory` / `read_file` — explore files and read their content. `read_file` automatically extracts text from PDF, DOCX, PPTX, and XLSX files — just call it on the file path like any other file.
 - `write_file` — create new files (plans, specs, code, etc.)
 - `edit_file` — make targeted changes to existing files (replace an exact string)
 - `run_shell_command` — run commands like tests, builds, installs
@@ -362,11 +362,142 @@ If you created files, mention them and their key contents in your text — do no
 **Do NOT stop after tool calls without writing a full text response.** The tool calls are for gathering information and creating artifacts. Your text is the handoff.
 "#;
 
+// ─────────────────────────────────────────────
+// Document text extraction
+// ─────────────────────────────────────────────
+
+/// Extract text from a tag like `<w:t>text</w:t>` or `<a:t>text</a:t>`.
+fn extract_xml_tagged_text(xml: &str, tag: &str) -> String {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    let mut result = String::new();
+    let mut remaining = xml;
+    while let Some(start) = remaining.find(&open) {
+        remaining = &remaining[start + open.len()..];
+        if let Some(end) = remaining.find(&close) {
+            let fragment = &remaining[..end];
+            // Decode basic XML entities
+            let decoded = fragment
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&apos;", "'");
+            if !decoded.trim().is_empty() {
+                result.push_str(decoded.trim());
+                result.push(' ');
+            }
+            remaining = &remaining[end + close.len()..];
+        } else {
+            break;
+        }
+    }
+    result.trim().to_string()
+}
+
+fn extract_docx_text(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).map_err(|e| format!("Cannot open: {}", e))?;
+    let mut zip = zip::ZipArchive::new(file).map_err(|_| "File is not a valid DOCX archive".to_string())?;
+    let mut xml = String::new();
+    zip.by_name("word/document.xml")
+        .map_err(|_| "Missing word/document.xml — may not be a valid DOCX".to_string())?
+        .read_to_string(&mut xml)
+        .map_err(|e| format!("Cannot read document.xml: {}", e))?;
+    let text = extract_xml_tagged_text(&xml, "w:t");
+    if text.is_empty() { Err("No text content found in DOCX".to_string()) } else { Ok(text) }
+}
+
+fn extract_pptx_text(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).map_err(|e| format!("Cannot open: {}", e))?;
+    let mut zip = zip::ZipArchive::new(file).map_err(|_| "File is not a valid PPTX archive".to_string())?;
+    let mut all_text = String::new();
+    let count = zip.len();
+    for i in 0..count {
+        let mut entry = zip.by_index(i).map_err(|e| e.to_string())?;
+        let name = entry.name().to_string();
+        if name.starts_with("ppt/slides/slide") && name.ends_with(".xml") {
+            let mut xml = String::new();
+            entry.read_to_string(&mut xml).ok();
+            let slide_text = extract_xml_tagged_text(&xml, "a:t");
+            if !slide_text.is_empty() {
+                all_text.push_str(&slide_text);
+                all_text.push('\n');
+            }
+        }
+    }
+    if all_text.is_empty() { Err("No text content found in PPTX".to_string()) } else { Ok(all_text.trim().to_string()) }
+}
+
+fn extract_xlsx_text(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+    let file = std::fs::File::open(path).map_err(|e| format!("Cannot open: {}", e))?;
+    let mut zip = zip::ZipArchive::new(file).map_err(|_| "File is not a valid XLSX archive".to_string())?;
+
+    // Collect shared strings (inline text values in XLSX)
+    let shared: Vec<String> = if let Ok(mut entry) = zip.by_name("xl/sharedStrings.xml") {
+        let mut xml = String::new();
+        entry.read_to_string(&mut xml).ok();
+        // Each shared string is wrapped in <si><t>...</t></si>; extract all <t> values in order
+        let raw = extract_xml_tagged_text(&xml, "t");
+        raw.split_whitespace().map(|s| s.to_string()).collect()
+    } else {
+        vec![]
+    };
+
+    // Read sheet 1 and emit a readable TSV-like output
+    let mut sheet_xml = String::new();
+    if let Ok(mut entry) = zip.by_name("xl/worksheets/sheet1.xml") {
+        entry.read_to_string(&mut sheet_xml).ok();
+    } else {
+        return Err("No sheet data found in XLSX".to_string());
+    }
+
+    // Build rows: each <row> contains <c> cells; <v> is value index into shared strings (type t="s")
+    // For simplicity: just concatenate all <v> and inline <t> values
+    let values = extract_xml_tagged_text(&sheet_xml, "v");
+    let inline = extract_xml_tagged_text(&sheet_xml, "is");
+
+    let mut result = String::new();
+    if !shared.is_empty() {
+        result.push_str("Spreadsheet text content:\n");
+        result.push_str(&shared.join("  "));
+    } else if !values.is_empty() {
+        result.push_str("Spreadsheet values:\n");
+        result.push_str(&values);
+    }
+    if !inline.is_empty() {
+        if !result.is_empty() { result.push('\n'); }
+        result.push_str(&inline);
+    }
+    if result.is_empty() { Err("No text content found in XLSX".to_string()) } else { Ok(result) }
+}
+
+/// Auto-detect file type and return extracted text content.
+/// For plain text files, reads as UTF-8. For PDF/DOCX/PPTX/XLSX, extracts text automatically.
+fn extract_text_from_file(path: &Path) -> Result<String, String> {
+    let ext = path.extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match ext.as_str() {
+        "pdf" => pdf_extract::extract_text(path)
+            .map_err(|e| format!("PDF extraction failed: {}", e)),
+        "docx" | "doc" => extract_docx_text(path),
+        "pptx" | "ppt" => extract_pptx_text(path),
+        "xlsx" | "xls" => extract_xlsx_text(path),
+        _ => std::fs::read_to_string(path)
+            .map_err(|e| format!("Cannot read '{}': {}", path.display(), e)),
+    }
+}
+
 fn tool_definitions(enabled_names: &[String]) -> Vec<ToolDef> {
     let all: Vec<ToolDef> = vec![
         ToolDef {
             name: "read_file".into(),
-            description: "Read the full contents of a file. Use this before editing to see current content.".into(),
+            description: "Read the text contents of a file. Supports plain text, PDF (.pdf), Word (.docx), PowerPoint (.pptx), and Excel (.xlsx) — text is extracted automatically. Use this before editing to see current content.".into(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": { "path": { "type": "string", "description": "Absolute or relative file path" } },
@@ -957,7 +1088,7 @@ async fn execute_tool(
             let raw = resolve_path(path, workspace_path);
             let canonical = jail_path(&raw, ws?)?;
             check_denied(&canonical, permissions)?;
-            let content = std::fs::read_to_string(&canonical)
+            let content = extract_text_from_file(&canonical)
                 .map_err(|e| format!("Cannot read '{}': {}", path, e))?;
             if content.len() > 200_000 {
                 Ok(format!("{}...\n[truncated — file is {} bytes]", safe_truncate(&content, 200_000), content.len()))

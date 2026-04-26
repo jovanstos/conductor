@@ -19,7 +19,6 @@ import ChamberView from "./components/chamber/ChamberView";
 import WorkspaceBar from "./components/workspace/WorkspaceBar";
 // TODO
 // Create new prompt creator tab to help users work out ideas and prompt structures
-// Make it so agents can read pdfs and other doc types
 
 type MainTab = "workflow" | "chamber";
 
