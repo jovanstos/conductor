@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Play, Square, AlertTriangle, X, Sparkles, Swords } from "lucide-react";
+import { Play, Square, AlertTriangle, X, Sparkles, Swords, Lightbulb } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useWorkflowStore } from "./stores/workflowStore";
 import { useRunStore } from "./stores/runStore";
@@ -17,10 +17,9 @@ import ResultModal from "./components/run/ResultModal";
 import SettingsPanel from "./components/settings/SettingsPanel";
 import ChamberView from "./components/chamber/ChamberView";
 import WorkspaceBar from "./components/workspace/WorkspaceBar";
-// TODO
-// Create new prompt creator tab to help users work out ideas and prompt structures
+import StudioView from "./components/studio/StudioView";
 
-type MainTab = "workflow" | "chamber";
+type MainTab = "workflow" | "chamber" | "studio";
 
 const SIDEBAR_DEFAULT = 200;
 const INSPECTOR_DEFAULT = 300;
@@ -165,6 +164,13 @@ export default function App() {
               label="Chamber"
               accent="amber"
             />
+            <TabButton
+              active={activeTab === "studio"}
+              onClick={() => setActiveTab("studio")}
+              icon={<Lightbulb size={13} />}
+              label="Studio"
+              accent="teal"
+            />
           </div>
 
           {/* Workflow task bar — only on workflow tab */}
@@ -240,7 +246,11 @@ export default function App() {
         )}
 
         {/* Main content */}
-        {activeTab === "chamber" ? (
+        {activeTab === "studio" ? (
+          <div className="flex-1 overflow-hidden">
+            <StudioView />
+          </div>
+        ) : activeTab === "chamber" ? (
           <div className="flex-1 overflow-hidden">
             <ChamberView />
           </div>
@@ -306,11 +316,13 @@ function TabButton({
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
-  accent?: "purple" | "amber";
+  accent?: "purple" | "amber" | "teal";
 }) {
   const activeStyle =
     accent === "amber"
       ? { color: "rgb(252,176,69)", background: "rgba(245,158,11,0.1)" }
+      : accent === "teal"
+      ? { color: "rgb(45,212,191)", background: "rgba(20,184,166,0.1)" }
       : { color: "var(--c-text-1)", background: "var(--c-surface-alt)" };
 
   return (

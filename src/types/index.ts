@@ -193,6 +193,18 @@ export type ToolCallStartedPayload = { nodeId: string; toolCallId: string; toolN
 export type ToolCallDonePayload = { nodeId: string; toolCallId: string; toolName: string; resultPreview: string; isError: boolean }
 export type ToolConfirmRequestPayload = { nodeId: string; agentName: string; toolCallId: string; toolName: string; command: string }
 
+// ── Studio types ──────────────────────────────────────
+
+export type StudioMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export type StudioSessionState = 'idle' | 'brainstorming' | 'generating_final' | 'finished'
+
+export type StudioChunkPayload = { chunk: string }
+
 // ── Chamber types ─────────────────────────────────────
 
 export type ChamberMode = 'audition' | 'war_room' | 'syndicate'
