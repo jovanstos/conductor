@@ -14,19 +14,19 @@ export default function Inspector() {
   return (
     <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: 'var(--c-surface)', borderLeft: '1px solid var(--c-border-subtle)' }}>
       {/* Header */}
-      <div className="px-4 h-12 flex items-center justify-between shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
-        <p className="text-xs font-medium" style={{ color: 'var(--c-text-3)' }}>
+      <div className="px-4 h-14 flex items-center justify-between shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+        <p className="text-sm font-medium" style={{ color: 'var(--c-text-3)' }}>
           {selectedNode ? nodeTypeLabel(selectedNode.type) : 'Workflow'}
         </p>
         {selectedNode && (
           <button
             onClick={() => setSelectedNode(null)}
-            className="transition-colors p-1 rounded"
+            className="transition-colors p-1.5 rounded"
             style={{ color: 'var(--c-text-dim)' }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-2)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-dim)')}
           >
-            <X size={14} />
+            <X size={16} />
           </button>
         )}
       </div>
@@ -34,13 +34,13 @@ export default function Inspector() {
       <div className="flex-1 overflow-y-auto p-4">
         {parentNode && (
           <button
-            className="flex items-center gap-1.5 text-xs mb-4 -mt-1 transition-colors"
+            className="flex items-center gap-2 text-sm mb-4 -mt-1 transition-colors"
             style={{ color: 'rgba(251,191,36,0.6)' }}
             onMouseEnter={e => (e.currentTarget.style.color = 'rgba(251,191,36,0.9)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'rgba(251,191,36,0.6)')}
             onClick={() => setSelectedNode(parentNode.id)}
           >
-            <ArrowLeft size={12} /> Back to Loop
+            <ArrowLeft size={14} /> Back to Loop
           </button>
         )}
 
@@ -73,7 +73,7 @@ function WorkflowSettings() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs leading-relaxed" style={{ color: 'var(--c-text-dim)' }}>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--c-text-dim)' }}>
         Select a node to configure it, or edit workflow details below.
       </p>
       <Field label="Name">
@@ -81,7 +81,7 @@ function WorkflowSettings() {
       </Field>
       <Field label="Description">
         <textarea
-          className={`${iCls} h-20 resize-none`}
+          className={`${iCls} h-24 resize-none`}
           value={currentWorkflow.description}
           onChange={(e) => updateWorkflowMeta({ description: e.target.value })}
         />
@@ -100,14 +100,14 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
   const reviewerNode = currentWorkflow?.nodes.find((n) => n.id === d.reviewerNodeId)
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Tabs */}
       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--c-input)' }}>
         {(['loop', 'worker', 'reviewer'] as LoopTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className="flex-1 text-xs py-1.5 rounded-lg transition-all font-medium capitalize"
+            className="flex-1 text-sm py-2 rounded-lg transition-all font-medium capitalize"
             style={activeTab === tab
               ? { background: 'var(--c-surface)', color: 'var(--c-text-1)', boxShadow: '0 1px 3px rgba(0,0,0,0.15)' }
               : { color: 'var(--c-text-3)' }
@@ -120,13 +120,13 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
 
       {activeTab === 'loop' && (
         <div className="space-y-4">
-          <p className="text-xs leading-relaxed rounded-xl px-3 py-2.5" style={{ color: 'var(--c-text-3)', background: 'var(--c-input)' }}>
+          <p className="text-sm leading-relaxed rounded-xl px-3 py-3" style={{ color: 'var(--c-text-3)', background: 'var(--c-input)' }}>
             The worker runs the task. The reviewer checks it. If not satisfied, the worker tries again — up to the max you set.
           </p>
           <Field label="Max attempts">
             <input type="number" className={iCls} value={d.maxRetries} min={1} max={10}
               onChange={(e) => updateNode(node.id, { data: { ...d, maxRetries: Number(e.target.value) } })} />
-            <p className="text-xs mt-1" style={{ color: 'var(--c-text-dim)' }}>How many times the worker can try before giving up.</p>
+            <p className="text-sm mt-1.5" style={{ color: 'var(--c-text-dim)' }}>How many times the worker can try before giving up.</p>
           </Field>
           <Field label="Exit condition">
             <select className={sCls} value={d.exitCondition}
@@ -134,15 +134,15 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
               <option value="reviewer_approves">Stop as soon as reviewer approves</option>
               <option value="max_retries">Always run all attempts</option>
             </select>
-            <p className="text-xs mt-1" style={{ color: 'var(--c-text-dim)' }}>Reviewer must include "APPROVED" to exit early.</p>
+            <p className="text-sm mt-1.5" style={{ color: 'var(--c-text-dim)' }}>Reviewer must include "APPROVED" to exit early.</p>
           </Field>
           <div className="flex gap-2 pt-1">
             <button onClick={() => { setActiveTab('worker'); workerNode && setSelectedNode(workerNode.id) }}
-              className="flex-1 text-xs py-2 rounded-xl transition-colors border border-purple-500/20 text-purple-400/60 hover:border-purple-500/40 hover:text-purple-400">
+              className="flex-1 text-sm py-2.5 rounded-xl transition-colors border border-purple-500/20 text-purple-400/60 hover:border-purple-500/40 hover:text-purple-400">
               Edit Worker
             </button>
             <button onClick={() => { setActiveTab('reviewer'); reviewerNode && setSelectedNode(reviewerNode.id) }}
-              className="flex-1 text-xs py-2 rounded-xl transition-colors border border-sky-500/20 text-sky-400/60 hover:border-sky-500/40 hover:text-sky-400">
+              className="flex-1 text-sm py-2.5 rounded-xl transition-colors border border-sky-500/20 text-sky-400/60 hover:border-sky-500/40 hover:text-sky-400">
               Edit Reviewer
             </button>
           </div>
@@ -150,10 +150,10 @@ function LoopInspector({ node }: { node: WorkflowNode }) {
       )}
 
       {activeTab === 'worker' && (
-        workerNode ? <AgentInspector node={workerNode} /> : <p className="text-xs" style={{ color: 'var(--c-text-3)' }}>Worker not found.</p>
+        workerNode ? <AgentInspector node={workerNode} /> : <p className="text-sm" style={{ color: 'var(--c-text-3)' }}>Worker not found.</p>
       )}
       {activeTab === 'reviewer' && (
-        reviewerNode ? <AgentInspector node={reviewerNode} /> : <p className="text-xs" style={{ color: 'var(--c-text-3)' }}>Reviewer not found.</p>
+        reviewerNode ? <AgentInspector node={reviewerNode} /> : <p className="text-sm" style={{ color: 'var(--c-text-3)' }}>Reviewer not found.</p>
       )}
     </div>
   )
@@ -165,14 +165,14 @@ function GateInspector({ node }: { node: WorkflowNode }) {
   return (
     <div className="space-y-4">
       <Field label="Message shown to reviewer">
-        <textarea className={`${iCls} h-24 resize-none`} value={d.message}
+        <textarea className={`${iCls} h-28 resize-none`} value={d.message}
           onChange={(e) => updateNode(node.id, { data: { ...d, message: e.target.value } })} />
       </Field>
       <Field label="Options">
-        <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--c-text-2)' }}>
+        <label className="flex items-center gap-2.5 text-sm cursor-pointer" style={{ color: 'var(--c-text-2)' }}>
           <input type="checkbox" checked={d.allowEdit}
             onChange={(e) => updateNode(node.id, { data: { ...d, allowEdit: e.target.checked } })}
-            className="accent-purple-500" />
+            className="accent-purple-500 w-4 h-4" />
           Allow editing the output before continuing
         </label>
       </Field>
@@ -183,12 +183,11 @@ function GateInspector({ node }: { node: WorkflowNode }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--c-text-3)' }}>{label}</p>
+      <p className="text-sm font-medium mb-2" style={{ color: 'var(--c-text-3)' }}>{label}</p>
       {children}
     </div>
   )
 }
 
-// These classes rely on CSS vars defined in index.css
-const iCls = 'w-full rounded-xl px-3 py-2 text-sm outline-none transition-colors conductor-input'
-const sCls = 'w-full rounded-xl px-3 py-2 text-sm outline-none transition-colors conductor-input'
+const iCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors conductor-input'
+const sCls = 'w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors conductor-input'

@@ -6,7 +6,7 @@ import * as tauri from '../../lib/tauri'
 import type { RunStep, ToolCallRecord } from '../../types'
 import { getRoleInfo, type RoleCategory } from '../../lib/defaults'
 
-function RoleIcon({ category, size = 13, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
+function RoleIcon({ category, size = 15, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
   const props = { size, className }
   switch (category) {
     case 'developer': return <Code2 {...props} />
@@ -36,10 +36,10 @@ function ToolCallBadge({ tc }: { tc: ToolCallRecord }) {
       : 'text-emerald-400'
 
   return (
-    <div className={`rounded-lg border px-2.5 py-1.5 ${containerCls}`}>
+    <div className={`rounded-lg border px-3 py-2 ${containerCls}`}>
       <div className="flex items-center gap-2">
-        <Wrench size={11} className={iconCls} />
-        <span className="text-xs font-mono text-white/60 truncate flex-1">
+        <Wrench size={13} className={iconCls} />
+        <span className="text-sm font-mono text-white/60 truncate flex-1">
           {tc.toolName}
           {tc.argsPreview && <span className="text-white/35">({tc.argsPreview})</span>}
         </span>
@@ -50,16 +50,16 @@ function ToolCallBadge({ tc }: { tc: ToolCallRecord }) {
             <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0.3s]" />
           </span>
         )}
-        {tc.status === 'done' && !tc.isError && <Check size={11} className="text-emerald-400 shrink-0" />}
-        {tc.isError && <span className="text-xs text-red-400 shrink-0 font-medium">Error</span>}
+        {tc.status === 'done' && !tc.isError && <Check size={13} className="text-emerald-400 shrink-0" />}
+        {tc.isError && <span className="text-sm text-red-400 shrink-0 font-medium">Error</span>}
         {tc.status !== 'running' && tc.resultPreview && (
           <button onClick={() => setExpanded(v => !v)} className="text-white/30 hover:text-white/55 shrink-0 transition-colors">
-            {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
           </button>
         )}
       </div>
       {expanded && tc.resultPreview && (
-        <pre className="mt-1.5 text-xs text-white/45 whitespace-pre-wrap leading-relaxed font-mono border-t border-white/6 pt-1.5">
+        <pre className="mt-2 text-xs text-white/45 whitespace-pre-wrap leading-relaxed font-mono border-t border-white/6 pt-2">
           {tc.resultPreview}
         </pre>
       )}
@@ -144,14 +144,14 @@ export default function RunDrawer({ height }: { height: number }) {
     <div className="shrink-0 flex flex-col bg-[#08080b] overflow-hidden" style={{ height }}>
 
       {/* ── Status bar ── */}
-      <div className={`flex items-center gap-3 px-4 py-2.5 border-b shrink-0 ${
+      <div className={`flex items-center gap-3 px-4 py-3 border-b shrink-0 ${
         isDone      ? 'bg-green-500/8 border-green-500/15'
         : isFailed  ? 'bg-red-500/8 border-red-500/15'
         : isCancelled ? 'bg-white/3 border-white/6'
         : isPaused  ? 'bg-blue-500/8 border-blue-500/20'
         : 'bg-purple-500/8 border-purple-500/12'
       }`}>
-        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+        <div className={`w-3 h-3 rounded-full shrink-0 ${
           isDone      ? 'bg-green-500'
           : isFailed  ? 'bg-red-500'
           : isCancelled ? 'bg-white/20'
@@ -175,10 +175,10 @@ export default function RunDrawer({ height }: { height: number }) {
               : 'Your team is starting up…'}
           </p>
           {ws && (
-            <p className="text-xs text-white/30 truncate mt-0.5 flex items-center gap-1">
+            <p className="text-xs text-white/30 truncate mt-0.5 flex items-center gap-1.5">
               {ws.mode === 'project' || ws.mode === 'existing'
-                ? <><FolderOpen size={11} className="shrink-0" />{ws.projectName ?? 'project'}</>
-                : <><Clock size={11} className="shrink-0" />temporary</>}
+                ? <><FolderOpen size={12} className="shrink-0" />{ws.projectName ?? 'project'}</>
+                : <><Clock size={12} className="shrink-0" />temporary</>}
               <span className="text-white/15">·</span>
               <span className="truncate text-white/20">{ws.workspacePath}</span>
               {totalFilesWritten > 0 && (
@@ -191,7 +191,7 @@ export default function RunDrawer({ height }: { height: number }) {
         </div>
 
         {steps.length > 0 && !isPaused && (
-          <span className="text-xs text-white/30 tabular-nums shrink-0 font-medium">
+          <span className="text-sm text-white/30 tabular-nums shrink-0 font-medium">
             {doneCount} / {steps.length} steps
           </span>
         )}
@@ -200,9 +200,9 @@ export default function RunDrawer({ height }: { height: number }) {
           {isDone && currentRun.finalOutput && (
             <button
               onClick={openResultModal}
-              className="bg-green-600 hover:bg-green-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+              className="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
             >
-              See Results <ArrowRight size={12} />
+              See Results <ArrowRight size={14} />
             </button>
           )}
           {isFinished && ws && (
@@ -210,42 +210,42 @@ export default function RunDrawer({ height }: { height: number }) {
               {ws.mode === 'project' || ws.mode === 'existing' ? (
                 <>
                   <button onClick={handleExportZip} disabled={saving}
-                    className="text-xs text-white/45 hover:text-white/70 border border-white/10 hover:border-white/25 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40 flex items-center gap-1.5"
+                    className="text-sm text-white/45 hover:text-white/70 border border-white/10 hover:border-white/25 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 flex items-center gap-2"
                     title="Export project as zip"
                   >
-                    {saving ? '…' : <><Download size={12} />Export</>}
+                    {saving ? '…' : <><Download size={14} />Export</>}
                   </button>
                   <button onClick={clearRun}
-                    className="text-xs text-emerald-400/75 hover:text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/40 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                  ><FolderOpen size={12} />Keep Project</button>
+                    className="text-sm text-emerald-400/75 hover:text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/40 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
+                  ><FolderOpen size={14} />Keep Project</button>
                   <button onClick={handleDiscard}
-                    className="text-xs text-red-400/60 hover:text-red-400 transition-colors"
+                    className="text-sm text-red-400/60 hover:text-red-400 transition-colors"
                   >Discard</button>
                 </>
               ) : (
                 <button onClick={handleDiscard}
-                  className="text-xs text-white/35 hover:text-white/65 border border-white/8 hover:border-white/20 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                ><X size={12} />Discard</button>
+                  className="text-sm text-white/35 hover:text-white/65 border border-white/8 hover:border-white/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
+                ><X size={14} />Discard</button>
               )}
             </>
           )}
           {isRunning && (
             <button onClick={cancelRun}
-              className="text-xs text-red-400/75 hover:text-red-400 border border-red-500/20 hover:border-red-500/40 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-            ><Square size={12} fill="currentColor" />Cancel</button>
+              className="text-sm text-red-400/75 hover:text-red-400 border border-red-500/20 hover:border-red-500/40 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
+            ><Square size={13} fill="currentColor" />Cancel</button>
           )}
           {!ws && (
             <button onClick={clearRun}
               className="text-white/25 hover:text-white/55 transition-colors ml-1"
               title="Dismiss"
-            ><X size={15} /></button>
+            ><X size={16} /></button>
           )}
         </div>
       </div>
 
       {/* ── Save message toast ── */}
       {saveMsg && (
-        <div className="mx-3 mt-2 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-300">
+        <div className="mx-3 mt-2 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 text-sm text-emerald-300">
           {saveMsg}
         </div>
       )}
@@ -254,29 +254,29 @@ export default function RunDrawer({ height }: { height: number }) {
       {discardConfirm && (
         <div className="mx-3 mt-2 shrink-0 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
           <div className="flex-1">
-            <p className="text-sm font-semibold text-red-300">Delete project files?</p>
-            <p className="text-xs text-red-300/60 mt-0.5">
+            <p className="text-base font-semibold text-red-300">Delete project files?</p>
+            <p className="text-sm text-red-300/60 mt-0.5">
               This will permanently delete all generated files at {ws?.workspacePath}. Cannot be undone.
             </p>
           </div>
           <button onClick={handleDiscardConfirmed}
-            className="text-xs bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-lg transition-colors shrink-0"
+            className="text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors shrink-0"
           >Delete</button>
           <button onClick={() => setDiscardConfirm(false)}
-            className="text-xs text-white/40 hover:text-white/70 transition-colors shrink-0"
+            className="text-sm text-white/40 hover:text-white/70 transition-colors shrink-0"
           >Cancel</button>
         </div>
       )}
 
       {/* ── Gate notice ── */}
       {isPaused && gateInfo && (
-        <div className="mx-3 mt-2.5 shrink-0 bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center animate-pulse shrink-0 text-blue-400">
-            <Pause size={16} />
+        <div className="mx-3 mt-3 shrink-0 bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center animate-pulse shrink-0 text-blue-400">
+            <Pause size={18} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-blue-300">Review panel is open</p>
-            <p className="text-xs text-blue-300/55 mt-0.5 line-clamp-1">
+            <p className="text-sm text-blue-300/55 mt-0.5 line-clamp-1">
               {gateInfo.message || 'Check the review popup and click Approve to continue.'}
             </p>
           </div>
@@ -300,9 +300,9 @@ export default function RunDrawer({ height }: { height: number }) {
             {logLines.filter(l => l.startsWith('[gate]') || l.startsWith('[cancelled]') || l.startsWith('[done]')).map((line, i) => (
               <div key={i} className="flex items-center gap-3 pl-1 py-1">
                 <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-white/15" />
+                  <div className="w-2 h-2 rounded-full bg-white/15" />
                 </div>
-                <p className="text-xs text-white/25 italic">{line}</p>
+                <p className="text-sm text-white/25 italic">{line}</p>
               </div>
             ))}
           </div>
@@ -338,7 +338,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
     <div className="flex gap-3">
       {/* Timeline spine */}
       <div className="flex flex-col items-center shrink-0 w-5">
-        <div className={`w-3 h-3 rounded-full border-2 shrink-0 mt-1.5 ${
+        <div className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 mt-1.5 ${
           isRunning ? 'border-purple-400 bg-purple-500/30 animate-pulse'
             : isDone  ? 'border-green-500 bg-green-500/25'
             : isError ? 'border-red-500 bg-red-500/25'
@@ -348,15 +348,15 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 pb-4">
+      <div className="flex-1 min-w-0 pb-5">
         {/* Header row */}
         <div className="flex items-center gap-2 flex-wrap mt-1">
-          <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+          <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
             isRunning ? 'bg-purple-500/20' : isDone ? 'bg-green-500/15' : role.bgColor
           }`}>
             <RoleIcon
               category={role.category}
-              size={13}
+              size={15}
               className={isRunning ? 'text-purple-300' : isDone ? 'text-green-400' : role.textColor}
             />
           </div>
@@ -388,7 +388,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
 
         {/* Live streaming output */}
         {isRunning && step.output && (
-          <div ref={streamRef} className="mt-2 max-h-28 overflow-y-auto rounded-lg bg-black/20 px-3 py-2 border border-purple-500/10">
+          <div ref={streamRef} className="mt-2 max-h-32 overflow-y-auto rounded-lg bg-black/20 px-3 py-2 border border-purple-500/10">
             <pre className="text-xs text-purple-200/60 whitespace-pre-wrap leading-relaxed font-mono">
               {step.output}
             </pre>
@@ -397,7 +397,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
 
         {/* Tool calls */}
         {(step.toolCalls?.length ?? 0) > 0 && (
-          <div className="mt-2 space-y-1">
+          <div className="mt-2 space-y-1.5">
             {step.toolCalls!.map((tc) => (
               <ToolCallBadge key={tc.toolCallId} tc={tc} />
             ))}
@@ -409,16 +409,16 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
           <div className="mt-2">
             <button
               onClick={() => setShowFiles(v => !v)}
-              className="flex items-center gap-1.5 text-xs text-emerald-400/75 hover:text-emerald-300 transition-colors"
+              className="flex items-center gap-2 text-sm text-emerald-400/75 hover:text-emerald-300 transition-colors"
             >
-              <FolderOpen size={12} />
+              <FolderOpen size={14} />
               <span>{step.filesWritten!.length} file{step.filesWritten!.length !== 1 ? 's' : ''} written</span>
-              {showFiles ? <ChevronUp size={11} className="text-white/25" /> : <ChevronDown size={11} className="text-white/25" />}
+              {showFiles ? <ChevronUp size={13} className="text-white/25" /> : <ChevronDown size={13} className="text-white/25" />}
             </button>
             {showFiles && (
-              <div className="mt-1.5 bg-black/20 rounded-lg p-2 space-y-0.5">
+              <div className="mt-1.5 bg-black/20 rounded-lg p-2.5 space-y-1">
                 {step.filesWritten!.map(f => (
-                  <p key={f} className="text-xs text-emerald-300/60 font-mono truncate">{f}</p>
+                  <p key={f} className="text-sm text-emerald-300/60 font-mono truncate">{f}</p>
                 ))}
               </div>
             )}
@@ -430,7 +430,7 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
           <div className="mt-2">
             {showOutput ? (
               <>
-                <div className="max-h-48 overflow-y-auto rounded-lg bg-black/25 px-3 py-2 border border-white/6 mb-1.5">
+                <div className="max-h-52 overflow-y-auto rounded-lg bg-black/25 px-3 py-2.5 border border-white/6 mb-1.5">
                   <pre className="text-xs text-white/65 whitespace-pre-wrap leading-relaxed font-mono">
                     {isError
                       ? <span className="text-red-400">{step.error}</span>
@@ -439,22 +439,22 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
                 </div>
                 <button
                   onClick={() => setShowOutput(false)}
-                  className="text-xs text-white/30 hover:text-white/60 transition-colors flex items-center gap-1"
+                  className="text-sm text-white/30 hover:text-white/60 transition-colors flex items-center gap-1.5"
                 >
-                  <ChevronUp size={11} />Collapse
+                  <ChevronUp size={13} />Collapse
                 </button>
               </>
             ) : (
               <>
-                <p className="text-xs text-white/40 line-clamp-2 leading-relaxed">
+                <p className="text-sm text-white/40 line-clamp-2 leading-relaxed">
                   {isError ? step.error : step.output}
                 </p>
                 {((step.output?.length ?? 0) > 80 || isError) && (
                   <button
                     onClick={() => setShowOutput(true)}
-                    className="text-xs text-purple-400/65 hover:text-purple-300 transition-colors mt-1 flex items-center gap-1"
+                    className="text-sm text-purple-400/65 hover:text-purple-300 transition-colors mt-1 flex items-center gap-1.5"
                   >
-                    <ChevronDown size={11} />View output →
+                    <ChevronDown size={13} />View output →
                   </button>
                 )}
               </>
@@ -467,13 +467,13 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
           <div className="mt-2">
             <button
               onClick={() => setShowPrompt(v => !v)}
-              className="text-xs text-white/25 hover:text-white/45 transition-colors flex items-center gap-1"
+              className="text-sm text-white/25 hover:text-white/45 transition-colors flex items-center gap-1.5"
             >
-              {showPrompt ? <ChevronUp size={11} /> : <ChevronRight size={11} />}
+              {showPrompt ? <ChevronUp size={13} /> : <ChevronRight size={13} />}
               <span>Prompt ({promptChars.toLocaleString()} chars)</span>
             </button>
             {showPrompt && (
-              <div className="mt-1.5 max-h-48 overflow-y-auto rounded-lg bg-black/30 px-3 py-2 border border-white/5">
+              <div className="mt-2 max-h-52 overflow-y-auto rounded-lg bg-black/30 px-3 py-2.5 border border-white/5">
                 <pre className="text-xs text-white/40 whitespace-pre-wrap leading-relaxed font-mono">
                   {step.input}
                 </pre>

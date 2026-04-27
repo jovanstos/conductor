@@ -58,38 +58,38 @@ export default function StudioView() {
       <div className="flex flex-col h-full" style={{ background: 'var(--c-base)' }}>
         {/* Document header */}
         <div
-          className="shrink-0 h-12 flex items-center justify-between px-5 border-b"
+          className="shrink-0 h-14 flex items-center justify-between px-5 border-b"
           style={{ borderColor: 'var(--c-border-subtle)', background: 'var(--c-surface)' }}
         >
-          <div className="flex items-center gap-2">
-            <FileText size={14} style={{ color: 'rgb(45,212,191)' }} />
-            <span className="text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>
+          <div className="flex items-center gap-2.5">
+            <FileText size={16} style={{ color: 'rgb(45,212,191)' }} />
+            <span className="text-base font-semibold" style={{ color: 'var(--c-text-1)' }}>
               Your Plan
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handleDownload}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors border"
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors border"
               style={{
                 background: 'rgba(45,212,191,0.08)',
                 borderColor: 'rgba(45,212,191,0.2)',
                 color: 'rgb(45,212,191)',
               }}
             >
-              <Download size={12} />
+              <Download size={14} />
               Download .txt
             </button>
             <button
               onClick={newSession}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors border"
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors border"
               style={{
                 background: 'var(--c-surface-alt)',
                 borderColor: 'var(--c-border)',
                 color: 'var(--c-text-2)',
               }}
             >
-              <Plus size={12} />
+              <Plus size={14} />
               New Session
             </button>
           </div>
@@ -109,24 +109,24 @@ export default function StudioView() {
     <div className="flex flex-col h-full" style={{ background: 'var(--c-base)' }}>
       {/* Header bar */}
       <div
-        className="shrink-0 h-12 flex items-center justify-between px-4 border-b"
+        className="shrink-0 h-14 flex items-center justify-between px-4 border-b"
         style={{ borderColor: 'var(--c-border-subtle)', background: 'var(--c-surface)' }}
       >
-        <div className="flex items-center gap-2">
-          <Sparkles size={14} style={{ color: 'rgb(45,212,191)' }} />
-          <span className="text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>
+        <div className="flex items-center gap-2.5">
+          <Sparkles size={16} style={{ color: 'rgb(45,212,191)' }} />
+          <span className="text-base font-semibold" style={{ color: 'var(--c-text-1)' }}>
             Studio
           </span>
           {sessionState === 'generating_final' && (
             <span
-              className="text-xs px-2 py-0.5 rounded-full"
+              className="text-sm px-2.5 py-0.5 rounded-full"
               style={{ background: 'rgba(45,212,191,0.1)', color: 'rgb(45,212,191)' }}
             >
               Generating document…
             </span>
           )}
         </div>
-        <div className="w-52">
+        <div className="w-56">
           <ModelPicker value={model} onChange={setModel} />
         </div>
       </div>
@@ -154,30 +154,30 @@ export default function StudioView() {
       {/* Error toast */}
       {error && (
         <div
-          className="mx-4 mb-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs border"
+          className="mx-4 mb-2 flex items-center gap-2 px-4 py-3 rounded-xl text-sm border"
           style={{
             background: 'rgba(239,68,68,0.08)',
             borderColor: 'rgba(239,68,68,0.2)',
             color: 'rgb(252,165,165)',
           }}
         >
-          <AlertTriangle size={13} className="shrink-0" />
+          <AlertTriangle size={15} className="shrink-0" />
           <span className="flex-1">{error}</span>
           <button
             onClick={() => useStudioStore.getState().newSession()}
             style={{ color: 'rgba(252,165,165,0.5)' }}
           >
-            <X size={13} />
+            <X size={15} />
           </button>
         </div>
       )}
 
       {/* Input area */}
       <div
-        className="shrink-0 border-t px-4 py-3 space-y-2"
+        className="shrink-0 border-t px-4 py-3.5 space-y-2.5"
         style={{ borderColor: 'var(--c-border-subtle)', background: 'var(--c-surface)' }}
       >
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-2.5 items-end">
           <textarea
             ref={textareaRef}
             value={input}
@@ -190,7 +190,7 @@ export default function StudioView() {
             }
             disabled={isStreaming}
             rows={2}
-            className="flex-1 resize-none rounded-xl px-3 py-2 text-sm outline-none transition-colors"
+            className="flex-1 resize-none rounded-xl px-4 py-3 text-sm outline-none transition-colors"
             style={{
               background: 'var(--c-input)',
               border: '1px solid var(--c-border)',
@@ -201,10 +201,10 @@ export default function StudioView() {
           <button
             onClick={handleSend}
             disabled={!input.trim() || isStreaming}
-            className="h-9 w-9 flex items-center justify-center rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            className="h-11 w-11 flex items-center justify-center rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
             style={{ background: 'rgba(45,212,191,0.15)', color: 'rgb(45,212,191)' }}
           >
-            <Send size={14} />
+            <Send size={16} />
           </button>
         </div>
 
@@ -213,10 +213,10 @@ export default function StudioView() {
             <button
               onClick={generateFinalDocument}
               disabled={isStreaming || messages.length === 0}
-              className="flex items-center gap-1.5 text-xs font-medium px-4 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'rgba(45,212,191,0.1)', color: 'rgb(45,212,191)' }}
             >
-              <FileText size={12} />
+              <FileText size={14} />
               Done with plan — Generate Document
             </button>
           </div>
@@ -226,22 +226,20 @@ export default function StudioView() {
   )
 }
 
-// ── Sub-components ──────────────────────────────────────────────────────
-
 function EmptyState() {
   return (
-    <div className="flex-1 h-full flex flex-col items-center justify-center gap-5 text-center p-8 pt-24">
+    <div className="flex-1 h-full flex flex-col items-center justify-center gap-6 text-center p-8 pt-24">
       <div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center"
+        className="w-16 h-16 rounded-2xl flex items-center justify-center"
         style={{ background: 'rgba(45,212,191,0.1)' }}
       >
-        <Sparkles size={24} style={{ color: 'rgba(45,212,191,0.7)' }} />
+        <Sparkles size={28} style={{ color: 'rgba(45,212,191,0.7)' }} />
       </div>
       <div className="max-w-sm">
-        <p className="text-base font-semibold mb-2" style={{ color: 'var(--c-text-1)' }}>
+        <p className="text-lg font-semibold mb-3" style={{ color: 'var(--c-text-1)' }}>
           Turn any idea into a bulletproof plan
         </p>
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
+        <p className="text-base leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
           Tell Studio your raw idea — a trip to plan, a project to build, a goal to reach. Studio
           will ask the right questions to draw out all the details, then generate a comprehensive
           document you can act on immediately.
@@ -256,7 +254,7 @@ function MessageBubble({ message }: { message: StudioMessage }) {
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
+        className="max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
         style={
           isUser
             ? { background: 'rgba(45,212,191,0.12)', color: 'var(--c-text-1)' }
@@ -273,7 +271,7 @@ function StreamingBubble({ text }: { text: string }) {
   return (
     <div className="flex justify-start">
       <div
-        className="max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed"
+        className="max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
         style={{ background: 'var(--c-surface)', color: 'var(--c-text-1)', border: '1px solid var(--c-border-subtle)' }}
       >
         <p className="whitespace-pre-wrap">
@@ -289,13 +287,13 @@ function ThinkingBubble() {
   return (
     <div className="flex justify-start">
       <div
-        className="rounded-2xl px-4 py-3 flex items-center gap-1.5"
+        className="rounded-2xl px-4 py-3.5 flex items-center gap-2"
         style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border-subtle)' }}
       >
         {[0, 1, 2].map((i) => (
           <span
             key={i}
-            className="w-1.5 h-1.5 rounded-full animate-bounce"
+            className="w-2 h-2 rounded-full animate-bounce"
             style={{
               background: 'rgb(45,212,191)',
               opacity: 0.6,
@@ -307,8 +305,6 @@ function ThinkingBubble() {
     </div>
   )
 }
-
-// ── Lightweight markdown renderer ──────────────────────────────────────
 
 function MarkdownDoc({ content }: { content: string }) {
   const lines = content.split('\n')
@@ -330,19 +326,19 @@ function MarkdownDoc({ content }: { content: string }) {
       )
     } else if (line.startsWith('## ')) {
       elements.push(
-        <h2 key={i} className="text-lg font-semibold mt-6 mb-2" style={{ color: 'var(--c-text-1)' }}>
+        <h2 key={i} className="text-xl font-semibold mt-6 mb-2" style={{ color: 'var(--c-text-1)' }}>
           {renderInline(line.slice(3))}
         </h2>,
       )
     } else if (line.startsWith('### ')) {
       elements.push(
-        <h3 key={i} className="text-base font-semibold mt-4 mb-1.5" style={{ color: 'var(--c-text-2)' }}>
+        <h3 key={i} className="text-lg font-semibold mt-4 mb-2" style={{ color: 'var(--c-text-2)' }}>
           {renderInline(line.slice(4))}
         </h3>,
       )
     } else if (line.startsWith('#### ')) {
       elements.push(
-        <h4 key={i} className="text-sm font-semibold mt-3 mb-1" style={{ color: 'var(--c-text-2)' }}>
+        <h4 key={i} className="text-base font-semibold mt-3 mb-1.5" style={{ color: 'var(--c-text-2)' }}>
           {renderInline(line.slice(5))}
         </h4>,
       )
@@ -353,9 +349,9 @@ function MarkdownDoc({ content }: { content: string }) {
         i++
       }
       elements.push(
-        <ul key={`ul-${i}`} className="list-disc pl-5 my-2 space-y-1">
+        <ul key={`ul-${i}`} className="list-disc pl-5 my-2.5 space-y-1.5">
           {items.map((item, j) => (
-            <li key={j} className="text-sm leading-relaxed" style={{ color: 'var(--c-text-2)' }}>
+            <li key={j} className="text-base leading-relaxed" style={{ color: 'var(--c-text-2)' }}>
               {renderInline(item)}
             </li>
           ))}
@@ -369,9 +365,9 @@ function MarkdownDoc({ content }: { content: string }) {
         i++
       }
       elements.push(
-        <ol key={`ol-${i}`} className="list-decimal pl-5 my-2 space-y-1">
+        <ol key={`ol-${i}`} className="list-decimal pl-5 my-2.5 space-y-1.5">
           {items.map((item, j) => (
-            <li key={j} className="text-sm leading-relaxed" style={{ color: 'var(--c-text-2)' }}>
+            <li key={j} className="text-base leading-relaxed" style={{ color: 'var(--c-text-2)' }}>
               {renderInline(item)}
             </li>
           ))}
@@ -380,13 +376,13 @@ function MarkdownDoc({ content }: { content: string }) {
       continue
     } else if (/^-{3,}$/.test(line.trim()) || /^\*{3,}$/.test(line.trim())) {
       elements.push(
-        <hr key={i} className="my-5" style={{ borderColor: 'var(--c-border-subtle)' }} />,
+        <hr key={i} className="my-6" style={{ borderColor: 'var(--c-border-subtle)' }} />,
       )
     } else if (line.startsWith('> ')) {
       elements.push(
         <blockquote
           key={i}
-          className="border-l-2 pl-4 my-2 text-sm italic"
+          className="border-l-2 pl-4 my-3 text-base italic"
           style={{ borderColor: 'rgb(45,212,191)', color: 'var(--c-text-3)' }}
         >
           {renderInline(line.slice(2))}
@@ -403,7 +399,7 @@ function MarkdownDoc({ content }: { content: string }) {
       elements.push(
         <pre
           key={`code-${i}`}
-          className="my-3 rounded-xl p-4 text-xs font-mono overflow-x-auto"
+          className="my-4 rounded-xl p-4 text-sm font-mono overflow-x-auto"
           style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border-subtle)', color: 'var(--c-text-2)' }}
         >
           {langLine && (
@@ -415,10 +411,10 @@ function MarkdownDoc({ content }: { content: string }) {
         </pre>,
       )
     } else if (line.trim() === '') {
-      elements.push(<div key={i} className="h-1.5" />)
+      elements.push(<div key={i} className="h-2" />)
     } else {
       elements.push(
-        <p key={i} className="text-sm leading-relaxed my-1" style={{ color: 'var(--c-text-2)' }}>
+        <p key={i} className="text-base leading-relaxed my-1.5" style={{ color: 'var(--c-text-2)' }}>
           {renderInline(line)}
         </p>,
       )
@@ -447,7 +443,7 @@ function renderInline(text: string): React.ReactNode {
       return (
         <code
           key={i}
-          className="rounded px-1 py-0.5 text-xs font-mono"
+          className="rounded px-1.5 py-0.5 text-sm font-mono"
           style={{ background: 'rgba(45,212,191,0.1)', color: 'rgb(45,212,191)' }}
         >
           {part.slice(1, -1)}

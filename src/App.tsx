@@ -21,9 +21,9 @@ import StudioView from "./components/studio/StudioView";
 
 type MainTab = "workflow" | "chamber" | "studio";
 
-const SIDEBAR_DEFAULT = 200;
-const INSPECTOR_DEFAULT = 300;
-const DRAWER_DEFAULT = 280;
+const SIDEBAR_DEFAULT = 220;
+const INSPECTOR_DEFAULT = 320;
+const DRAWER_DEFAULT = 300;
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -96,7 +96,6 @@ export default function App() {
       return;
     }
 
-    // Ensure we have a workspace — open picker if not set
     let workspace = currentWorkflow.settings?.workspacePath;
     if (!workspace) {
       const selected = await openDialog({
@@ -137,37 +136,37 @@ export default function App() {
 
       <DragHandle
         direction="h"
-        onDelta={(d) => setSidebarWidth((w) => clamp(w + d, 140, 380))}
+        onDelta={(d) => setSidebarWidth((w) => clamp(w + d, 160, 400))}
       />
 
       {/* ── Center column ── */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Tab bar */}
         <div
-          className="h-12 shrink-0 flex items-center border-b"
+          className="h-14 shrink-0 flex items-center border-b"
           style={{
             borderColor: "var(--c-border-subtle)",
             background: "var(--c-surface)",
           }}
         >
-          <div className="flex items-center h-full px-3 gap-0.5">
+          <div className="flex items-center h-full px-3 gap-1">
             <TabButton
               active={activeTab === "workflow"}
               onClick={() => setActiveTab("workflow")}
-              icon={<Sparkles size={13} />}
+              icon={<Sparkles size={15} />}
               label="Workflow"
             />
             <TabButton
               active={activeTab === "chamber"}
               onClick={() => setActiveTab("chamber")}
-              icon={<Swords size={13} />}
+              icon={<Swords size={15} />}
               label="Chamber"
               accent="amber"
             />
             <TabButton
               active={activeTab === "studio"}
               onClick={() => setActiveTab("studio")}
-              icon={<Lightbulb size={13} />}
+              icon={<Lightbulb size={15} />}
               label="Studio"
               accent="teal"
             />
@@ -177,23 +176,23 @@ export default function App() {
           {activeTab === "workflow" && currentWorkflow && (
             <div className="ml-auto flex items-center gap-2 px-4">
               <span
-                className="text-sm truncate max-w-[160px]"
+                className="text-sm truncate max-w-[180px]"
                 style={{ color: "var(--c-text-3)" }}
               >
                 {currentWorkflow.name}
               </span>
               <div
-                className="w-px h-4 mx-1"
+                className="w-px h-5 mx-1"
                 style={{ background: "var(--c-border)" }}
               />
               <input
-                className="w-56 rounded-lg px-3 py-1.5 text-sm outline-none transition-colors"
+                className="w-64 rounded-lg px-3 py-2 text-sm outline-none transition-colors"
                 style={{
                   background: "var(--c-input)",
                   border: "1px solid var(--c-border)",
                   color: "var(--c-text-1)",
                 }}
-                placeholder="Describe your task..."
+                placeholder="Describe your task…"
                 value={taskInput}
                 onChange={(e) => setTaskInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleRun()}
@@ -202,17 +201,17 @@ export default function App() {
               {isRunning ? (
                 <button
                   onClick={cancelRun}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors border border-red-500/20"
+                  className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg bg-red-500/15 text-red-400 hover:bg-red-500/25 transition-colors border border-red-500/20"
                 >
-                  <Square size={11} fill="currentColor" /> Stop
+                  <Square size={13} fill="currentColor" /> Stop
                 </button>
               ) : (
                 <button
                   onClick={handleRun}
                   disabled={!taskInput.trim() || isStarting}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white"
+                  className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white"
                 >
-                  <Play size={11} fill="currentColor" />
+                  <Play size={13} fill="currentColor" />
                   {isStarting ? "Starting…" : "Run"}
                 </button>
               )}
@@ -220,27 +219,27 @@ export default function App() {
           )}
         </div>
 
-        {/* Workspace anchor bar — visible on workflow tab whenever a workflow is open */}
+        {/* Workspace anchor bar */}
         {activeTab === "workflow" && <WorkspaceBar />}
 
         {/* Error toast */}
         {runError && activeTab === "workflow" && (
           <div
-            className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs z-20 border"
+            className="mx-4 mt-2 flex items-center gap-2 px-4 py-3 rounded-xl text-sm z-20 border"
             style={{
               background: "rgba(239,68,68,0.08)",
               borderColor: "rgba(239,68,68,0.2)",
               color: "rgb(252,165,165)",
             }}
           >
-            <AlertTriangle size={13} className="shrink-0" />
+            <AlertTriangle size={15} className="shrink-0" />
             <span className="flex-1">{runError}</span>
             <button
               onClick={() => setRunError(null)}
               style={{ color: "rgba(252,165,165,0.5)" }}
               className="hover:opacity-100"
             >
-              <X size={13} />
+              <X size={15} />
             </button>
           </div>
         )}
@@ -265,7 +264,7 @@ export default function App() {
                   <DragHandle
                     direction="h"
                     onDelta={(d) =>
-                      setInspectorWidth((w) => clamp(w - d, 220, 520))
+                      setInspectorWidth((w) => clamp(w - d, 240, 560))
                     }
                   />
                   <div
@@ -304,7 +303,6 @@ export default function App() {
   );
 }
 
-// ── Tab button ──────────────────────────────────────────────────────
 function TabButton({
   active,
   onClick,
@@ -328,7 +326,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-sm font-medium transition-all"
+      className="flex items-center gap-2 h-9 px-4 rounded-lg text-sm font-medium transition-all"
       style={active ? activeStyle : { color: "var(--c-text-3)" }}
     >
       {icon}
@@ -337,7 +335,6 @@ function TabButton({
   );
 }
 
-// ── Drag handle ─────────────────────────────────────────────────────
 function DragHandle({
   direction,
   onDelta,
@@ -386,26 +383,25 @@ function DragHandle({
   );
 }
 
-// ── Empty state ─────────────────────────────────────────────────────
 function EmptyState() {
   const [showModal, setShowModal] = useState(false);
   return (
-    <div className="flex-1 h-full flex flex-col items-center justify-center gap-5 text-center p-8">
+    <div className="flex-1 h-full flex flex-col items-center justify-center gap-6 text-center p-8">
       <div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center"
+        className="w-16 h-16 rounded-2xl flex items-center justify-center"
         style={{ background: "rgba(168,85,247,0.1)" }}
       >
-        <Sparkles size={24} className="text-purple-400/70" />
+        <Sparkles size={28} className="text-purple-400/70" />
       </div>
-      <div className="max-w-xs">
+      <div className="max-w-sm">
         <p
-          className="text-base font-semibold mb-2"
+          className="text-lg font-semibold mb-3"
           style={{ color: "var(--c-text-1)" }}
         >
           Build your AI workforce
         </p>
         <p
-          className="text-sm leading-relaxed"
+          className="text-base leading-relaxed"
           style={{ color: "var(--c-text-3)" }}
         >
           Create a workflow, fill it with AI agents, and point it at a
@@ -414,7 +410,7 @@ function EmptyState() {
       </div>
       <button
         onClick={() => setShowModal(true)}
-        className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-5 py-2 rounded-xl transition-colors"
+        className="bg-purple-600 hover:bg-purple-500 text-white text-base font-medium px-6 py-2.5 rounded-xl transition-colors"
       >
         New Workflow
       </button>

@@ -121,13 +121,13 @@ const STARTERS: {
 ];
 
 const STARTER_ICON: Record<StarterIcon, ReactNode> = {
-  blank: <Sparkles size={18} />,
-  software: <Settings size={18} />,
-  janitor: <Archive size={18} />,
-  education: <BookOpen size={18} />,
-  creative: <PenLine size={18} />,
-  productivity: <CheckSquare size={18} />,
-  job: <Briefcase size={18} />,
+  blank: <Sparkles size={22} />,
+  software: <Settings size={22} />,
+  janitor: <Archive size={22} />,
+  education: <BookOpen size={22} />,
+  creative: <PenLine size={22} />,
+  productivity: <CheckSquare size={22} />,
+  job: <Briefcase size={22} />,
 };
 
 export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
@@ -167,12 +167,12 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-xl bg-[#0e0e13] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="w-full max-w-2xl bg-[#0e0e13] border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
+        <div className="flex items-center justify-between px-7 py-6 border-b border-white/8">
           <div>
-            <p className="text-base font-bold text-white/90">New Workflow</p>
-            <p className="text-xs text-white/35 mt-0.5">
+            <p className="text-xl font-bold text-white/90">New Workflow</p>
+            <p className="text-sm text-white/40 mt-1">
               Choose a starting template or begin from scratch
             </p>
           </div>
@@ -180,26 +180,26 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             className="text-white/25 hover:text-white/60 transition-colors"
           >
-            <X size={16} />
+            <X size={20} />
           </button>
         </div>
 
         {/* Starter cards */}
-        <div className="p-6 space-y-2.5 max-h-[70vh] overflow-y-auto">
+        <div className="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
           {STARTERS.map((s) => (
             <button
               key={s.id}
               onClick={() => handleSelect(s.id)}
-              className={`w-full flex items-start gap-4 p-4 rounded-xl border bg-white/2 hover:bg-white/5 transition-all text-left ${s.color}`}
+              className={`w-full flex items-start gap-4 p-5 rounded-xl border bg-white/2 hover:bg-white/5 transition-all text-left ${s.color}`}
             >
               <div
-                className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${s.iconBg} ${s.iconColor}`}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${s.iconBg} ${s.iconColor}`}
               >
                 {STARTER_ICON[s.iconKey]}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <p className="text-sm font-semibold text-white/90">
+                <div className="flex items-center gap-2.5 mb-1">
+                  <p className="text-base font-semibold text-white/90">
                     {s.name}
                   </p>
                   {s.agentCount > 0 && (
@@ -208,11 +208,11 @@ export default function NewWorkflowModal({ onClose }: { onClose: () => void }) {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-white/45 leading-relaxed">
+                <p className="text-sm text-white/50 leading-relaxed">
                   {s.description}
                 </p>
               </div>
-              <ArrowRight size={16} className="text-white/20 shrink-0 mt-0.5" />
+              <ArrowRight size={18} className="text-white/20 shrink-0 mt-1" />
             </button>
           ))}
         </div>

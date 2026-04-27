@@ -10,7 +10,7 @@ import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
 import { getRoleInfo, getProviderColor, type RoleCategory } from '../../lib/defaults'
 
-function RoleIcon({ category, size = 14, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
+function RoleIcon({ category, size = 15, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
   const props = { size, className }
   switch (category) {
     case 'developer':  return <Code2 {...props} />
@@ -29,7 +29,6 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
   const { selectedNodeId, setSelectedNode, removeNode } = useWorkflowStore()
   const { currentRun } = useRunStore()
 
-
   const step = currentRun?.steps.filter((s) => s.nodeId === id).at(-1)
   const status = step?.status ?? 'idle'
   const role = getRoleInfo(d.name, d.roleDescription || '')
@@ -45,7 +44,7 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
   const borderColor = isRunning  ? 'rgba(168,85,247,0.7)'
     : isDone    ? 'rgba(52,211,153,0.5)'
     : isError   ? 'rgba(239,68,68,0.5)'
-    : isSelected? 'rgba(168,85,247,0.55)'  // purple works on both light + dark
+    : isSelected? 'rgba(168,85,247,0.55)'
     : needsSetup? 'rgba(245,158,11,0.35)'
     : 'var(--c-border)'
 
@@ -56,7 +55,7 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
 
   return (
     <div
-      className="w-56 rounded-2xl cursor-pointer shadow-md group relative transition-all"
+      className="w-64 rounded-2xl cursor-pointer shadow-md group relative transition-all"
       style={{ background: bgColor, border: `1px solid ${borderColor}` }}
       onClick={() => setSelectedNode(id)}
     >
@@ -66,12 +65,12 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
       {/* Delete button */}
       {!isChild && (
         <button
-          className="absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 text-red-400/60 hover:text-red-400"
+          className="absolute -top-2.5 -right-2.5 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10 text-red-400/60 hover:text-red-400"
           style={{ background: 'var(--c-elevated)', border: '1px solid var(--c-border)' }}
           onClick={(e) => { e.stopPropagation(); removeNode(id) }}
           title="Delete"
         >
-          <X size={9} />
+          <X size={12} />
         </button>
       )}
 
@@ -79,18 +78,18 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         type="target"
         position={Position.Left}
         id="context"
-        className="!bg-purple-500/60 !border-purple-400/30 !w-3 !h-3"
+        className="!bg-purple-500/60 !border-purple-400/30 !w-3.5 !h-3.5"
       />
 
-      <div className="px-3.5 py-3">
+      <div className="px-4 py-3.5">
         {/* Header */}
-        <div className="flex items-center gap-2 mb-2.5">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
             isRunning ? 'bg-purple-500/20 animate-pulse' : isDone ? 'bg-emerald-500/12' : role.bgColor
           }`}>
-            {isRunning ? <Zap size={13} className="text-purple-300" />
-              : isDone  ? <Check size={13} className="text-emerald-400" />
-              : <RoleIcon category={role.category} size={13} className={role.textColor} />
+            {isRunning ? <Zap size={15} className="text-purple-300" />
+              : isDone  ? <Check size={15} className="text-emerald-400" />
+              : <RoleIcon category={role.category} size={15} className={role.textColor} />
             }
           </div>
           <div className="flex-1 min-w-0">
@@ -103,8 +102,8 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         </div>
 
         {/* Model + tool access */}
-        <div className="flex items-center gap-1.5 pb-2 mb-2" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
-          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: getProviderColor(d.model?.provider) }} />
+        <div className="flex items-center gap-2 pb-2.5 mb-2.5" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+          <div className="w-2 h-2 rounded-full shrink-0" style={{ background: getProviderColor(d.model?.provider) }} />
           <span className="text-xs truncate flex-1 min-w-0" style={{ color: 'var(--c-text-dim)' }}>
             {d.model?.modelId ?? 'no model'}
           </span>
@@ -112,11 +111,11 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
             <span className="text-xs tabular-nums shrink-0" style={{ color: 'var(--c-text-dim)' }}>{step.tokensUsed.toLocaleString()}</span>
           ) : (d.toolsEnabled?.length ?? 0) === 0 ? (
             <span className="flex items-center gap-0.5 text-emerald-400/70 shrink-0" title="Full tool access">
-              <ShieldCheck size={10} />
+              <ShieldCheck size={13} />
             </span>
           ) : (
             <span className="flex items-center gap-0.5 text-amber-400/70 shrink-0" title={`Restricted: ${d.toolsEnabled?.length} tools`}>
-              <ShieldAlert size={10} />
+              <ShieldAlert size={13} />
             </span>
           )}
         </div>
@@ -139,7 +138,7 @@ export default memo(function AgentNode({ id, data, parentId }: NodeProps) {
         type="source"
         position={Position.Right}
         id="response"
-        className="!bg-emerald-500/60 !border-emerald-400/30 !w-3 !h-3"
+        className="!bg-emerald-500/60 !border-emerald-400/30 !w-3.5 !h-3.5"
       />
     </div>
   )
@@ -149,7 +148,7 @@ function StatusBadge({ status }: { status: string }) {
   if (status === 'done')
     return (
       <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 flex items-center gap-1 shrink-0 font-medium">
-        <Check size={11} /> Done
+        <Check size={12} /> Done
       </span>
     )
   if (status === 'running')

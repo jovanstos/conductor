@@ -8,7 +8,7 @@ import { getTemplates, saveTemplate, deleteTemplate } from '../../lib/tauri'
 import ModelPicker from '../shared/ModelPicker'
 import AgentTestModal from './AgentTestModal'
 
-function RoleIcon({ category, size = 16, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
+function RoleIcon({ category, size = 18, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
   const props = { size, className }
   switch (category) {
     case 'developer': return <Code2 {...props} />
@@ -43,7 +43,6 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
   const [showTestModal, setShowTestModal] = useState(false)
   const [toolsEnabled, setToolsEnabled] = useState<ToolNameId[]>(d.toolsEnabled ?? [])
 
-  // Custom template save state
   const [showSaveForm, setShowSaveForm] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [saveCategory, setSaveCategory] = useState('My Templates')
@@ -83,13 +82,11 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
 
   function toggleTool(id: ToolNameId) {
     if (isFullAccess) {
-      // Uncheck one tool → restrict to all-except-this
       saveTools(allToolIds.filter((t) => t !== id))
     } else {
       const next = toolsEnabled.includes(id)
         ? toolsEnabled.filter((t) => t !== id)
         : [...toolsEnabled, id]
-      // If everything is now checked, go back to full access (empty = no restriction)
       saveTools(allToolIds.every((t) => next.includes(t)) ? [] : (next as ToolNameId[]))
     }
   }
@@ -133,12 +130,12 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
   return (
     <div className="space-y-4">
       {/* Persona header */}
-      <div className={`flex items-center gap-3 p-3 rounded-xl border ${roleInfo.borderColor} ${roleInfo.bgColor}/30`}>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${roleInfo.bgColor}`}>
-          <RoleIcon category={roleInfo.category} size={18} className={roleInfo.textColor} />
+      <div className={`flex items-center gap-3 p-3.5 rounded-xl border ${roleInfo.borderColor} ${roleInfo.bgColor}/30`}>
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${roleInfo.bgColor}`}>
+          <RoleIcon category={roleInfo.category} size={20} className={roleInfo.textColor} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-white/85 truncate">{name || 'New Agent'}</p>
+          <p className="text-base font-semibold text-white/85 truncate">{name || 'New Agent'}</p>
           <span className={`text-xs px-2 py-0.5 rounded-full ${roleInfo.bgColor} ${roleInfo.textColor} font-medium`}>
             {roleInfo.label}
           </span>
@@ -146,8 +143,8 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
       </div>
 
       {!hasPrompt && (
-        <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-3 py-2.5">
-          <p className="text-xs text-amber-300/80 leading-relaxed">
+        <div className="bg-amber-500/8 border border-amber-500/20 rounded-lg px-4 py-3">
+          <p className="text-sm text-amber-300/80 leading-relaxed">
             No instructions yet. Load a template to get started quickly, or write your own system prompt.
           </p>
         </div>
@@ -157,18 +154,17 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
       <div>
         <button
           onClick={() => setShowTemplates((v) => !v)}
-          className="w-full flex items-center justify-between bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 text-purple-300/80 text-xs px-3 py-2 rounded-lg transition-colors"
+          className="w-full flex items-center justify-between bg-purple-600/15 hover:bg-purple-600/25 border border-purple-500/25 text-purple-300/80 text-sm px-4 py-2.5 rounded-lg transition-colors"
         >
-          <span className="flex items-center gap-1.5"><Zap size={12} /> Load a template</span>
-          {showTemplates ? <ChevronDown size={12} className="text-white/30" /> : <ChevronRight size={12} className="text-white/30" />}
+          <span className="flex items-center gap-2"><Zap size={14} /> Load a template</span>
+          {showTemplates ? <ChevronDown size={14} className="text-white/30" /> : <ChevronRight size={14} className="text-white/30" />}
         </button>
 
         {showTemplates && (
           <div className="mt-1 bg-[#0f0f14] border border-white/8 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
-            {/* User templates */}
             {userTemplates.length > 0 && (
               <div>
-                <p className="px-3 py-1.5 text-xs text-white/30 font-semibold uppercase tracking-widest bg-white/3 sticky top-0">
+                <p className="px-3 py-2 text-xs text-white/30 font-semibold uppercase tracking-widest bg-white/3 sticky top-0">
                   My Templates
                 </p>
                 {userTemplates.map((t) => (
@@ -178,34 +174,33 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
                   >
                     <button
                       onClick={() => applyTemplate(t)}
-                      className="flex-1 text-left px-3 py-2"
+                      className="flex-1 text-left px-4 py-2.5"
                     >
                       <p className="text-sm text-white/80">{t.name}</p>
                       <p className="text-xs text-white/35">{t.description}</p>
                     </button>
                     <button
                       onClick={() => handleDeleteUserTemplate(t.id)}
-                      className="px-1 text-white/20 hover:text-red-400 transition-colors shrink-0"
+                      className="px-2 text-white/20 hover:text-red-400 transition-colors shrink-0"
                       title="Delete template"
                     >
-                      <X size={10} />
+                      <X size={13} />
                     </button>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Built-in templates */}
             {categories.map((cat) => (
               <div key={cat}>
-                <p className="px-3 py-1.5 text-xs text-white/30 font-semibold uppercase tracking-widest bg-white/3 sticky top-0">
+                <p className="px-3 py-2 text-xs text-white/30 font-semibold uppercase tracking-widest bg-white/3 sticky top-0">
                   {cat}
                 </p>
                 {BUILT_IN_TEMPLATES.filter((t) => t.category === cat).map((t) => (
                   <button
                     key={t.id}
                     onClick={() => applyTemplate(t)}
-                    className="w-full text-left px-3 py-2 hover:bg-white/6 transition-colors border-b border-white/4 last:border-0"
+                    className="w-full text-left px-4 py-2.5 hover:bg-white/6 transition-colors border-b border-white/4 last:border-0"
                   >
                     <p className="text-sm text-white/80">{t.name}</p>
                     <p className="text-xs text-white/35">{t.roleDescription}</p>
@@ -245,8 +240,8 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
       </Field>
 
       <Field label="System prompt">
-        <p className="text-xs text-white/30 mb-1.5">
-          The full instruction set for this employee. Templates above give you a great starting point.
+        <p className="text-sm text-white/30 mb-2">
+          The full instruction set for this agent. Templates above give you a great starting point.
         </p>
         <textarea
           className={`${inputCls} h-52 resize-y font-mono text-xs leading-relaxed`}
@@ -260,15 +255,15 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
       {hasPrompt && !showSaveForm && (
         <button
           onClick={() => { setSaveName(name); setShowSaveForm(true) }}
-          className="w-full text-left text-xs text-white/30 hover:text-white/55 flex items-center gap-1.5 transition-colors"
+          className="w-full text-left text-sm text-white/30 hover:text-white/55 flex items-center gap-2 transition-colors"
         >
-          <Plus size={12} className="inline mr-1" /> Save as template
+          <Plus size={14} className="inline" /> Save as template
         </button>
       )}
 
       {showSaveForm && (
-        <div className="bg-white/3 border border-white/8 rounded-xl p-3 space-y-2">
-          <p className="text-xs font-semibold text-white/40 uppercase tracking-wider">Save as template</p>
+        <div className="bg-white/3 border border-white/8 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-white/40 uppercase tracking-wider">Save as template</p>
           <input
             autoFocus
             value={saveName}
@@ -287,13 +282,13 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
             <button
               onClick={handleSaveTemplate}
               disabled={!saveName.trim()}
-              className="flex-1 bg-purple-600/80 hover:bg-purple-600 disabled:opacity-40 text-white text-xs py-1.5 rounded-lg transition-colors"
+              className="flex-1 bg-purple-600/80 hover:bg-purple-600 disabled:opacity-40 text-white text-sm py-2 rounded-lg transition-colors"
             >
               Save
             </button>
             <button
               onClick={() => setShowSaveForm(false)}
-              className="text-xs text-white/30 hover:text-white/60 px-3 py-1.5 transition-colors"
+              className="text-sm text-white/30 hover:text-white/60 px-3 py-2 transition-colors"
             >
               Cancel
             </button>
@@ -304,14 +299,14 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
       {/* Advanced section */}
       <button
         onClick={() => setShowAdvanced((v) => !v)}
-        className="w-full text-left text-xs text-white/30 hover:text-white/50 flex items-center gap-1.5 transition-colors"
+        className="w-full text-left text-sm text-white/30 hover:text-white/50 flex items-center gap-2 transition-colors"
       >
-        {showAdvanced ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {showAdvanced ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         Advanced settings
       </button>
 
       {showAdvanced && (
-        <div className="space-y-3 pl-3 border-l border-white/8">
+        <div className="space-y-4 pl-4 border-l border-white/8">
           <Field label="Context from prior agents">
             <select
               className={selectCls}
@@ -326,7 +321,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
               <option style={optionStyle} value="previous">Previous agent only</option>
               <option style={optionStyle} value="none">None — only sees the original task</option>
             </select>
-            <p className="text-xs text-white/30 mt-1.5 leading-relaxed">
+            <p className="text-sm text-white/30 mt-2 leading-relaxed">
               {CONTEXT_MODE_HELP[contextMode]}
             </p>
           </Field>
@@ -341,7 +336,7 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
               onChange={(e) => setMaxTokens(Number(e.target.value))}
               onBlur={() => save()}
             />
-            <p className="text-xs text-white/25 mt-1">
+            <p className="text-sm text-white/25 mt-1.5">
               Controls how long the agent's response can be. Default (8096) works well for most tasks.
             </p>
           </Field>
@@ -350,36 +345,35 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
 
       {/* Tool access section */}
       <div className="pt-2 border-t border-white/5">
-        {/* Status row */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
             {isFullAccess ? (
-              <ShieldCheck size={12} className="text-emerald-400" />
+              <ShieldCheck size={15} className="text-emerald-400" />
             ) : (
-              <ShieldAlert size={12} className="text-amber-400" />
+              <ShieldAlert size={15} className="text-amber-400" />
             )}
-            <span className="text-xs font-semibold text-white/50">Tool Access</span>
+            <span className="text-sm font-semibold text-white/50">Tool Access</span>
             {isFullAccess ? (
-              <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
                 Full Access
               </span>
             ) : (
-              <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/12 text-amber-400 border border-amber-500/25">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/12 text-amber-400 border border-amber-500/25">
                 Restricted · {toolsEnabled.length}/{allToolIds.length}
               </span>
             )}
           </div>
           <button
             onClick={() => setShowTools((v) => !v)}
-            className="text-xs text-white/30 hover:text-white/55 flex items-center gap-1 transition-colors"
+            className="text-sm text-white/30 hover:text-white/55 flex items-center gap-1.5 transition-colors"
           >
             {showTools ? 'Hide' : 'Restrict'}
-            {showTools ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+            {showTools ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
           </button>
         </div>
 
         {!showTools && isFullAccess && (
-          <p className="text-xs text-white/25 leading-relaxed">
+          <p className="text-sm text-white/25 leading-relaxed">
             All tools are enabled. The agent can read, write, run commands, and fetch URLs.
             Click <em>Restrict</em> to limit access.
           </p>
@@ -390,30 +384,30 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
             {!isFullAccess && (
               <button
                 onClick={() => saveTools([])}
-                className="text-xs text-emerald-400/70 hover:text-emerald-400 transition-colors flex items-center gap-1"
+                className="text-sm text-emerald-400/70 hover:text-emerald-400 transition-colors flex items-center gap-1.5"
               >
-                <ShieldCheck size={11} /> Reset to Full Access
+                <ShieldCheck size={14} /> Reset to Full Access
               </button>
             )}
             {TOOL_GROUPS.map((group) => {
               const groupTools = TOOL_REGISTRY.filter((t) => t.group === group.id)
               return (
                 <div key={group.id}>
-                  <p className="text-xs font-semibold text-white/25 uppercase tracking-wider mb-1">{group.label}</p>
-                  <div className="space-y-0.5">
+                  <p className="text-xs font-semibold text-white/25 uppercase tracking-wider mb-1.5">{group.label}</p>
+                  <div className="space-y-1">
                     {groupTools.map((tool) => (
-                      <label key={tool.id} className="flex items-center gap-2 cursor-pointer group">
+                      <label key={tool.id} className="flex items-center gap-2.5 cursor-pointer group">
                         <input
                           type="checkbox"
                           checked={isChecked(tool.id)}
                           onChange={() => toggleTool(tool.id)}
-                          className="w-3 h-3 accent-purple-500 cursor-pointer"
+                          className="w-4 h-4 accent-purple-500 cursor-pointer"
                         />
-                        <span className="text-xs text-white/55 group-hover:text-white/75 transition-colors flex items-center gap-1 flex-1">
+                        <span className="text-sm text-white/55 group-hover:text-white/75 transition-colors flex items-center gap-1.5 flex-1">
                           {tool.label}
                           {tool.requiresConfirmation && (
                             <span className="text-xs text-amber-400/60 flex items-center gap-0.5 ml-1">
-                              <AlertTriangle size={10} /> asks permission
+                              <AlertTriangle size={12} /> asks permission
                             </span>
                           )}
                         </span>
@@ -431,9 +425,9 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
       <div className="pt-2 border-t border-white/5">
         <button
           onClick={() => setShowTestModal(true)}
-          className="w-full text-xs text-purple-400/60 hover:text-purple-400/90 hover:bg-purple-500/8 border border-purple-500/15 hover:border-purple-500/30 rounded-lg py-2 transition-colors"
+          className="w-full text-sm text-purple-400/60 hover:text-purple-400/90 hover:bg-purple-500/8 border border-purple-500/15 hover:border-purple-500/30 rounded-lg py-2.5 transition-colors"
         >
-          <Play size={11} className="inline mr-1.5" fill="currentColor" />Test this agent
+          <Play size={13} className="inline mr-2" fill="currentColor" />Test this agent
         </button>
       </div>
 
@@ -447,16 +441,16 @@ export default function AgentInspector({ node }: { node: WorkflowNode }) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-semibold text-white/35 uppercase tracking-wider mb-1.5">{label}</p>
+      <p className="text-sm font-semibold text-white/35 uppercase tracking-wider mb-2">{label}</p>
       {children}
     </div>
   )
 }
 
 const inputCls =
-  'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
+  'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
 
 const selectCls =
-  'w-full bg-[#141418] border border-white/10 rounded-lg px-3 py-2 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
+  'w-full bg-[#141418] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white/75 outline-none focus:border-purple-500/50 transition-colors'
 
 const optionStyle = { background: '#141418', color: 'rgba(255,255,255,0.75)' }

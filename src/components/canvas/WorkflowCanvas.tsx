@@ -125,13 +125,11 @@ export default function WorkflowCanvas() {
     currentWorkflow?.edges.map(toRFEdge) ?? [],
   );
 
-  // Sync store → RF on workflow change
   useEffect(() => {
     setRfNodes(currentWorkflow?.nodes.map(toRFNode) ?? []);
     setRfEdges(currentWorkflow?.edges.map(toRFEdge) ?? []);
   }, [currentWorkflow?.nodes, currentWorkflow?.edges, setRfNodes, setRfEdges]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement).tagName;
@@ -208,16 +206,13 @@ export default function WorkflowCanvas() {
     [storeAddEdge, setRfEdges],
   );
 
-  // Prevent connecting to/from child nodes of loop groups, self-loops, and End→Start
   const isValidConnection = useCallback(
     (connection: Connection | RFEdge): boolean => {
       if (connection.source === connection.target) return false
       const nodes = currentWorkflow?.nodes ?? []
       const sourceNode = nodes.find((n) => n.id === connection.source)
       const targetNode = nodes.find((n) => n.id === connection.target)
-      // Child nodes (inside a loop group) cannot have external connections
       if (sourceNode?.parentId || targetNode?.parentId) return false
-      // Prevent obvious End→Start cycle
       if (sourceNode?.type === 'end' && targetNode?.type === 'start') return false
       return true
     },
@@ -294,47 +289,47 @@ export default function WorkflowCanvas() {
   return (
     <div className="w-full h-full relative">
       {/* Toolbar */}
-      <div className="absolute top-3 left-3 z-10 flex gap-1.5 items-center">
+      <div className="absolute top-3 left-3 z-10 flex gap-2 items-center">
         <ToolbarBtn
           onClick={addStartNode}
           title="Add Start node"
-          icon={<Play size={11} fill="currentColor" />}
+          icon={<Play size={14} fill="currentColor" />}
           label="Start"
           color="emerald"
         />
         <ToolbarBtn
           onClick={addAgentNode}
           title="Add Agent"
-          icon={<Sparkles size={11} />}
+          icon={<Sparkles size={14} />}
           label="Agent"
           color="purple"
         />
         <ToolbarBtn
           onClick={addLoopNode}
           title="Add Loop (creates worker + reviewer inside)"
-          icon={<RefreshCw size={11} />}
+          icon={<RefreshCw size={14} />}
           label="Loop"
           color="amber"
         />
         <ToolbarBtn
           onClick={addReviewGate}
           title="Add Review Gate"
-          icon={<GitPullRequest size={11} />}
+          icon={<GitPullRequest size={14} />}
           label="Gate"
           color="blue"
         />
         <ToolbarBtn
           onClick={addEndNode}
           title="Add End node"
-          icon={<StopCircle size={11} />}
+          icon={<StopCircle size={14} />}
           label="End"
           color="indigo"
         />
-        <div className="w-px mx-0.5 self-stretch" style={{ background: 'var(--c-border)' }} />
+        <div className="w-px mx-1 self-stretch" style={{ background: 'var(--c-border)' }} />
         <ToolbarBtn
           onClick={undo}
           title="Undo (Ctrl+Z)"
-          icon={<Undo2 size={11} />}
+          icon={<Undo2 size={14} />}
           label="Undo"
           color="gray"
           disabled={!canUndo}
@@ -342,12 +337,12 @@ export default function WorkflowCanvas() {
         <ToolbarBtn
           onClick={redo}
           title="Redo (Ctrl+Y)"
-          icon={<Redo2 size={11} />}
+          icon={<Redo2 size={14} />}
           label="Redo"
           color="gray"
           disabled={!canRedo}
         />
-        <div className="w-px mx-0.5 self-stretch" style={{ background: 'var(--c-border)' }} />
+        <div className="w-px mx-1 self-stretch" style={{ background: 'var(--c-border)' }} />
         <ModelDefaultControl
           defaultModel={defaultModel}
           onModelChange={setDefaultModel}
@@ -355,7 +350,6 @@ export default function WorkflowCanvas() {
           agentCount={currentWorkflow?.nodes.filter((n) => n.type === 'agent').length ?? 0}
         />
       </div>
-
 
       <ReactFlow
         nodes={rfNodes}
@@ -434,22 +428,21 @@ function ModelDefaultControl({
   }
 
   return (
-    <div className="flex items-center gap-1">
-      {/* Model selector button */}
+    <div className="flex items-center gap-1.5">
       <div className="relative">
         <button
           onClick={() => setPickerOpen((o) => !o)}
           title="Default model — used for new agents"
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors"
+          className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg transition-colors"
           style={btnBase}
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
         >
           <div
-            className="w-1.5 h-1.5 rounded-full shrink-0"
+            className="w-2 h-2 rounded-full shrink-0"
             style={{ background: getProviderColor(defaultModel.provider) }}
           />
-          <span className="max-w-[120px] truncate font-mono">{defaultModel.modelId}</span>
+          <span className="max-w-[130px] truncate font-mono">{defaultModel.modelId}</span>
         </button>
         {pickerOpen && (
           <div className="absolute top-full left-0 mt-1 w-72 z-50">
@@ -464,12 +457,11 @@ function ModelDefaultControl({
         )}
       </div>
 
-      {/* Apply to all button */}
       <button
         onClick={handleApply}
         disabled={agentCount === 0}
         title={`Apply to all ${agentCount} agents`}
-        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         style={btnBase}
         onMouseEnter={e => {
           if (!e.currentTarget.disabled) {
@@ -482,18 +474,17 @@ function ModelDefaultControl({
           e.currentTarget.style.borderColor = 'var(--c-border)'
         }}
       >
-        <ChevronsRight size={11} />
+        <ChevronsRight size={14} />
         Apply to all
       </button>
 
-      {/* Confirm dialog */}
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="rounded-2xl w-80 p-5 space-y-4 shadow-2xl" style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
+          <div className="rounded-2xl w-80 p-6 space-y-5 shadow-2xl" style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>Apply model to all agents?</p>
-                <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
+                <p className="text-base font-semibold" style={{ color: 'var(--c-text-1)' }}>Apply model to all agents?</p>
+                <p className="text-sm mt-1.5 leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
                   Sets all {agentCount} agent{agentCount !== 1 ? 's' : ''} to{' '}
                   <span className="font-mono" style={{ color: 'var(--c-text-2)' }}>{defaultModel.modelId}</span>.
                 </p>
@@ -505,13 +496,13 @@ function ModelDefaultControl({
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-2)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-dim)')}
               >
-                <X size={14} />
+                <X size={16} />
               </button>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmOpen(false)}
-                className="flex-1 text-xs py-2 rounded-xl transition-colors"
+                className="flex-1 text-sm py-2.5 rounded-xl transition-colors"
                 style={{ border: '1px solid var(--c-border)', color: 'var(--c-text-3)' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
@@ -520,7 +511,7 @@ function ModelDefaultControl({
               </button>
               <button
                 onClick={confirmApply}
-                className="flex-1 text-xs py-2 rounded-xl font-medium bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 transition-colors"
+                className="flex-1 text-sm py-2.5 rounded-xl font-medium bg-purple-500/20 border border-purple-500/30 text-purple-400 hover:bg-purple-500/30 transition-colors"
               >
                 Apply to all {agentCount}
               </button>
@@ -560,7 +551,7 @@ function ToolbarBtn({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`border text-xs px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed ${colors[color]}`}
+      className={`border text-sm px-3 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed ${colors[color]}`}
       style={{ background: 'var(--c-surface)', borderColor: color === 'gray' ? 'var(--c-border)' : undefined, color: color === 'gray' ? 'var(--c-text-3)' : undefined }}
     >
       <span>{icon}</span>

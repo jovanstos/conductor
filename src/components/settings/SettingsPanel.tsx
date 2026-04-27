@@ -22,19 +22,19 @@ function ProjectsFolderSettings() {
   }
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)' }}>
-      <span className="flex-1 text-xs font-mono truncate" style={{ color: 'var(--c-text-2)' }} title={defaultProjectsPath}>
+    <div className="flex items-center gap-3 px-4 py-3 rounded-xl" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)' }}>
+      <span className="flex-1 text-sm font-mono truncate" style={{ color: 'var(--c-text-2)' }} title={defaultProjectsPath}>
         {defaultProjectsPath}
       </span>
       <button
         onClick={handleBrowse}
         disabled={saving}
-        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 shrink-0"
+        className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 shrink-0"
         style={{ color: 'var(--c-text-3)', border: '1px solid var(--c-border)' }}
         onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
         onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
       >
-        {saving ? '...' : <><FolderOpen size={11} />Browse</>}
+        {saving ? '...' : <><FolderOpen size={14} />Browse</>}
       </button>
     </div>
   )
@@ -46,41 +46,41 @@ export default function SettingsPanel() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div
-        className="w-[540px] max-h-[82vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden"
+        className="w-[580px] max-h-[84vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden"
         style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}
       >
         {/* Header */}
-        <div className="px-6 py-4 flex items-center justify-between shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
-          <h2 className="text-base font-semibold" style={{ color: 'var(--c-text-1)' }}>Settings</h2>
+        <div className="px-6 py-5 flex items-center justify-between shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--c-text-1)' }}>Settings</h2>
           <button
             onClick={closeSettings}
-            className="transition-colors rounded-md p-1"
+            className="transition-colors rounded-md p-1.5"
             style={{ color: 'var(--c-text-3)' }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-7">
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
 
           {/* Appearance */}
           <SettingsSection title="Appearance">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm" style={{ color: 'var(--c-text-2)' }}>Theme</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--c-text-dim)' }}>Choose how Conductor looks</p>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--c-text-dim)' }}>Choose how Conductor looks</p>
               </div>
               <div className="flex gap-1.5 p-1 rounded-lg" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border-subtle)' }}>
                 {([
-                  { id: 'dark',  icon: <Moon  size={13} />, label: 'Dark'  },
-                  { id: 'light', icon: <Sun   size={13} />, label: 'Light' },
+                  { id: 'dark',  icon: <Moon  size={15} />, label: 'Dark'  },
+                  { id: 'light', icon: <Sun   size={15} />, label: 'Light' },
                 ] as const).map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setTheme(t.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+                    className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all"
                     style={
                       theme === t.id
                         ? { background: 'var(--c-surface)', color: 'var(--c-text-1)', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }
@@ -128,10 +128,10 @@ export default function SettingsPanel() {
           </SettingsSection>
         </div>
 
-        <div className="px-6 py-4 shrink-0 flex justify-end" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
+        <div className="px-6 py-5 shrink-0 flex justify-end" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
           <button
             onClick={closeSettings}
-            className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors"
+            className="bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
           >
             Done
           </button>
@@ -144,8 +144,8 @@ export default function SettingsPanel() {
 function SettingsSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <section>
-      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--c-text-2)' }}>{title}</h3>
-      {description && <p className="text-xs mb-3" style={{ color: 'var(--c-text-dim)' }}>{description}</p>}
+      <h3 className="text-base font-semibold mb-1.5" style={{ color: 'var(--c-text-2)' }}>{title}</h3>
+      {description && <p className="text-sm mb-3 leading-relaxed" style={{ color: 'var(--c-text-dim)' }}>{description}</p>}
       {children}
     </section>
   )
@@ -197,9 +197,9 @@ function ApiKeyRow({
   }
 
   return (
-    <div className="rounded-xl px-4 py-3 space-y-2" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)' }}>
+    <div className="rounded-xl px-4 py-3.5 space-y-2" style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)' }}>
       <div className="flex items-center gap-3">
-        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: hasKey ? '#22c55e' : 'var(--c-text-dim)' }} />
+        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: hasKey ? '#22c55e' : 'var(--c-text-dim)' }} />
         <span className="text-sm w-24" style={{ color: 'var(--c-text-2)' }}>{providerLabel[provider] ?? provider}</span>
 
         {editing ? (
@@ -207,41 +207,41 @@ function ApiKeyRow({
             <input
               type="password"
               autoFocus
-              placeholder="Paste API key..."
-              className="flex-1 rounded-lg px-3 py-1.5 text-sm outline-none"
+              placeholder="Paste API key…"
+              className="flex-1 rounded-lg px-3 py-2 text-sm outline-none"
               style={{ background: 'var(--c-elevated)', border: '1px solid var(--c-border)', color: 'var(--c-text-1)' }}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             />
             <button onClick={handleSave} disabled={saving || !value.trim()}
-              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
+              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm px-3 py-1.5 rounded-lg transition-colors">
               {saving ? '...' : 'Save'}
             </button>
-            <button onClick={() => setEditing(false)} className="text-xs transition-colors" style={{ color: 'var(--c-text-3)' }}>
+            <button onClick={() => setEditing(false)} className="text-sm transition-colors" style={{ color: 'var(--c-text-3)' }}>
               Cancel
             </button>
           </>
         ) : (
           <>
-            <span className="flex-1 text-xs font-mono" style={{ color: 'var(--c-text-dim)' }}>
+            <span className="flex-1 text-sm font-mono" style={{ color: 'var(--c-text-dim)' }}>
               {hasKey ? '••••••••••••••••' : 'Not configured'}
             </span>
             {hasKey && (
               <button onClick={handleTest} disabled={testing}
-                className="text-xs px-3 py-1 rounded-lg transition-colors disabled:opacity-40"
+                className="text-sm px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
                 style={{ color: 'var(--c-text-3)', border: '1px solid var(--c-border)' }}>
-                {testing ? 'Testing...' : 'Test'}
+                {testing ? 'Testing…' : 'Test'}
               </button>
             )}
             <button
               onClick={() => { setEditing(true); setTestResult(null) }}
-              className="text-xs px-3 py-1 rounded-lg transition-colors"
+              className="text-sm px-3 py-1.5 rounded-lg transition-colors"
               style={{ color: 'var(--c-text-3)', border: '1px solid var(--c-border)' }}>
               {hasKey ? 'Update' : 'Add key'}
             </button>
             {hasKey && (
-              <button onClick={onDelete} className="text-xs transition-colors" style={{ color: 'rgba(248,113,113,0.6)' }}
+              <button onClick={onDelete} className="text-sm transition-colors" style={{ color: 'rgba(248,113,113,0.6)' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'rgb(248,113,113)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'rgba(248,113,113,0.6)')}>
                 Remove
@@ -251,8 +251,8 @@ function ApiKeyRow({
         )}
       </div>
       {testResult && (
-        <p className={`text-xs pl-5 flex items-center gap-1 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-          {testResult.ok ? <Check size={11} /> : <X size={11} />}{testResult.msg}
+        <p className={`text-sm pl-5 flex items-center gap-1.5 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+          {testResult.ok ? <Check size={13} /> : <X size={13} />}{testResult.msg}
         </p>
       )}
     </div>
@@ -263,9 +263,9 @@ function OllamaSettings() {
   const { ollamaUrl, setOllamaUrl } = useSettingsStore()
   return (
     <div className="flex items-center gap-3">
-      <label className="text-xs w-20 shrink-0" style={{ color: 'var(--c-text-3)' }}>Base URL</label>
+      <label className="text-sm w-20 shrink-0" style={{ color: 'var(--c-text-3)' }}>Base URL</label>
       <input
-        className="flex-1 rounded-lg px-3 py-2 text-sm outline-none"
+        className="flex-1 rounded-lg px-3 py-2.5 text-sm outline-none"
         style={{ background: 'var(--c-input)', border: '1px solid var(--c-border)', color: 'var(--c-text-1)' }}
         value={ollamaUrl}
         onChange={(e) => setOllamaUrl(e.target.value)}
@@ -300,7 +300,7 @@ function CustomHostsSettings({ hosts }: { hosts: CustomHostEntry[] }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-white/35">
+      <p className="text-sm text-white/35">
         Connect to any OpenAI-compatible API endpoint — DeepSeek, Groq, Together AI, OpenRouter, LiteLLM, and more.
       </p>
       {hosts.map((host) => (
@@ -316,9 +316,9 @@ function CustomHostsSettings({ hosts }: { hosts: CustomHostEntry[] }) {
       ) : (
         <button
           onClick={startAdd}
-          className="flex items-center gap-1.5 text-xs text-purple-400/70 hover:text-purple-400 border border-purple-500/20 hover:border-purple-500/40 px-3 py-1.5 rounded-lg transition-colors"
+          className="flex items-center gap-2 text-sm text-purple-400/70 hover:text-purple-400 border border-purple-500/20 hover:border-purple-500/40 px-3 py-2 rounded-lg transition-colors"
         >
-          <Plus size={12} />
+          <Plus size={14} />
           Add connection
         </button>
       )}
@@ -360,38 +360,37 @@ function CustomHostRow({ host, onEdit }: { host: CustomHostEntry; onEdit: () => 
 
   return (
     <div className="bg-white/4 rounded-xl overflow-hidden">
-      <div className="px-4 py-3 flex items-center gap-3">
-        <div className={`w-2 h-2 rounded-full shrink-0 ${host.hasKey ? 'bg-purple-500' : 'bg-white/20'}`} />
+      <div className="px-4 py-3.5 flex items-center gap-3">
+        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${host.hasKey ? 'bg-purple-500' : 'bg-white/20'}`} />
         <div className="flex-1 min-w-0">
           <p className="text-sm text-white/75 font-medium truncate">{host.name}</p>
           <p className="text-xs text-white/35 font-mono truncate">{host.baseUrl}</p>
         </div>
-        <span className="text-xs text-white/25 shrink-0">
+        <span className="text-sm text-white/25 shrink-0">
           {host.models.length} model{host.models.length !== 1 ? 's' : ''}
         </span>
-        <button onClick={onEdit} className="text-xs text-white/35 hover:text-white/60 border border-white/10 px-2 py-1 rounded-md transition-colors">
+        <button onClick={onEdit} className="text-sm text-white/35 hover:text-white/60 border border-white/10 px-2.5 py-1.5 rounded-md transition-colors">
           Edit
         </button>
         <button onClick={() => deleteCustomHost(host.id)} className="text-red-400/50 hover:text-red-400 transition-colors">
-          <Trash2 size={13} />
+          <Trash2 size={15} />
         </button>
         <button onClick={() => setExpanded((v) => !v)} className="text-white/30 hover:text-white/60">
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
       </div>
 
       {expanded && (
-        <div className="border-t border-white/6 px-4 py-3 space-y-2">
-          {/* Key management */}
+        <div className="border-t border-white/6 px-4 py-3.5 space-y-3">
           <div className="flex items-center gap-3">
-            <span className="text-xs text-white/40 w-16">API Key</span>
+            <span className="text-sm text-white/40 w-16">API Key</span>
             {editingKey ? (
               <>
                 <input
                   type="password"
                   autoFocus
-                  placeholder="Paste API key..."
-                  className="flex-1 bg-white/5 border border-white/15 rounded-lg px-3 py-1.5 text-sm text-white/80 outline-none focus:border-purple-500/50"
+                  placeholder="Paste API key…"
+                  className="flex-1 bg-white/5 border border-white/15 rounded-lg px-3 py-2 text-sm text-white/80 outline-none focus:border-purple-500/50"
                   value={keyValue}
                   onChange={(e) => setKeyValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveKey()}
@@ -399,36 +398,36 @@ function CustomHostRow({ host, onEdit }: { host: CustomHostEntry; onEdit: () => 
                 <button
                   onClick={handleSaveKey}
                   disabled={savingKey || !keyValue.trim()}
-                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs px-3 py-1.5 rounded-md transition-colors"
+                  className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm px-3 py-2 rounded-md transition-colors"
                 >
                   {savingKey ? '...' : 'Save'}
                 </button>
-                <button onClick={() => setEditingKey(false)} className="text-white/30 hover:text-white/60 text-xs">
+                <button onClick={() => setEditingKey(false)} className="text-white/30 hover:text-white/60 text-sm">
                   Cancel
                 </button>
               </>
             ) : (
               <>
-                <span className="flex-1 text-xs text-white/30">
+                <span className="flex-1 text-sm text-white/30">
                   {host.hasKey ? '••••••••••••••••' : 'Not configured'}
                 </span>
                 {host.hasKey && (
                   <button
                     onClick={handleTest}
                     disabled={testing}
-                    className="text-xs text-white/35 hover:text-white/60 border border-white/10 hover:border-white/20 px-3 py-1 rounded-md transition-colors disabled:opacity-40"
+                    className="text-sm text-white/35 hover:text-white/60 border border-white/10 hover:border-white/20 px-3 py-1.5 rounded-md transition-colors disabled:opacity-40"
                   >
-                    {testing ? 'Testing...' : 'Test'}
+                    {testing ? 'Testing…' : 'Test'}
                   </button>
                 )}
                 <button
                   onClick={() => { setEditingKey(true); setTestResult(null) }}
-                  className="text-xs text-white/40 hover:text-white/70 border border-white/10 px-3 py-1 rounded-md transition-colors"
+                  className="text-sm text-white/40 hover:text-white/70 border border-white/10 px-3 py-1.5 rounded-md transition-colors"
                 >
                   {host.hasKey ? 'Update' : 'Add key'}
                 </button>
                 {host.hasKey && (
-                  <button onClick={() => deleteCustomHostKey(host.id)} className="text-xs text-red-400/60 hover:text-red-400 transition-colors">
+                  <button onClick={() => deleteCustomHostKey(host.id)} className="text-sm text-red-400/60 hover:text-red-400 transition-colors">
                     Remove
                   </button>
                 )}
@@ -436,17 +435,16 @@ function CustomHostRow({ host, onEdit }: { host: CustomHostEntry; onEdit: () => 
             )}
           </div>
           {testResult && (
-            <p className={`text-xs pl-0 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
-              {testResult.ok ? <Check size={11} className="inline mr-1" /> : <X size={11} className="inline mr-1" />}{testResult.msg}
+            <p className={`text-sm pl-0 ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+              {testResult.ok ? <Check size={13} className="inline mr-1" /> : <X size={13} className="inline mr-1" />}{testResult.msg}
             </p>
           )}
-          {/* Model list */}
           {host.models.length > 0 && (
             <div className="pt-1">
-              <p className="text-xs text-white/30 mb-1">Models</p>
-              <div className="flex flex-wrap gap-1">
+              <p className="text-sm text-white/30 mb-1.5">Models</p>
+              <div className="flex flex-wrap gap-1.5">
                 {host.models.map((m) => (
-                  <span key={m} className="text-xs bg-white/6 text-white/50 font-mono px-2 py-0.5 rounded">
+                  <span key={m} className="text-sm bg-white/6 text-white/50 font-mono px-2.5 py-0.5 rounded">
                     {m}
                   </span>
                 ))}
@@ -492,52 +490,52 @@ function CustomHostForm({
 
   return (
     <div className="bg-white/4 rounded-xl px-4 py-4 space-y-3 border border-purple-500/20">
-      <p className="text-xs font-semibold text-white/50 uppercase tracking-wider">
+      <p className="text-sm font-semibold text-white/50 uppercase tracking-wider">
         {initial ? 'Edit connection' : 'New connection'}
       </p>
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <div className="flex items-center gap-3">
-          <label className="text-xs text-white/40 w-20">Name</label>
+          <label className="text-sm text-white/40 w-20">Name</label>
           <input
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. DeepSeek"
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/80 outline-none focus:border-purple-500/50"
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 outline-none focus:border-purple-500/50"
           />
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-xs text-white/40 w-20">Base URL</label>
+          <label className="text-sm text-white/40 w-20">Base URL</label>
           <input
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder="https://api.deepseek.com"
-            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/80 font-mono outline-none focus:border-purple-500/50"
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 font-mono outline-none focus:border-purple-500/50"
           />
         </div>
         <div className="flex gap-3">
-          <label className="text-xs text-white/40 w-20 pt-1.5">Models</label>
+          <label className="text-sm text-white/40 w-20 pt-2">Models</label>
           <div className="flex-1">
             <textarea
               value={modelsText}
               onChange={(e) => setModelsText(e.target.value)}
               placeholder={'deepseek-chat\ndeepseek-reasoner'}
               rows={3}
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white/80 font-mono outline-none focus:border-purple-500/50 resize-none"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 font-mono outline-none focus:border-purple-500/50 resize-none"
             />
-            <p className="text-xs text-white/25 mt-1">One model ID per line (or comma-separated)</p>
+            <p className="text-sm text-white/25 mt-1">One model ID per line (or comma-separated)</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <label className="text-xs text-white/40 w-20">Color</label>
-          <div className="flex items-center gap-2">
+          <label className="text-sm text-white/40 w-20">Color</label>
+          <div className="flex items-center gap-2.5">
             <input
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="w-7 h-7 rounded cursor-pointer bg-transparent border-0 p-0"
+              className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
             />
-            <span className="text-xs text-white/30 font-mono">{color}</span>
+            <span className="text-sm text-white/30 font-mono">{color}</span>
           </div>
         </div>
       </div>
@@ -545,11 +543,11 @@ function CustomHostForm({
         <button
           onClick={handleSave}
           disabled={saving || !name.trim() || !baseUrl.trim()}
-          className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-xs px-4 py-1.5 rounded-md transition-colors"
+          className="bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-md transition-colors"
         >
           {saving ? '...' : 'Save'}
         </button>
-        <button onClick={onCancel} className="text-xs text-white/35 hover:text-white/60 border border-white/10 px-3 py-1.5 rounded-md transition-colors">
+        <button onClick={onCancel} className="text-sm text-white/35 hover:text-white/60 border border-white/10 px-3 py-2 rounded-md transition-colors">
           Cancel
         </button>
       </div>

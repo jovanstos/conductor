@@ -27,20 +27,20 @@ export default function Sidebar() {
     <div className="w-full h-full flex flex-col overflow-hidden" style={{ background: 'var(--c-surface)', borderRight: '1px solid var(--c-border-subtle)' }}>
 
       {/* Logo */}
-      <div className="px-4 h-12 flex items-center shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
-        <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--c-text-1)' }}>
-          <Sparkles size={15} className="text-purple-400" />
+      <div className="px-4 h-14 flex items-center shrink-0" style={{ borderBottom: '1px solid var(--c-border-subtle)' }}>
+        <span className="flex items-center gap-2.5 text-base font-semibold" style={{ color: 'var(--c-text-1)' }}>
+          <Sparkles size={18} className="text-purple-400" />
           Conductor
         </span>
       </div>
 
       {/* Search */}
-      <div className="px-3 py-2 shrink-0">
+      <div className="px-3 py-2.5 shrink-0">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search workflows..."
-          className="w-full rounded-lg px-3 py-1.5 text-xs outline-none transition-colors"
+          placeholder="Search workflows…"
+          className="w-full rounded-lg px-3 py-2 text-sm outline-none transition-colors"
           style={{
             background: 'var(--c-input)',
             border: '1px solid var(--c-border-subtle)',
@@ -55,7 +55,7 @@ export default function Sidebar() {
         {/* Workflows */}
         <Section label="Workflows">
           {filtered.length === 0 ? (
-            <p className="px-4 py-2 text-xs" style={{ color: 'var(--c-text-dim)' }}>No workflows yet</p>
+            <p className="px-4 py-2 text-sm" style={{ color: 'var(--c-text-dim)' }}>No workflows yet</p>
           ) : (
             filtered.map((w) => (
               <WorkflowItem
@@ -69,10 +69,10 @@ export default function Sidebar() {
               />
             ))
           )}
-          <div className="mx-2 mt-0.5 flex gap-1">
+          <div className="mx-2 mt-1 flex gap-1">
             <button
               onClick={() => setShowNewModal(true)}
-              className="flex-1 text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+              className="flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors"
               style={{ color: 'var(--c-text-dim)' }}
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-2)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-dim)')}
@@ -81,13 +81,13 @@ export default function Sidebar() {
             </button>
             <button
               onClick={() => importWorkflow()}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors"
               title="Import workflow"
               style={{ color: 'var(--c-text-dim)' }}
               onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-2)')}
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-dim)')}
             >
-              <Upload size={11} /> Import
+              <Upload size={14} /> Import
             </button>
           </div>
         </Section>
@@ -102,12 +102,12 @@ export default function Sidebar() {
               title="Refresh"
               style={{ color: 'var(--c-text-dim)' }}
             >
-              <RefreshCw size={11} />
+              <RefreshCw size={14} />
             </button>
           }
         >
           {projects.length === 0 ? (
-            <p className="px-4 py-2 text-xs" style={{ color: 'var(--c-text-dim)' }}>No projects found</p>
+            <p className="px-4 py-2 text-sm" style={{ color: 'var(--c-text-dim)' }}>No projects found</p>
           ) : (
             projects.map((p) => (
               <ProjectItem key={p.path} project={p} onOpen={() => setSelectedProject(p)} />
@@ -121,12 +121,12 @@ export default function Sidebar() {
       )}
 
       {/* Provider dots */}
-      <div className="px-4 py-2 shrink-0" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="px-4 py-2.5 shrink-0" style={{ borderTop: '1px solid var(--c-border-subtle)' }}>
+        <div className="flex items-center gap-3 flex-wrap">
           {providerStatuses.map((p) => (
             <div key={p.provider} className="flex items-center gap-1.5" title={`${p.provider} ${p.hasKey ? '— connected' : '— no key'}`}>
               <div
-                className="w-1.5 h-1.5 rounded-full"
+                className="w-2 h-2 rounded-full"
                 style={{ background: p.hasKey ? getProviderColor(p.provider) : 'var(--c-text-dim)' }}
               />
               <span className="text-xs capitalize" style={{ color: 'var(--c-text-dim)' }}>{p.provider}</span>
@@ -134,8 +134,8 @@ export default function Sidebar() {
           ))}
           {customHosts.map((h) => (
             <div key={h.id} className="flex items-center gap-1.5" title={`${h.name} ${h.hasKey ? '— connected' : '— no key'}`}>
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: h.hasKey ? h.color : 'var(--c-text-dim)' }} />
-              <span className="text-xs truncate max-w-[60px]" style={{ color: 'var(--c-text-dim)' }}>{h.name}</span>
+              <div className="w-2 h-2 rounded-full" style={{ background: h.hasKey ? h.color : 'var(--c-text-dim)' }} />
+              <span className="text-xs truncate max-w-[70px]" style={{ color: 'var(--c-text-dim)' }}>{h.name}</span>
             </div>
           ))}
         </div>
@@ -144,12 +144,12 @@ export default function Sidebar() {
       {/* Settings */}
       <button
         onClick={openSettings}
-        className="flex items-center gap-2 px-4 py-3 text-sm transition-colors shrink-0"
+        className="flex items-center gap-2.5 px-4 py-3.5 text-sm transition-colors shrink-0"
         style={{ borderTop: '1px solid var(--c-border-subtle)', color: 'var(--c-text-3)' }}
         onMouseEnter={e => (e.currentTarget.style.color = 'var(--c-text-1)')}
         onMouseLeave={e => (e.currentTarget.style.color = 'var(--c-text-3)')}
       >
-        <Settings size={14} /> Settings
+        <Settings size={16} /> Settings
       </button>
 
       {showNewModal && <NewWorkflowModal onClose={() => setShowNewModal(false)} />}
@@ -159,9 +159,9 @@ export default function Sidebar() {
 
 function Section({ label, children, action }: { label: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="mb-3">
-      <div className="flex items-center justify-between px-4 mb-1">
-        <p className="text-xs font-medium" style={{ color: 'var(--c-text-dim)' }}>{label}</p>
+    <div className="mb-4">
+      <div className="flex items-center justify-between px-4 mb-1.5">
+        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--c-text-dim)' }}>{label}</p>
         {action}
       </div>
       {children}
@@ -172,15 +172,15 @@ function Section({ label, children, action }: { label: string; children: React.R
 function ProjectItem({ project, onOpen }: { project: ProjectEntry; onOpen: () => void }) {
   return (
     <div
-      className="mx-2 flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer mb-0.5 group transition-colors"
+      className="mx-2 flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer mb-0.5 group transition-colors"
       style={{ color: 'var(--c-text-3)' }}
       onMouseEnter={e => { e.currentTarget.style.color = 'var(--c-text-2)'; e.currentTarget.style.background = 'var(--c-surface-alt)' }}
       onMouseLeave={e => { e.currentTarget.style.color = 'var(--c-text-3)'; e.currentTarget.style.background = '' }}
       onClick={onOpen}
     >
-      <FolderOpen size={12} className="text-emerald-500/60 shrink-0" />
-      <span className="text-xs truncate flex-1">{project.name}</span>
-      <ChevronRight size={11} className="opacity-0 group-hover:opacity-60 transition-opacity" />
+      <FolderOpen size={14} className="text-emerald-500/60 shrink-0" />
+      <span className="text-sm truncate flex-1">{project.name}</span>
+      <ChevronRight size={13} className="opacity-0 group-hover:opacity-60 transition-opacity" />
     </div>
   )
 }
@@ -211,19 +211,19 @@ function WorkflowItem({
 
   return (
     <div
-      className="mx-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg cursor-pointer mb-0.5 transition-colors"
+      className="mx-2 flex items-center gap-1.5 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors"
       style={active ? activeStyle : hover ? hoverStyle : idleStyle}
       onClick={onSelect}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <span className="text-xs truncate flex-1">{workflow.name}</span>
+      <span className="text-sm truncate flex-1">{workflow.name}</span>
 
       {hover && (
         <div className="flex items-center gap-0.5 shrink-0">
-          <ActionBtn onClick={onExport} title="Export"><Download size={11} /></ActionBtn>
-          <ActionBtn onClick={onDuplicate} title="Duplicate"><Copy size={11} /></ActionBtn>
-          {!active && <ActionBtn onClick={onDelete} title="Delete" danger><Trash2 size={11} /></ActionBtn>}
+          <ActionBtn onClick={onExport} title="Export"><Download size={13} /></ActionBtn>
+          <ActionBtn onClick={onDuplicate} title="Duplicate"><Copy size={13} /></ActionBtn>
+          {!active && <ActionBtn onClick={onDelete} title="Delete" danger><Trash2 size={13} /></ActionBtn>}
         </div>
       )}
     </div>
@@ -242,7 +242,7 @@ function ActionBtn({
     <button
       onClick={(e) => { e.stopPropagation(); onClick() }}
       title={title}
-      className="p-1 rounded transition-colors"
+      className="p-1.5 rounded transition-colors"
       style={{ color: 'var(--c-text-dim)' }}
       onMouseEnter={e => { e.currentTarget.style.color = danger ? 'rgb(248,113,113)' : 'var(--c-text-2)' }}
       onMouseLeave={e => { e.currentTarget.style.color = 'var(--c-text-dim)' }}
