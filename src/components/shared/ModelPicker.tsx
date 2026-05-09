@@ -76,8 +76,8 @@ export default function ModelPicker({
     <>
       <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
       <div
-        style={dropdownStyle}
-        className="bg-[#1a1a22] border border-white/10 rounded-xl shadow-2xl overflow-hidden overflow-y-auto"
+        style={{ ...dropdownStyle, background: 'var(--c-elevated)', border: '1px solid var(--c-border)', borderRadius: '12px', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}
+        className="overflow-hidden overflow-y-auto"
       >
         {/* Cloud providers */}
         {CLOUD_PROVIDERS.map((p) => {
@@ -85,7 +85,7 @@ export default function ModelPicker({
           const status = providerStatuses.find((s) => s.provider === p.id)
           return (
             <div key={p.id}>
-              <div className="px-3 py-2 bg-white/3 flex items-center gap-2 sticky top-0">
+              <div className="px-3 py-2 flex items-center gap-2 sticky top-0" style={{ background: 'var(--c-surface)' }}>
                 <ProviderDot provider={p.id} hasKey={status?.hasKey ?? false} />
                 <span className="text-xs text-white/40 uppercase tracking-wider">{p.label}</span>
                 {!status?.hasKey && <span className="text-xs text-amber-400/60 ml-auto">no key</span>}
@@ -94,9 +94,10 @@ export default function ModelPicker({
                 <button
                   key={m.id}
                   onClick={() => { onChange({ ...value, provider: p.id, modelId: m.id, apiKeyRef: undefined, baseUrl: undefined }); setOpen(false) }}
-                  className={`w-full text-left px-4 py-2.5 hover:bg-white/6 transition-colors text-sm ${
-                    value.modelId === m.id && value.provider === p.id ? 'text-purple-300' : 'text-white/65'
-                  }`}
+                  className="w-full text-left px-4 py-2.5 transition-colors text-sm"
+                  style={{ color: value.modelId === m.id && value.provider === p.id ? 'var(--c-accent)' : 'var(--c-text-2)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--c-card)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
                 >
                   {m.name}
                 </button>
@@ -226,7 +227,10 @@ export default function ModelPicker({
       <button
         ref={triggerRef}
         onClick={handleToggle}
-        className="w-full flex items-center gap-2.5 bg-white/5 border border-white/10 hover:border-white/20 rounded-lg px-3 py-2.5 text-sm text-white/75 transition-colors text-left"
+        className="w-full flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors text-left"
+        style={{ background: 'var(--c-card)', border: '1px solid var(--c-border)', color: 'var(--c-text-1)' }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--c-accent-border)' }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--c-border)' }}
       >
         <ProviderDot provider={value.provider} hasKey={currentHasKey} />
         <span className="flex-1 truncate">{value.modelId}</span>
@@ -238,10 +242,14 @@ export default function ModelPicker({
 }
 
 function ProviderDot({ provider, hasKey }: { provider: ModelProvider; hasKey: boolean }) {
+  const color = hasKey ? getProviderColor(provider) : 'var(--c-text-dim)'
   return (
     <div
-      className="w-2.5 h-2.5 rounded-full shrink-0"
-      style={{ background: hasKey ? getProviderColor(provider) : 'rgba(255,255,255,0.15)' }}
+      className="w-3 h-3 rounded-full shrink-0"
+      style={{
+        background: color,
+        boxShadow: hasKey ? `0 0 8px ${color}88` : 'none',
+      }}
     />
   )
 }

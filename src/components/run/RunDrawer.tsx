@@ -1,65 +1,46 @@
 import { useState, useEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
-import { FolderOpen, Clock, Download, X, ChevronDown, ChevronUp, ChevronRight, Pause, ArrowRight, Square, Code2, Search, PenLine, BookOpen, ClipboardList, TestTube2, Megaphone, Zap, Wrench, Check } from 'lucide-react'
+import { FolderOpen, Clock, Download, X, ChevronDown, ChevronUp, ChevronRight, Pause, ArrowRight, Square, Wrench, Check } from 'lucide-react'
 import { useRunStore } from '../../stores/runStore'
 import * as tauri from '../../lib/tauri'
 import type { RunStep, ToolCallRecord } from '../../types'
-import { getRoleInfo, type RoleCategory } from '../../lib/defaults'
-
-function RoleIcon({ category, size = 15, className = '' }: { category: RoleCategory; size?: number; className?: string }): ReactNode {
-  const props = { size, className }
-  switch (category) {
-    case 'developer': return <Code2 {...props} />
-    case 'reviewer':  return <Search {...props} />
-    case 'writer':    return <PenLine {...props} />
-    case 'researcher':return <BookOpen {...props} />
-    case 'planner':   return <ClipboardList {...props} />
-    case 'tester':    return <TestTube2 {...props} />
-    case 'marketer':  return <Megaphone {...props} />
-    default:          return <Zap {...props} />
-  }
-}
 
 function ToolCallBadge({ tc }: { tc: ToolCallRecord }) {
   const [expanded, setExpanded] = useState(false)
 
-  const containerCls = tc.status === 'running'
-    ? 'border-purple-500/30 bg-purple-500/6'
-    : tc.isError
-      ? 'border-red-500/30 bg-red-500/6'
-      : 'border-white/8 bg-white/3'
-
-  const iconCls = tc.status === 'running'
-    ? 'text-purple-400'
-    : tc.isError
-      ? 'text-red-400'
-      : 'text-emerald-400'
+  const isRunning = tc.status === 'running'
+  const isError = tc.isError
 
   return (
-    <div className={`rounded-lg border px-3 py-2 ${containerCls}`}>
+    <div
+      className="rounded px-3 py-2"
+      style={{
+        background: isRunning ? 'var(--c-accent-glow)' : isError ? 'var(--c-red-dim)' : 'var(--c-card)',
+        border: `1px solid ${isRunning ? 'var(--c-accent-border)' : isError ? 'rgba(248,113,113,0.25)' : 'var(--c-border)'}`,
+      }}
+    >
       <div className="flex items-center gap-2">
-        <Wrench size={13} className={iconCls} />
-        <span className="text-sm font-mono text-white/60 truncate flex-1">
+        <Wrench size={12} style={{ color: isRunning ? 'var(--c-green)' : isError ? 'var(--c-red)' : 'var(--c-text-3)', flexShrink: 0 }} />
+        <span className="text-xs font-mono-accent flex-1 truncate" style={{ color: 'var(--c-text-2)' }}>
           {tc.toolName}
-          {tc.argsPreview && <span className="text-white/35">({tc.argsPreview})</span>}
+          {tc.argsPreview && <span style={{ color: 'var(--c-text-3)' }}>({tc.argsPreview})</span>}
         </span>
-        {tc.status === 'running' && (
-          <span className="flex items-center gap-0.5 shrink-0">
-            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]" />
-            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0.15s]" />
-            <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0.3s]" />
+        {isRunning && (
+          <span className="flex gap-0.5 shrink-0">
+            {[0, 150, 300].map((d) => (
+              <span key={d} className="w-1 h-1 rounded-full animate-bounce" style={{ background: 'var(--c-green)', animationDelay: `${d}ms` }} />
+            ))}
           </span>
         )}
-        {tc.status === 'done' && !tc.isError && <Check size={13} className="text-emerald-400 shrink-0" />}
-        {tc.isError && <span className="text-sm text-red-400 shrink-0 font-medium">Error</span>}
+        {tc.status === 'done' && !isError && <Check size={12} style={{ color: 'var(--c-green)', flexShrink: 0 }} />}
+        {isError && <span className="text-xs shrink-0" style={{ color: 'var(--c-red)' }}>Error</span>}
         {tc.status !== 'running' && tc.resultPreview && (
-          <button onClick={() => setExpanded(v => !v)} className="text-white/30 hover:text-white/55 shrink-0 transition-colors">
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          <button onClick={() => setExpanded((v) => !v)} style={{ color: 'var(--c-text-3)', flexShrink: 0 }}>
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
         )}
       </div>
       {expanded && tc.resultPreview && (
-        <pre className="mt-2 text-xs text-white/45 whitespace-pre-wrap leading-relaxed font-mono border-t border-white/6 pt-2">
+        <pre className="mt-2 text-xs whitespace-pre-wrap leading-relaxed border-t pt-2" style={{ color: 'var(--c-text-2)', borderColor: 'var(--c-border)', fontFamily: 'var(--font-mono)' }}>
           {tc.resultPreview}
         </pre>
       )}
@@ -78,12 +59,10 @@ function fmtDuration(ms: number): string {
 }
 
 export default function RunDrawer({ height }: { height: number }) {
-  const { currentRun, isRunning, isPaused, gateInfo, logLines, cancelRun, clearRun, openResultModal } =
-    useRunStore()
+  const { currentRun, isRunning, isPaused, gateInfo, clearRun, openResultModal, cancelRun } = useRunStore()
   const [discardConfirm, setDiscardConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
-
   const timelineRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -117,8 +96,7 @@ export default function RunDrawer({ height }: { height: number }) {
   async function handleDiscardConfirmed() {
     if (!ws) return
     try { await tauri.deleteWorkspace(ws.workspacePath) } catch { /* ignore */ }
-    setDiscardConfirm(false)
-    clearRun()
+    setDiscardConfirm(false); clearRun()
   }
 
   async function handleExportZip() {
@@ -126,184 +104,152 @@ export default function RunDrawer({ height }: { height: number }) {
     setSaving(true)
     try {
       const { save: saveDialog } = await import('@tauri-apps/plugin-dialog')
-      const dest = await saveDialog({
-        defaultPath: `${ws.projectName ?? 'project'}.zip`,
-        filters: [{ name: 'ZIP Archive', extensions: ['zip'] }],
-      })
+      const dest = await saveDialog({ defaultPath: `${ws.projectName ?? 'project'}.zip`, filters: [{ name: 'ZIP Archive', extensions: ['zip'] }] })
       if (!dest) { setSaving(false); return }
       await tauri.zipAndSaveWorkspace(ws.workspacePath, dest)
       setSaveMsg('Exported!')
       setTimeout(() => setSaveMsg(null), 4000)
-    } catch (e) {
-      setSaveMsg(`Error: ${String(e)}`)
-    }
+    } catch (e) { setSaveMsg(`Error: ${String(e)}`) }
     setSaving(false)
   }
 
-  return (
-    <div className="shrink-0 flex flex-col bg-[#08080b] overflow-hidden" style={{ height }}>
+  const statusBg = isDone ? 'var(--c-green-dim)' : isFailed ? 'var(--c-red-dim)' : isCancelled ? 'var(--c-card)' : isPaused ? 'var(--c-accent-dim)' : 'var(--c-accent-glow)'
+  const statusBorder = isDone ? 'rgba(74,222,128,0.25)' : isFailed ? 'rgba(248,113,113,0.25)' : isCancelled ? 'var(--c-border)' : isPaused ? 'var(--c-accent-border)' : 'var(--c-accent-border)'
+  const dotColor = isDone ? 'var(--c-green)' : isFailed ? 'var(--c-red)' : isCancelled ? 'var(--c-text-3)' : 'var(--c-accent)'
+  const statusColor = isDone ? 'var(--c-green)' : isFailed ? 'var(--c-red)' : isCancelled ? 'var(--c-text-3)' : 'var(--c-accent)'
 
-      {/* ── Status bar ── */}
-      <div className={`flex items-center gap-3 px-4 py-3 border-b shrink-0 ${
-        isDone      ? 'bg-green-500/8 border-green-500/15'
-        : isFailed  ? 'bg-red-500/8 border-red-500/15'
-        : isCancelled ? 'bg-white/3 border-white/6'
-        : isPaused  ? 'bg-blue-500/8 border-blue-500/20'
-        : 'bg-purple-500/8 border-purple-500/12'
-      }`}>
-        <div className={`w-3 h-3 rounded-full shrink-0 ${
-          isDone      ? 'bg-green-500'
-          : isFailed  ? 'bg-red-500'
-          : isCancelled ? 'bg-white/20'
-          : isPaused  ? 'bg-blue-400 animate-pulse'
-          : 'bg-purple-500 animate-pulse'
-        }`} />
+  return (
+    <div className="shrink-0 flex flex-col overflow-hidden" style={{ height, background: 'var(--c-base)', borderTop: '1px solid var(--c-border)' }}>
+
+      {/* Status bar */}
+      <div
+        className="flex items-center gap-3 px-4 py-2.5 shrink-0 border-b"
+        style={{ background: statusBg, borderColor: statusBorder }}
+      >
+        <div
+          className={`w-2 h-2 rounded-full shrink-0 ${isRunning || isPaused ? 'pulse-green' : ''}`}
+          style={{ background: dotColor }}
+        />
 
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-semibold ${
-            isDone      ? 'text-green-400'
-            : isFailed  ? 'text-red-400'
-            : isCancelled ? 'text-white/35'
-            : isPaused  ? 'text-blue-300'
-            : 'text-purple-200'
-          }`}>
-            {isDone ? 'All done! Your team finished the job.'
-              : isFailed ? 'Something went wrong.'
-              : isCancelled ? 'Run was cancelled.'
-              : isPaused ? 'Workflow paused — your input is needed!'
-              : activeStep ? `${activeStep.nodeName} is working…`
-              : 'Your team is starting up…'}
+          <p className="text-sm font-semibold font-mono-accent" style={{ color: statusColor }}>
+            {isDone ? 'COMPLETED'
+              : isFailed ? 'FAILED'
+              : isCancelled ? 'CANCELLED'
+              : isPaused ? 'PAUSED — REVIEW NEEDED'
+              : activeStep ? `${activeStep.nodeName.toUpperCase()} RUNNING`
+              : 'STARTING…'}
           </p>
           {ws && (
-            <p className="text-xs text-white/30 truncate mt-0.5 flex items-center gap-1.5">
+            <p className="text-xs truncate mt-0.5 flex items-center gap-1.5" style={{ color: 'var(--c-text-3)' }}>
               {ws.mode === 'project' || ws.mode === 'existing'
-                ? <><FolderOpen size={12} className="shrink-0" />{ws.projectName ?? 'project'}</>
-                : <><Clock size={12} className="shrink-0" />temporary</>}
-              <span className="text-white/15">·</span>
-              <span className="truncate text-white/20">{ws.workspacePath}</span>
+                ? <><FolderOpen size={11} className="shrink-0" />{ws.projectName ?? 'project'}</>
+                : <><Clock size={11} className="shrink-0" />temporary</>}
               {totalFilesWritten > 0 && (
-                <span className="ml-1 text-emerald-400/70 shrink-0">
-                  · {totalFilesWritten} file{totalFilesWritten !== 1 ? 's' : ''} written
-                </span>
+                <span style={{ color: 'var(--c-green)' }}>· {totalFilesWritten} file{totalFilesWritten !== 1 ? 's' : ''} written</span>
               )}
             </p>
           )}
         </div>
 
         {steps.length > 0 && !isPaused && (
-          <span className="text-sm text-white/30 tabular-nums shrink-0 font-medium">
-            {doneCount} / {steps.length} steps
+          <span className="text-xs font-mono-accent shrink-0" style={{ color: 'var(--c-text-3)' }}>
+            {doneCount}/{steps.length}
           </span>
         )}
 
         <div className="flex items-center gap-2 shrink-0">
           {isDone && currentRun.finalOutput && (
-            <button
-              onClick={openResultModal}
-              className="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-            >
-              See Results <ArrowRight size={14} />
+            <button onClick={openResultModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold"
+              style={{ background: 'var(--c-green)', color: '#000' }}>
+              Results <ArrowRight size={12} />
             </button>
           )}
           {isFinished && ws && (
             <>
-              {ws.mode === 'project' || ws.mode === 'existing' ? (
+              {(ws.mode === 'project' || ws.mode === 'existing') ? (
                 <>
                   <button onClick={handleExportZip} disabled={saving}
-                    className="text-sm text-white/45 hover:text-white/70 border border-white/10 hover:border-white/25 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 flex items-center gap-2"
-                    title="Export project as zip"
-                  >
-                    {saving ? '…' : <><Download size={14} />Export</>}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs transition-colors disabled:opacity-40"
+                    style={{ background: 'var(--c-card)', color: 'var(--c-text-2)', border: '1px solid var(--c-border)' }}>
+                    {saving ? '…' : <><Download size={12} />Export</>}
                   </button>
                   <button onClick={clearRun}
-                    className="text-sm text-emerald-400/75 hover:text-emerald-300 border border-emerald-500/20 hover:border-emerald-500/40 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-                  ><FolderOpen size={14} />Keep Project</button>
-                  <button onClick={handleDiscard}
-                    className="text-sm text-red-400/60 hover:text-red-400 transition-colors"
-                  >Discard</button>
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs"
+                    style={{ color: 'var(--c-green)', border: '1px solid rgba(0,255,136,0.2)' }}>
+                    <FolderOpen size={12} />Keep
+                  </button>
+                  <button onClick={handleDiscard} className="text-xs" style={{ color: 'var(--c-text-3)' }}>Discard</button>
                 </>
               ) : (
                 <button onClick={handleDiscard}
-                  className="text-sm text-white/35 hover:text-white/65 border border-white/8 hover:border-white/20 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-                ><X size={14} />Discard</button>
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs"
+                  style={{ background: 'var(--c-card)', color: 'var(--c-text-2)', border: '1px solid var(--c-border)' }}>
+                  <X size={12} />Dismiss
+                </button>
               )}
             </>
           )}
           {isRunning && (
             <button onClick={cancelRun}
-              className="text-sm text-red-400/75 hover:text-red-400 border border-red-500/20 hover:border-red-500/40 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-2"
-            ><Square size={13} fill="currentColor" />Cancel</button>
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs"
+              style={{ background: 'var(--c-red-dim)', color: 'var(--c-red)', border: '1px solid rgba(255,68,68,0.25)' }}>
+              <Square size={11} fill="currentColor" />Stop
+            </button>
           )}
-          {!ws && (
-            <button onClick={clearRun}
-              className="text-white/25 hover:text-white/55 transition-colors ml-1"
-              title="Dismiss"
-            ><X size={16} /></button>
+          {!ws && isFinished && (
+            <button onClick={clearRun} style={{ color: 'var(--c-text-3)' }}><X size={15} /></button>
           )}
         </div>
       </div>
 
-      {/* ── Save message toast ── */}
       {saveMsg && (
-        <div className="mx-3 mt-2 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 text-sm text-emerald-300">
+        <div className="mx-3 mt-2 shrink-0 px-3 py-2 rounded text-xs" style={{ background: 'var(--c-green-dim)', color: 'var(--c-green)', border: '1px solid rgba(0,255,136,0.2)' }}>
           {saveMsg}
         </div>
       )}
 
-      {/* ── Discard confirmation ── */}
       {discardConfirm && (
-        <div className="mx-3 mt-2 shrink-0 bg-red-500/10 border border-red-500/25 rounded-xl px-4 py-3 flex items-center gap-3">
+        <div className="mx-3 mt-2 shrink-0 rounded px-4 py-3 flex items-center gap-3" style={{ background: 'var(--c-red-dim)', border: '1px solid rgba(255,68,68,0.25)' }}>
           <div className="flex-1">
-            <p className="text-base font-semibold text-red-300">Delete project files?</p>
-            <p className="text-sm text-red-300/60 mt-0.5">
-              This will permanently delete all generated files at {ws?.workspacePath}. Cannot be undone.
+            <p className="text-sm font-semibold" style={{ color: 'var(--c-red)' }}>Delete project files?</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,68,68,0.6)' }}>
+              This will permanently delete all files at {ws?.workspacePath}. Cannot be undone.
             </p>
           </div>
           <button onClick={handleDiscardConfirmed}
-            className="text-sm bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg transition-colors shrink-0"
-          >Delete</button>
-          <button onClick={() => setDiscardConfirm(false)}
-            className="text-sm text-white/40 hover:text-white/70 transition-colors shrink-0"
-          >Cancel</button>
+            className="text-xs px-3 py-1.5 rounded"
+            style={{ background: 'var(--c-red)', color: '#fff' }}>Delete</button>
+          <button onClick={() => setDiscardConfirm(false)} className="text-xs" style={{ color: 'var(--c-text-3)' }}>Cancel</button>
         </div>
       )}
 
-      {/* ── Gate notice ── */}
       {isPaused && gateInfo && (
-        <div className="mx-3 mt-3 shrink-0 bg-blue-500/10 border border-blue-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center animate-pulse shrink-0 text-blue-400">
-            <Pause size={18} />
-          </div>
+        <div className="mx-3 mt-2 shrink-0 rounded px-4 py-3 flex items-center gap-3" style={{ background: 'var(--c-blue-dim)', border: '1px solid rgba(68,136,255,0.25)' }}>
+          <Pause size={16} style={{ color: 'var(--c-blue)', flexShrink: 0 }} className="animate-pulse" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-blue-300">Review panel is open</p>
-            <p className="text-sm text-blue-300/55 mt-0.5 line-clamp-1">
+            <p className="text-sm font-semibold" style={{ color: 'var(--c-blue)' }}>Review panel is open</p>
+            <p className="text-xs line-clamp-1 mt-0.5" style={{ color: 'rgba(68,136,255,0.6)' }}>
               {gateInfo.message || 'Check the review popup and click Approve to continue.'}
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Timeline ── */}
+      {/* Timeline */}
       <div ref={timelineRef} className="flex-1 overflow-y-auto px-3 py-3">
         {steps.length === 0 ? (
           <div className="flex items-center gap-2 h-full justify-center">
-            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]" />
-            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:0.15s]" />
-            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:0.3s]" />
-            <span className="text-sm text-white/30 ml-1">Preparing your team…</span>
+            {[0, 150, 300].map((d) => (
+              <span key={d} className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: 'var(--c-green)', animationDelay: `${d}ms` }} />
+            ))}
+            <span className="text-xs ml-1" style={{ color: 'var(--c-text-3)' }}>Starting…</span>
           </div>
         ) : (
           <div className="space-y-0">
             {steps.map((step, i) => (
               <TimelineEntry key={`${step.nodeId}-${step.attempt}`} step={step} isLast={i === steps.length - 1} />
-            ))}
-            {logLines.filter(l => l.startsWith('[gate]') || l.startsWith('[cancelled]') || l.startsWith('[done]')).map((line, i) => (
-              <div key={i} className="flex items-center gap-3 pl-1 py-1">
-                <div className="w-5 flex justify-center shrink-0">
-                  <div className="w-2 h-2 rounded-full bg-white/15" />
-                </div>
-                <p className="text-sm text-white/25 italic">{line}</p>
-              </div>
             ))}
           </div>
         )}
@@ -313,8 +259,8 @@ export default function RunDrawer({ height }: { height: number }) {
 }
 
 function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
-  const [showPrompt, setShowPrompt] = useState(false)
   const [showOutput, setShowOutput] = useState(false)
+  const [showPrompt, setShowPrompt] = useState(false)
   const [showFiles, setShowFiles] = useState(false)
   const streamRef = useRef<HTMLDivElement>(null)
 
@@ -332,64 +278,57 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
   const hasFiles   = (step.filesWritten?.length ?? 0) > 0
   const hasOutput  = !isRunning && (step.output || step.error)
   const promptChars = step.input?.length ?? 0
-  const role = getRoleInfo(step.nodeName, '')
+
+  const dotColor = isRunning ? 'var(--c-green)' : isDone ? 'var(--c-green)' : isError ? 'var(--c-red)' : 'var(--c-border)'
+  const dotOpacity = isDone ? 0.6 : 1
 
   return (
     <div className="flex gap-3">
-      {/* Timeline spine */}
+      {/* Spine */}
       <div className="flex flex-col items-center shrink-0 w-5">
-        <div className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 mt-1.5 ${
-          isRunning ? 'border-purple-400 bg-purple-500/30 animate-pulse'
-            : isDone  ? 'border-green-500 bg-green-500/25'
-            : isError ? 'border-red-500 bg-red-500/25'
-            : 'border-white/20 bg-white/5'
-        }`} />
-        {!isLast && <div className="w-px flex-1 bg-white/8 mt-1 mb-0" />}
+        <div
+          className={`w-3 h-3 rounded-full border shrink-0 mt-1.5 ${isRunning ? 'pulse-accent' : ''}`}
+          style={{
+            borderColor: dotColor,
+            background: isRunning ? 'var(--c-accent-glow)' : isDone ? 'var(--c-green-dim)' : isError ? 'var(--c-red-dim)' : 'var(--c-card)',
+            opacity: dotOpacity,
+          }}
+        />
+        {!isLast && <div className="w-px flex-1 mt-1" style={{ background: 'var(--c-border)' }} />}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0 pb-5">
-        {/* Header row */}
+      <div className="flex-1 min-w-0 pb-4">
         <div className="flex items-center gap-2 flex-wrap mt-1">
-          <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
-            isRunning ? 'bg-purple-500/20' : isDone ? 'bg-green-500/15' : role.bgColor
-          }`}>
-            <RoleIcon
-              category={role.category}
-              size={15}
-              className={isRunning ? 'text-purple-300' : isDone ? 'text-green-400' : role.textColor}
-            />
-          </div>
-          <span className="text-sm font-semibold text-white/85">
-            {isRunning ? `${step.nodeName} is working…`
-              : isDone  ? step.nodeName
-              : isError ? `${step.nodeName} ran into a problem`
-              : step.nodeName}
+          <span className="text-xs font-semibold font-mono-accent" style={{ color: isRunning ? 'var(--c-green)' : isDone ? 'var(--c-text-1)' : isError ? 'var(--c-red)' : 'var(--c-text-2)' }}>
+            {step.nodeName}
           </span>
           {step.attempt > 1 && (
-            <span className="text-xs text-amber-400/75 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-medium">
-              revision {step.attempt}
+            <span className="text-xs px-1.5 py-0.5 rounded font-mono-accent" style={{ background: 'var(--c-amber-dim)', color: 'var(--c-amber)', border: '1px solid rgba(255,170,0,0.2)' }}>
+              rev {step.attempt}
             </span>
           )}
           {isRunning && (
-            <span className="flex items-center gap-0.5">
-              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0.15s]" />
-              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce [animation-delay:0.3s]" />
+            <span className="flex gap-0.5">
+              {[0, 150, 300].map((d) => (
+                <span key={d} className="w-1 h-1 rounded-full animate-bounce" style={{ background: 'var(--c-green)', animationDelay: `${d}ms` }} />
+              ))}
             </span>
           )}
-          {durationMs !== null && (
-            <span className="text-xs text-white/30 tabular-nums ml-auto">{fmtDuration(durationMs)}</span>
-          )}
-          {step.tokensUsed != null && (
-            <span className="text-xs text-white/25 tabular-nums">{step.tokensUsed.toLocaleString()} tok</span>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {durationMs !== null && (
+              <span className="text-xs font-mono-accent" style={{ color: 'var(--c-text-3)' }}>{fmtDuration(durationMs)}</span>
+            )}
+            {step.tokensUsed != null && (
+              <span className="text-xs font-mono-accent" style={{ color: 'var(--c-text-dim)' }}>{step.tokensUsed.toLocaleString()}t</span>
+            )}
+          </div>
         </div>
 
-        {/* Live streaming output */}
+        {/* Live streaming */}
         {isRunning && step.output && (
-          <div ref={streamRef} className="mt-2 max-h-32 overflow-y-auto rounded-lg bg-black/20 px-3 py-2 border border-purple-500/10">
-            <pre className="text-xs text-purple-200/60 whitespace-pre-wrap leading-relaxed font-mono">
+          <div ref={streamRef} className="mt-2 max-h-28 overflow-y-auto rounded px-3 py-2" style={{ background: 'var(--c-card)', border: '1px solid rgba(0,255,136,0.15)' }}>
+            <pre className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--c-text-2)', fontFamily: 'var(--font-mono)' }}>
               {step.output}
             </pre>
           </div>
@@ -397,64 +336,55 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
 
         {/* Tool calls */}
         {(step.toolCalls?.length ?? 0) > 0 && (
-          <div className="mt-2 space-y-1.5">
-            {step.toolCalls!.map((tc) => (
-              <ToolCallBadge key={tc.toolCallId} tc={tc} />
-            ))}
+          <div className="mt-2 space-y-1">
+            {step.toolCalls!.map((tc) => <ToolCallBadge key={tc.toolCallId} tc={tc} />)}
           </div>
         )}
 
         {/* Files written */}
         {hasFiles && (
           <div className="mt-2">
-            <button
-              onClick={() => setShowFiles(v => !v)}
-              className="flex items-center gap-2 text-sm text-emerald-400/75 hover:text-emerald-300 transition-colors"
-            >
-              <FolderOpen size={14} />
-              <span>{step.filesWritten!.length} file{step.filesWritten!.length !== 1 ? 's' : ''} written</span>
-              {showFiles ? <ChevronUp size={13} className="text-white/25" /> : <ChevronDown size={13} className="text-white/25" />}
+            <button onClick={() => setShowFiles((v) => !v)}
+              className="flex items-center gap-1.5 text-xs"
+              style={{ color: 'var(--c-green)' }}>
+              <FolderOpen size={12} />
+              {step.filesWritten!.length} file{step.filesWritten!.length !== 1 ? 's' : ''} written
+              {showFiles ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
             </button>
             {showFiles && (
-              <div className="mt-1.5 bg-black/20 rounded-lg p-2.5 space-y-1">
-                {step.filesWritten!.map(f => (
-                  <p key={f} className="text-sm text-emerald-300/60 font-mono truncate">{f}</p>
+              <div className="mt-1.5 rounded p-2 space-y-0.5" style={{ background: 'var(--c-card)', border: '1px solid var(--c-border)' }}>
+                {step.filesWritten!.map((f) => (
+                  <p key={f} className="text-xs truncate font-mono-accent" style={{ color: 'var(--c-green)' }}>{f}</p>
                 ))}
               </div>
             )}
           </div>
         )}
 
-        {/* Finished output */}
+        {/* Output */}
         {hasOutput && (
           <div className="mt-2">
             {showOutput ? (
               <>
-                <div className="max-h-52 overflow-y-auto rounded-lg bg-black/25 px-3 py-2.5 border border-white/6 mb-1.5">
-                  <pre className="text-xs text-white/65 whitespace-pre-wrap leading-relaxed font-mono">
-                    {isError
-                      ? <span className="text-red-400">{step.error}</span>
-                      : step.output}
+                <div className="max-h-48 overflow-y-auto rounded px-3 py-2 mb-1" style={{ background: 'var(--c-card)', border: '1px solid var(--c-border)' }}>
+                  <pre className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: isError ? 'var(--c-red)' : 'var(--c-text-2)', fontFamily: 'var(--font-mono)' }}>
+                    {isError ? step.error : step.output}
                   </pre>
                 </div>
-                <button
-                  onClick={() => setShowOutput(false)}
-                  className="text-sm text-white/30 hover:text-white/60 transition-colors flex items-center gap-1.5"
-                >
-                  <ChevronUp size={13} />Collapse
+                <button onClick={() => setShowOutput(false)}
+                  className="text-xs flex items-center gap-1" style={{ color: 'var(--c-text-3)' }}>
+                  <ChevronUp size={11} />Collapse
                 </button>
               </>
             ) : (
               <>
-                <p className="text-sm text-white/40 line-clamp-2 leading-relaxed">
+                <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: isError ? 'var(--c-red)' : 'var(--c-text-3)' }}>
                   {isError ? step.error : step.output}
                 </p>
                 {((step.output?.length ?? 0) > 80 || isError) && (
-                  <button
-                    onClick={() => setShowOutput(true)}
-                    className="text-sm text-purple-400/65 hover:text-purple-300 transition-colors mt-1 flex items-center gap-1.5"
-                  >
-                    <ChevronDown size={13} />View output →
+                  <button onClick={() => setShowOutput(true)}
+                    className="text-xs flex items-center gap-1 mt-1" style={{ color: 'var(--c-text-3)' }}>
+                    <ChevronDown size={11} />View output
                   </button>
                 )}
               </>
@@ -462,19 +392,17 @@ function TimelineEntry({ step, isLast }: { step: RunStep; isLast: boolean }) {
           </div>
         )}
 
-        {/* View prompt */}
+        {/* Prompt */}
         {promptChars > 0 && (
-          <div className="mt-2">
-            <button
-              onClick={() => setShowPrompt(v => !v)}
-              className="text-sm text-white/25 hover:text-white/45 transition-colors flex items-center gap-1.5"
-            >
-              {showPrompt ? <ChevronUp size={13} /> : <ChevronRight size={13} />}
-              <span>Prompt ({promptChars.toLocaleString()} chars)</span>
+          <div className="mt-1.5">
+            <button onClick={() => setShowPrompt((v) => !v)}
+              className="text-xs flex items-center gap-1" style={{ color: 'var(--c-text-dim)' }}>
+              {showPrompt ? <ChevronUp size={11} /> : <ChevronRight size={11} />}
+              Prompt ({promptChars.toLocaleString()} chars)
             </button>
             {showPrompt && (
-              <div className="mt-2 max-h-52 overflow-y-auto rounded-lg bg-black/30 px-3 py-2.5 border border-white/5">
-                <pre className="text-xs text-white/40 whitespace-pre-wrap leading-relaxed font-mono">
+              <div className="mt-1 max-h-48 overflow-y-auto rounded px-3 py-2" style={{ background: 'var(--c-card)', border: '1px solid var(--c-border)' }}>
+                <pre className="text-xs whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--c-text-3)', fontFamily: 'var(--font-mono)' }}>
                   {step.input}
                 </pre>
               </div>

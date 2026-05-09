@@ -1,302 +1,176 @@
 @import "tailwindcss";
 
 /* ══════════════════════════════════════════════════════════════════
-   DESIGN TOKENS  ─  change values here to update the entire app.
-   ─────────────────────────────────────────────────────────────────
-   Sections:
-     1. Tailwind font-scale overrides  (@theme)
-     2. Responsive base font size      (html)
-     3. Colour tokens                  (:root / html.light)
-     4. Typography scale variables     (--fs-*)
-     5. Icon size guide                (--icon-*)
-     6. Spacing scale variables        (--sp-*)
-     7. Component styles               (scrollbars, inputs, ReactFlow)
-     8. Light-mode Tailwind remaps     (html.light .text-white/*, …)
+   CONDUCTOR — Obsidian Theme
+   Medium charcoal base (#1c1c1e) · Pure white text · Indigo accent
+   Not too dark, not too light — modern sleek dark mode
 ══════════════════════════════════════════════════════════════════ */
 
-
-/* ── 1. Tailwind font-scale overrides ───────────────────────────────
-   Bumps every text-* class so text-xs / text-sm are legible at
-   normal desktop sizes without touching any component file.
-   Change just these two numbers to shift the entire type scale.
-──────────────────────────────────────────────────────────────────── */
 @theme {
-  --font-size-xs:   0.8125rem;   /* 13 px @ 16 px base  (Tailwind default: 12 px) */
-  --font-size-sm:   0.9375rem;   /* 15 px @ 16 px base  (Tailwind default: 14 px) */
-  --font-size-base: 1rem;        /* 16 px @ 16 px base */
-  --font-size-lg:   1.125rem;    /* 18 px @ 16 px base */
-  --font-size-xl:   1.25rem;     /* 20 px @ 16 px base */
-  --font-size-2xl:  1.5rem;      /* 24 px @ 16 px base */
-  --font-size-3xl:  1.875rem;    /* 30 px @ 16 px base */
+  --font-size-xs:   0.875rem;    /* 14px */
+  --font-size-sm:   1rem;        /* 16px */
+  --font-size-base: 1.0625rem;   /* 17px */
+  --font-size-lg:   1.1875rem;   /* 19px */
+  --font-size-xl:   1.375rem;    /* 22px */
+  --font-size-2xl:  1.625rem;    /* 26px */
+  --font-size-3xl:  2rem;        /* 32px */
 }
 
-
-/* ── 2. Responsive base font size ───────────────────────────────────
-   ALL rem values (Tailwind classes + --fs-* vars) scale with this.
-   Calibrated for desktop:  1024 px → 14 px  │  1440 px → 16 px  │  1920 px → 18 px
-   To shrink / grow the whole app: adjust only the clamp() values.
-──────────────────────────────────────────────────────────────────── */
 html {
-  font-size: clamp(14px, 0.45vw + 9.4px, 18px);
+  font-size: clamp(14px, 0.5vw + 10px, 17px);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  -webkit-text-size-adjust: 100%;
 }
 
-
-/* ── 3. Colour tokens ───────────────────────────────────────────────
-   Dark (default).  All component colours reference var(--c-*).
-──────────────────────────────────────────────────────────────────── */
 :root {
-  --c-base:          #0f0f12;
-  --c-surface:       #16161b;
-  --c-surface-alt:   #1c1c23;
-  --c-elevated:      #22222c;
-  --c-input:         #1e1e27;
+  /* ── Backgrounds — darker Obsidian ── */
+  --c-base:        #141415;   /* dark but not black — clearly visible panels */
+  --c-surface:     #1c1c1e;   /* macOS dark sidebar color */
+  --c-card:        #252528;   /* cards — clearly distinct */
+  --c-elevated:    #2e2e32;   /* dropdowns, tooltips */
+  --c-input:       #1a1a1d;   /* form inputs */
 
-  --c-border:        rgba(255,255,255,0.09);
-  --c-border-subtle: rgba(255,255,255,0.05);
+  /* ── Borders ── */
+  --c-border:        #38383f;
+  --c-border-subtle: #222226;
 
-  --c-text-1:   rgba(255,255,255,0.88);
-  --c-text-2:   rgba(255,255,255,0.58);
-  --c-text-3:   rgba(255,255,255,0.38);
-  --c-text-dim: rgba(255,255,255,0.22);
+  /* ── Text — HIGH CONTRAST ── */
+  --c-text-1:   #ffffff;    /* pure white — primary */
+  --c-text-2:   #e4e4e7;    /* zinc-200 — secondary, still very readable */
+  --c-text-3:   #a1a1aa;    /* zinc-400 — tertiary */
+  --c-text-dim: #71717a;    /* zinc-500 — disabled/placeholders */
 
-  --c-canvas:   #0f0f12;
+  /* ── Indigo — primary accent (running, active, buttons) ── */
+  --c-accent:        #6366f1;
+  --c-accent-dim:    rgba(99, 102, 241, 0.18);
+  --c-accent-glow:   rgba(99, 102, 241, 0.08);
+  --c-accent-border: rgba(99, 102, 241, 0.45);
 
+  /* ── Green — done/success ── */
+  --c-green:      #22c55e;
+  --c-green-dim:  rgba(34, 197, 94, 0.15);
+  --c-green-glow: rgba(34, 197, 94, 0.07);
 
-  /* ── 4. Typography scale ──────────────────────────────────────────
-     rem units — scale automatically with html font-size above.
-     Use these in CSS rules; prefer text-* Tailwind classes in JSX.
-     ─────────────────────────────────────────────────────────────── */
-  --fs-2xs:  0.6875rem;    /*  11 px  ─ timestamps, badge text        */
-  --fs-xs:   0.8125rem;    /*  13 px  ─ secondary labels, meta        */
-  --fs-sm:   0.9375rem;    /*  15 px  ─ body text, form fields        */
-  --fs-base: 1rem;         /*  16 px  ─ primary labels                */
-  --fs-lg:   1.125rem;     /*  18 px  ─ panel / section headings      */
-  --fs-xl:   1.25rem;      /*  20 px  ─ modal titles                  */
-  --fs-2xl:  1.5rem;       /*  24 px  ─ page-level headings           */
+  /* ── Amber — loops / scheduled ── */
+  --c-loop:      #f59e0b;
+  --c-loop-dim:  rgba(245, 158, 11, 0.15);
+  --c-amber:     #f59e0b;
+  --c-amber-dim: rgba(245, 158, 11, 0.15);
 
+  /* ── Red — error/stop ── */
+  --c-red:        #ef4444;
+  --c-red-dim:    rgba(239, 68, 68, 0.15);
 
-  /* ── 5. Icon sizes ────────────────────────────────────────────────
-     Use as size={} prop on Lucide icons.
-     xs=12  sm=14  md=16  lg=20  xl=24
-     These are intentionally px (not rem) — icons don't need to
-     scale with text in the same way.
-     ─────────────────────────────────────────────────────────────── */
-  --icon-xs: 12px;
-  --icon-sm: 14px;
-  --icon-md: 16px;
-  --icon-lg: 20px;
-  --icon-xl: 24px;
+  /* ── Purple — studio ── */
+  --c-purple:     #a78bfa;
+  --c-purple-dim: rgba(167, 139, 250, 0.15);
 
+  /* ── Provider colors ── */
+  --c-anthropic:  #f97316;
+  --c-openai:     #10b981;
+  --c-ollama:     #3b82f6;
+  --c-custom:     #a855f7;
 
-  /* ── 6. Spacing scale ─────────────────────────────────────────────
-     rem units — scales with html font-size.
-     Tailwind p-* / m-* / gap-* already use rem so they scale too.
-     Use these in CSS rules when Tailwind utilities aren't enough.
-     ─────────────────────────────────────────────────────────────── */
-  --sp-1:  0.25rem;    /*  4 px  */
-  --sp-2:  0.5rem;     /*  8 px  */
-  --sp-3:  0.75rem;    /* 12 px  */
-  --sp-4:  1rem;       /* 16 px  */
-  --sp-5:  1.25rem;    /* 20 px  */
-  --sp-6:  1.5rem;     /* 24 px  */
-  --sp-8:  2rem;       /* 32 px  */
+  /* ── Legacy aliases ── */
+  --c-surface-alt:   var(--c-card);
+  --c-canvas:        var(--c-base);
+  --c-blue:          var(--c-accent);
+  --c-blue-dim:      var(--c-accent-dim);
+
+  /* ── Mono font ── */
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+
+  /* ── Spacing ── */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.25rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
 }
 
-/* Light mode — overrides colour tokens only.
-   Everything else (sizes, spacing) is identical between themes. */
-html.light {
-  --c-base:          #f2f2f7;
-  --c-surface:       #ffffff;
-  --c-surface-alt:   #f7f7fb;
-  --c-elevated:      #ededf2;
-  --c-input:         #f0f0f5;
-
-  --c-border:        rgba(0,0,0,0.10);
-  --c-border-subtle: rgba(0,0,0,0.06);
-
-  --c-text-1:   rgba(0,0,0,0.88);
-  --c-text-2:   rgba(0,0,0,0.58);
-  --c-text-3:   rgba(0,0,0,0.40);
-  --c-text-dim: rgba(0,0,0,0.24);
-
-  --c-canvas:   #e8e8ef;
+/* ── Base ── */
+body {
+  background: var(--c-base);
+  color: var(--c-text-1);
 }
 
-
-/* ── 7. Component styles ─────────────────────────────────────────── */
-
-/* Scrollbars */
-::-webkit-scrollbar        { width: 4px; height: 4px; }
+/* ── Scrollbars ── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: var(--c-border); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { filter: brightness(1.5); }
 ::-webkit-scrollbar-corner { background: transparent; }
-
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Base */
-body { background: var(--c-base); color: var(--c-text-1); }
-
-/* Reusable form input */
+/* ── Form inputs ── */
 .conductor-input {
   background: var(--c-input);
   border: 1px solid var(--c-border);
   color: var(--c-text-1);
-  font-size: var(--fs-sm);
+  font-size: var(--font-size-sm);
+  border-radius: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.conductor-input:focus        { border-color: rgba(168,85,247,0.5); outline: none; }
+.conductor-input:focus {
+  border-color: var(--c-accent-border);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--c-accent-glow);
+}
 .conductor-input::placeholder { color: var(--c-text-dim); }
 
-/* ReactFlow canvas */
-.react-flow__pane { background: var(--c-canvas) !important; }
-html.light .react-flow__background pattern circle { fill: rgba(0,0,0,0.07) !important; }
-
-/* ReactFlow controls */
-.react-flow__controls {
-  background: var(--c-surface) !important;
-  border: 1px solid var(--c-border) !important;
-  border-radius: 10px !important;
-  overflow: hidden;
-  box-shadow: none !important;
+/* ── Animations ── */
+@keyframes pulse-accent {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
 }
-.react-flow__controls-button {
-  background: var(--c-surface) !important;
-  border-bottom: 1px solid var(--c-border) !important;
-  fill: var(--c-text-2) !important;
-  color: var(--c-text-2) !important;
-  width: 28px !important;
-  height: 28px !important;
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
 }
-.react-flow__controls-button:last-child { border-bottom: none !important; }
-.react-flow__controls-button:hover { background: var(--c-surface-alt) !important; }
-.react-flow__controls-button svg {
-  fill: var(--c-text-2) !important;
-  max-width: 13px;
-  max-height: 13px;
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
 }
 
-/* ReactFlow minimap */
-.react-flow__minimap {
-  background: var(--c-surface) !important;
-  border: 1px solid var(--c-border) !important;
-  border-radius: 10px !important;
-  overflow: hidden;
+.pulse-accent { animation: pulse-accent 1.6s ease-in-out infinite; }
+.pulse-green  { animation: pulse-green  1.6s ease-in-out infinite; }
+
+.cursor-blink::after {
+  content: '▊';
+  color: var(--c-accent);
+  animation: blink 1s step-end infinite;
+  margin-left: 1px;
 }
 
+/* ── Provider glow utilities ── */
+.glow-anthropic { box-shadow: 0 0 14px 2px rgba(249,115,22,0.22);  border-color: rgba(249,115,22,0.45) !important; }
+.glow-openai    { box-shadow: 0 0 14px 2px rgba(16,185,129,0.22);  border-color: rgba(16,185,129,0.45) !important; }
+.glow-ollama    { box-shadow: 0 0 14px 2px rgba(59,130,246,0.22);  border-color: rgba(59,130,246,0.45) !important; }
+.glow-custom    { box-shadow: 0 0 14px 2px rgba(168,85,247,0.22);  border-color: rgba(168,85,247,0.45) !important; }
 
-/* ── 8. Light-mode Tailwind remaps ───────────────────────────────────
-   Components that use text-white/*, bg-white/*, border-white/* get
-   automatically inverted in light mode via these overrides.
-   This lets existing className strings work in both themes without
-   touching component files.
-──────────────────────────────────────────────────────────────────── */
+/* ── Agent card state utilities ── */
+.card-running {
+  border-color: rgba(99,102,241,0.5) !important;
+  box-shadow: 0 0 20px rgba(99,102,241,0.1), 0 0 0 1px rgba(99,102,241,0.2);
+}
+.card-loop {
+  border-color: rgba(245,158,11,0.4) !important;
+  box-shadow: 0 0 12px rgba(245,158,11,0.08);
+}
+.card-done {
+  border-color: rgba(34,197,94,0.3) !important;
+}
+.card-error {
+  border-color: rgba(239,68,68,0.4) !important;
+  box-shadow: 0 0 10px rgba(239,68,68,0.08);
+}
 
-/* text-white/{opacity} */
-html.light .text-white      { color: rgba(0,0,0,0.88) }
-html.light .text-white\/10  { color: rgba(0,0,0,0.12) }
-html.light .text-white\/15  { color: rgba(0,0,0,0.18) }
-html.light .text-white\/20  { color: rgba(0,0,0,0.22) }
-html.light .text-white\/25  { color: rgba(0,0,0,0.28) }
-html.light .text-white\/30  { color: rgba(0,0,0,0.35) }
-html.light .text-white\/35  { color: rgba(0,0,0,0.40) }
-html.light .text-white\/40  { color: rgba(0,0,0,0.46) }
-html.light .text-white\/45  { color: rgba(0,0,0,0.52) }
-html.light .text-white\/50  { color: rgba(0,0,0,0.56) }
-html.light .text-white\/55  { color: rgba(0,0,0,0.62) }
-html.light .text-white\/60  { color: rgba(0,0,0,0.66) }
-html.light .text-white\/65  { color: rgba(0,0,0,0.70) }
-html.light .text-white\/70  { color: rgba(0,0,0,0.74) }
-html.light .text-white\/75  { color: rgba(0,0,0,0.78) }
-html.light .text-white\/80  { color: rgba(0,0,0,0.82) }
-html.light .text-white\/85  { color: rgba(0,0,0,0.86) }
-html.light .text-white\/90  { color: rgba(0,0,0,0.90) }
-html.light .text-white\/95  { color: rgba(0,0,0,0.95) }
+/* ── Mono text ── */
+.font-mono-accent { font-family: var(--font-mono); letter-spacing: -0.01em; }
 
-/* hover:text-white/{opacity} */
-html.light .hover\:text-white\/40:hover  { color: rgba(0,0,0,0.46) }
-html.light .hover\:text-white\/45:hover  { color: rgba(0,0,0,0.52) }
-html.light .hover\:text-white\/50:hover  { color: rgba(0,0,0,0.56) }
-html.light .hover\:text-white\/55:hover  { color: rgba(0,0,0,0.62) }
-html.light .hover\:text-white\/60:hover  { color: rgba(0,0,0,0.66) }
-html.light .hover\:text-white\/65:hover  { color: rgba(0,0,0,0.70) }
-html.light .hover\:text-white\/70:hover  { color: rgba(0,0,0,0.74) }
-html.light .hover\:text-white\/75:hover  { color: rgba(0,0,0,0.78) }
-html.light .hover\:text-white\/80:hover  { color: rgba(0,0,0,0.82) }
-html.light .hover\:text-white\/85:hover  { color: rgba(0,0,0,0.86) }
-
-/* placeholder:text-white/{opacity} */
-html.light .placeholder\:text-white\/20::placeholder { color: rgba(0,0,0,0.24) }
-html.light .placeholder\:text-white\/25::placeholder { color: rgba(0,0,0,0.30) }
-html.light .placeholder\:text-white\/30::placeholder { color: rgba(0,0,0,0.35) }
-
-/* bg-white/{opacity} */
-html.light .bg-white\/2  { background: rgba(0,0,0,0.02) }
-html.light .bg-white\/3  { background: rgba(0,0,0,0.03) }
-html.light .bg-white\/4  { background: rgba(0,0,0,0.04) }
-html.light .bg-white\/5  { background: rgba(0,0,0,0.04) }
-html.light .bg-white\/6  { background: rgba(0,0,0,0.05) }
-html.light .bg-white\/8  { background: rgba(0,0,0,0.06) }
-html.light .bg-white\/10 { background: rgba(0,0,0,0.07) }
-html.light .bg-white\/12 { background: rgba(0,0,0,0.08) }
-html.light .bg-white\/15 { background: rgba(0,0,0,0.09) }
-html.light .bg-white\/20 { background: rgba(0,0,0,0.11) }
-
-/* hover:bg-white/{opacity} */
-html.light .hover\:bg-white\/3:hover  { background: rgba(0,0,0,0.03) }
-html.light .hover\:bg-white\/4:hover  { background: rgba(0,0,0,0.04) }
-html.light .hover\:bg-white\/5:hover  { background: rgba(0,0,0,0.04) }
-html.light .hover\:bg-white\/6:hover  { background: rgba(0,0,0,0.05) }
-html.light .hover\:bg-white\/8:hover  { background: rgba(0,0,0,0.06) }
-html.light .hover\:bg-white\/10:hover { background: rgba(0,0,0,0.07) }
-
-/* focus:bg-white/{opacity} */
-html.light .focus\:bg-white\/8:focus { background: rgba(0,0,0,0.06) }
-
-/* border-white/{opacity} */
-html.light .border-white\/4  { border-color: rgba(0,0,0,0.05) }
-html.light .border-white\/5  { border-color: rgba(0,0,0,0.06) }
-html.light .border-white\/6  { border-color: rgba(0,0,0,0.07) }
-html.light .border-white\/8  { border-color: rgba(0,0,0,0.08) }
-html.light .border-white\/10 { border-color: rgba(0,0,0,0.10) }
-html.light .border-white\/12 { border-color: rgba(0,0,0,0.11) }
-html.light .border-white\/15 { border-color: rgba(0,0,0,0.13) }
-html.light .border-white\/18 { border-color: rgba(0,0,0,0.15) }
-html.light .border-white\/20 { border-color: rgba(0,0,0,0.16) }
-html.light .border-white\/25 { border-color: rgba(0,0,0,0.20) }
-html.light .border-white\/30 { border-color: rgba(0,0,0,0.24) }
-
-/* hover:border-white/{opacity} */
-html.light .hover\:border-white\/10:hover { border-color: rgba(0,0,0,0.10) }
-html.light .hover\:border-white\/15:hover { border-color: rgba(0,0,0,0.13) }
-html.light .hover\:border-white\/18:hover { border-color: rgba(0,0,0,0.15) }
-html.light .hover\:border-white\/20:hover { border-color: rgba(0,0,0,0.16) }
-html.light .hover\:border-white\/25:hover { border-color: rgba(0,0,0,0.20) }
-
-/* focus:border-white/{opacity} */
-html.light .focus\:border-white\/20:focus { border-color: rgba(0,0,0,0.20) }
-html.light .focus\:border-white\/25:focus { border-color: rgba(0,0,0,0.25) }
-html.light .focus\:border-white\/30:focus { border-color: rgba(0,0,0,0.28) }
-
-/* Hardcoded dark hex backgrounds still in some components */
-html.light .bg-\[\#0f0f12\],
-html.light .bg-\[\#0a0a0d\],
-html.light .bg-\[\#08080b\],
-html.light .bg-\[\#0e0e13\],
-html.light .bg-\[\#0c0c10\] { background: var(--c-base) }
-
-html.light .bg-\[\#141418\],
-html.light .bg-\[\#16161b\],
-html.light .bg-\[\#0f0f14\] { background: var(--c-surface) }
-
-html.light .bg-\[\#1a1a22\],
-html.light .bg-\[\#1c1c23\],
-html.light .bg-\[\#1e1e27\] { background: var(--c-elevated) }
-
-/* Hardcoded dark hex borders */
-html.light .border-\[\#1a1a22\] { border-color: var(--c-border) }
+/* ── Sidebar divider ── */
+.sidebar-divider { height: 1px; background: var(--c-border-subtle); margin: 0.5rem 0; }

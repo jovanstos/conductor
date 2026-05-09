@@ -29,6 +29,7 @@ interface WorkflowStore {
   duplicateWorkflow: (id: string) => Promise<void>
   saveCurrentWorkflow: () => Promise<void>
   updateWorkflowMeta: (patch: Partial<Pick<Workflow, 'name' | 'description' | 'settings'>>) => void
+  applyWorkflowPatch: (nodes: Workflow['nodes'], edges: Workflow['edges']) => void
 
   addNode: (node: WorkflowNode) => void
   addLoopGroup: (params: { groupId: string; workerId: string; reviewerId: string; position: { x: number; y: number } }) => void
@@ -148,9 +149,28 @@ export const useWorkflowStore = create<WorkflowStore>()((set, get) => ({
     set((s) => {
       if (!s.currentWorkflow) return s
       const updated = { ...s.currentWorkflow, ...patch, updatedAt: new Date().toISOString() }
+      tauri.saveWorkflow(updated).catch(() => {})
       return {
         currentWorkflow: updated,
         workflows: s.workflows.map((w) => (w.id === updated.id ? updated : w)),
+      }
+    })
+  },
+
+  applyWorkflowPatch: (nodes, edges) => {
+    set((s) => {
+      if (!s.currentWorkflow) return s
+      const snap = snapshot(s.currentWorkflow)
+      const hist = [...s._history.slice(0, s._historyIndex + 1), snap].slice(-HISTORY_LIMIT)
+      const updated = { ...s.currentWorkflow, nodes, edges, updatedAt: new Date().toISOString() }
+      tauri.saveWorkflow(updated).catch(() => {})
+      return {
+        currentWorkflow: updated,
+        workflows: s.workflows.map((w) => (w.id === updated.id ? updated : w)),
+        _history: hist,
+        _historyIndex: hist.length - 1,
+        canUndo: true,
+        canRedo: false,
       }
     })
   },

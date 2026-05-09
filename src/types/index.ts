@@ -77,11 +77,25 @@ export type WorkflowEdge = {
   contextMode: EdgeContextMode
 }
 
+export type ScheduleInterval = 'minutes' | 'hours' | 'daily' | 'weekly'
+
+export type WorkflowSchedule = {
+  enabled: boolean
+  interval: ScheduleInterval
+  intervalValue: number
+  time?: string
+  days?: number[]
+  task: string
+  nextRunAt?: string
+  lastRunAt?: string
+}
+
 export type WorkflowSettings = {
   defaultModel: ModelConfig
   inputMode: 'text' | 'file'
   saveHistory: boolean
   workspacePath?: string
+  schedule?: WorkflowSchedule
 }
 
 export type Workflow = {
@@ -201,7 +215,24 @@ export type StudioMessage = {
   content: string
 }
 
+export type StudioPhase = 'idle' | 'explore' | 'refine' | 'finished'
 export type StudioSessionState = 'idle' | 'brainstorming' | 'generating_final' | 'finished'
+
+export type StudioTemplateId =
+  | 'agent_prompt'
+  | 'project_plan'
+  | 'design_doc'
+  | 'research_brief'
+  | 'free_form'
+
+export type StudioSession = {
+  id: string
+  title: string
+  templateId: StudioTemplateId
+  createdAt: string
+  messages: StudioMessage[]
+  finalDocument: string
+}
 
 export type StudioChunkPayload = { chunk: string }
 
