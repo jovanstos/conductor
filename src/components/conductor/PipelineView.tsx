@@ -227,7 +227,7 @@ export default function PipelineView({ onError }: { onError?: (msg: string) => v
                   className="flex items-center gap-2 px-5 py-3 rounded-xl text-base font-semibold transition-all"
                   style={{ background: 'var(--c-card)', color: 'var(--c-text-1)', border: '1px solid var(--c-border)' }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'rgba(52,211,153,0.4)'
+                    e.currentTarget.style.borderColor = 'rgba(245,158,11,0.45)'
                     e.currentTarget.style.background = 'var(--c-loop-dim)'
                     e.currentTarget.style.color = 'var(--c-loop)'
                   }}
@@ -286,7 +286,7 @@ function EmptyPipeline({ onAddAgent, onAddLoop }: { onAddAgent: () => void; onAd
         <button
           onClick={onAddLoop}
           className="flex items-center gap-2 px-6 py-3 rounded-xl text-base font-semibold transition-all"
-          style={{ background: 'var(--c-loop-dim)', color: 'var(--c-loop)', border: '1px solid rgba(52,211,153,0.4)' }}
+          style={{ background: 'var(--c-loop-dim)', color: 'var(--c-loop)', border: '1px solid rgba(245,158,11,0.45)' }}
         >
           <RotateCcw size={18} /> Add Loop
         </button>

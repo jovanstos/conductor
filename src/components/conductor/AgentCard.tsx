@@ -100,9 +100,9 @@ export default function AgentCard({
       <div
         className={`rounded-xl border transition-all ${cardClass}`}
         style={{
-          background: isLoop ? 'rgba(52,211,153,0.06)' : isGate ? 'rgba(56,189,248,0.06)' : 'var(--c-card)',
+          background: isLoop ? 'rgba(245,158,11,0.05)' : isGate ? 'rgba(99,102,241,0.06)' : 'var(--c-card)',
           borderColor: isLoop
-            ? 'rgba(52,211,153,0.35)'
+            ? 'rgba(245,158,11,0.4)'
             : isGate
             ? 'var(--c-accent-border)'
             : isRunning ? 'var(--c-accent-border)'
@@ -129,7 +129,7 @@ export default function AgentCard({
           {/* Type badge */}
           {isLoop && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg shrink-0"
-              style={{ background: 'rgba(52,211,153,0.2)', border: '1px solid rgba(52,211,153,0.4)', color: 'var(--c-loop)' }}>
+              style={{ background: 'var(--c-loop-dim)', border: '1px solid rgba(245,158,11,0.45)', color: 'var(--c-loop)' }}>
               <RotateCcw size={13} />
               <span className="text-xs font-bold">LOOP</span>
             </div>
@@ -244,7 +244,7 @@ export default function AgentCard({
         {isLoop && worker && reviewer && (
           <div
             className="flex items-center gap-5 px-5 py-2.5 flex-wrap"
-            style={{ borderTop: '1px solid rgba(52,211,153,0.2)', background: 'rgba(0,0,0,0.1)' }}
+            style={{ borderTop: '1px solid rgba(245,158,11,0.2)', background: 'rgba(0,0,0,0.1)' }}
           >
             <div className="flex items-center gap-2">
               <span className="text-xs px-2 py-0.5 rounded font-bold" style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--c-green)', border: '1px solid rgba(74,222,128,0.25)' }}>
@@ -254,7 +254,7 @@ export default function AgentCard({
             </div>
             <ArrowDown size={12} style={{ color: 'var(--c-text-3)' }} />
             <div className="flex items-center gap-2">
-              <span className="text-xs px-2 py-0.5 rounded font-bold" style={{ background: 'var(--c-loop-dim)', color: 'var(--c-loop)', border: '1px solid rgba(52,211,153,0.3)' }}>
+              <span className="text-xs px-2 py-0.5 rounded font-bold" style={{ background: 'var(--c-loop-dim)', color: 'var(--c-loop)', border: '1px solid rgba(245,158,11,0.35)' }}>
                 REVIEWER
               </span>
               <span className="text-sm" style={{ color: 'var(--c-text-2)' }}>{(reviewer.data as AgentNodeData).name}</span>

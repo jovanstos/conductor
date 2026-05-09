@@ -7,6 +7,7 @@ import {
 import { useStudioStore } from '../../stores/studioStore'
 import type { StudioTemplateId, StudioMessage } from '../../types'
 import ModelPicker from '../shared/ModelPicker'
+import MarkdownRenderer from './MarkdownRenderer'
 
 // ── Templates ────────────────────────────────────────────────────────
 const TEMPLATES: { id: StudioTemplateId; label: string; icon: React.ReactNode; description: string }[] = [
@@ -310,10 +311,10 @@ export default function StudioView() {
               {isStreaming && streamingText && (
                 <div className="flex justify-start">
                   <div
-                    className="max-w-[82%] rounded-xl px-4 py-3 text-sm leading-relaxed cursor-blink"
-                    style={{ background: 'var(--c-card)', color: 'var(--c-text-1)', border: '1px solid var(--c-border)', whiteSpace: 'pre-wrap' }}
+                    className="max-w-[82%] rounded-xl px-4 py-3 text-sm cursor-blink"
+                    style={{ background: 'var(--c-card)', color: 'var(--c-text-1)', border: '1px solid var(--c-border)' }}
                   >
-                    {streamingText}
+                    <MarkdownRenderer content={streamingText} />
                   </div>
                 </div>
               )}
@@ -444,12 +445,9 @@ export default function StudioView() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-8 py-6">
-              <pre
-                className="text-sm leading-relaxed whitespace-pre-wrap"
-                style={{ color: 'var(--c-text-1)', fontFamily: 'var(--font-mono)', maxWidth: '720px', margin: '0 auto' }}
-              >
-                {finalDocument}
-              </pre>
+              <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                <MarkdownRenderer content={finalDocument} />
+              </div>
             </div>
           </div>
         )}
@@ -524,16 +522,19 @@ function MessageBubble({ msg, onEdit }: { msg: StudioMessage; onEdit: (content: 
     >
       <div className="relative max-w-[82%]">
         <div
-          className="rounded-xl px-4 py-3 text-sm leading-relaxed select-text"
+          className="rounded-xl px-4 py-3 text-sm select-text"
           style={{
             background: isUser ? 'var(--c-accent-dim)' : 'var(--c-card)',
             color: isUser ? 'var(--c-accent)' : 'var(--c-text-1)',
             border: `1px solid ${isUser ? 'var(--c-accent-border)' : 'var(--c-border)'}`,
-            whiteSpace: 'pre-wrap',
             userSelect: 'text',
           }}
         >
-          {msg.content}
+          {isUser ? (
+            <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, margin: 0 }}>{msg.content}</p>
+          ) : (
+            <MarkdownRenderer content={msg.content} />
+          )}
         </div>
 
         {/* Hover actions */}
