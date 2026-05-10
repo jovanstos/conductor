@@ -3646,6 +3646,32 @@ fn manager_tool_definitions() -> Vec<ToolDef> {
             }),
         },
         ToolDef {
+            name: "create_agent".into(),
+            description: "Create and dispatch a custom specialist agent when no built-in template is a good fit. You define the agent's name, expertise, and full system prompt — think of it as hiring someone specifically for this task. The agent gets full file system access and returns its output when done.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "A descriptive job title for this agent (e.g. 'Database Migration Specialist', 'Legal Contract Reviewer')"
+                    },
+                    "system_prompt": {
+                        "type": "string",
+                        "description": "The agent's full instructions: role, objective, approach, and output format. Write this like a job description + brief — be specific about what expertise they bring and exactly what to produce."
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "The specific task for this agent to complete"
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Additional background, constraints, or relevant prior work the agent should know about"
+                    }
+                },
+                "required": ["name", "system_prompt", "task"]
+            }),
+        },
+        ToolDef {
             name: "wait".into(),
             description: "End this cycle without dispatching agents. Use when all work is in progress, you're waiting for something, or there is genuinely nothing to do right now.".into(),
             parameters: serde_json::json!({
@@ -3657,6 +3683,105 @@ fn manager_tool_definitions() -> Vec<ToolDef> {
                     }
                 },
                 "required": ["reason"]
+            }),
+        },
+
+        // ── Direct filesystem / web tools ──────────────────────────────────────
+        // Use these for quick lookups and simple writes. Dispatch a specialist
+        // agent when the task requires domain expertise or many tool calls.
+
+        ToolDef {
+            name: "read_file".into(),
+            description: "Read a file in the workspace. Use for quick checks before deciding what to do next — no need to dispatch an agent just to read a file.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "File path (relative to workspace or absolute)" }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolDef {
+            name: "list_directory".into(),
+            description: "List files and folders in a directory. Use to understand workspace contents before deciding what agents to dispatch.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "Directory path to list" }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolDef {
+            name: "search_files".into(),
+            description: "Search for a text pattern across files in the workspace.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "Directory to search in" },
+                    "pattern": { "type": "string", "description": "Text pattern to search for (case-insensitive)" },
+                    "file_glob": { "type": "string", "description": "Optional glob filter (e.g. '*.md')" }
+                },
+                "required": ["path", "pattern"]
+            }),
+        },
+        ToolDef {
+            name: "write_file".into(),
+            description: "Create or overwrite a file. Use for writing summaries, progress notes, or simple output documents directly.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "File path (relative to workspace or absolute)" },
+                    "content": { "type": "string", "description": "Content to write" }
+                },
+                "required": ["path", "content"]
+            }),
+        },
+        ToolDef {
+            name: "edit_file".into(),
+            description: "Replace a specific string in an existing file.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "File path" },
+                    "old_str": { "type": "string", "description": "The exact string to find" },
+                    "new_str": { "type": "string", "description": "The replacement string" }
+                },
+                "required": ["path", "old_str", "new_str"]
+            }),
+        },
+        ToolDef {
+            name: "create_directory".into(),
+            description: "Create a directory (and any needed parents).".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "Directory path to create" }
+                },
+                "required": ["path"]
+            }),
+        },
+        ToolDef {
+            name: "move_file".into(),
+            description: "Move or rename a file.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "src": { "type": "string", "description": "Source path" },
+                    "dst": { "type": "string", "description": "Destination path" }
+                },
+                "required": ["src", "dst"]
+            }),
+        },
+        ToolDef {
+            name: "fetch_url".into(),
+            description: "Fetch text content from a URL.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "url": { "type": "string", "description": "URL to fetch" }
+                },
+                "required": ["url"]
             }),
         },
     ]
@@ -3713,6 +3838,14 @@ fn build_manager_context(mission: &Mission) -> String {
     format!(r#"You are the Manager Agent for mission: "{name}".
 Mission description: {description}
 
+You mange other AI agents and should act like a boss to these agents. You are in charge of getting the work done in any way possible. 
+The human is your boss and CEO — they set the mission and will review your work, 
+but they are not involved in day-to-day decisions. 
+Your job is to figure out how to accomplish the mission goals by dispatching specialist agents,
+managing their work, and escalating to the human when needed. 
+You have a set of tools you can use to manage agents, ask the human questions, 
+and manipulate files in the shared workspace. Use them freely and creatively to get the job done.
+
 ## Active Goals (use goal_id exactly as shown when calling complete_goal)
 {goals}
 
@@ -3724,37 +3857,53 @@ Mission description: {description}
 ## Recent Work Log
 {log}
 
-## HOW TO USE YOUR TOOLS
+## YOUR TOOLS
 
-**dispatch_agent(template_id, task, context)**
-Run a specialist agent. The agent returns its output to you. Use the output to evaluate progress and decide next steps.
+### Mission management
+**dispatch_agent(template_id, task, context)** — Run a built-in specialist agent. The agent has full file system access and returns its output when done. Use when a template matches the work well.
 
-**complete_goal(goal_id, summary)**
-⚠️ CRITICAL: Call this IMMEDIATELY after agent work confirms a goal is done.
-Use the EXACT goal_id string shown above (e.g., goal_id="abc-123-...").
-Do NOT wait for the next cycle. If an agent's output shows the goal criteria are met → call complete_goal RIGHT NOW in this same cycle.
-Example: If the goal is "Write a report" and an agent just wrote report.md → call complete_goal immediately.
+**create_agent(name, system_prompt, task, context?)** — Hire a custom agent when no built-in template is the right fit. You write the system prompt — define their expertise, approach, and what to produce. Think of it as bringing in a contractor with exactly the skills this job needs.
 
-**escalate_to_human(message, context)**
-Ask the CEO for input. Blocks until they respond. Use for decisions only the human can make.
+**complete_goal(goal_id, summary)** — ⚠️ CRITICAL: Call this IMMEDIATELY after work confirms a goal is done. Use the EXACT goal_id shown above. Do NOT wait for the next cycle — if an agent's output satisfies a goal, call complete_goal RIGHT NOW.
 
-**ask_human_choice(question, context, options)**
-Present the CEO with specific choices to pick from.
+**escalate_to_human(message, context)** — Ask the CEO for input. Blocks the mission until they respond. Use only for decisions you cannot make yourself.
 
-**add_note(note)**
-Record something for future reference.
+**ask_human_choice(question, context, options)** — Present the CEO with specific options to pick from.
+
+**add_note(note)** — Record an observation, decision, or context for future cycles.
 
 {goal_tool_note}
 
-**wait(reason)**
-End this cycle doing nothing. Use sparingly.
+**wait(reason)** — End this cycle without acting. Use when all work is in progress and there is nothing left to start.
+
+### Direct tools (use yourself without dispatching an agent)
+These are for quick, self-contained actions. If a task is small enough to do in a single tool call, just do it directly rather than spinning up an agent.
+
+**read_file(path)** — Read any file in the workspace. Use before dispatching agents so you understand the current state.
+
+**list_directory(path)** — List the contents of a directory.
+
+**search_files(path, pattern, file_glob?)** — Search for text across files.
+
+**write_file(path, content)** — Write a file directly (summaries, plans, notes, status docs).
+
+**edit_file(path, old_str, new_str)** — Replace a specific string in an existing file.
+
+**create_directory(path)** — Create a new directory.
+
+**move_file(src, dst)** — Move or rename a file.
+
+**fetch_url(url)** — Fetch content from a URL.
+
+**Rule:** Use direct tools for reconnaissance and simple writes. Dispatch specialist agents for work that requires expertise, iteration, or a long sequence of tool calls.
 
 ## YOUR DECISION PROCESS (follow this every cycle)
-1. Read agent outputs in the work log — what was actually accomplished?
+1. Use list_directory or read_file to understand the current workspace state if needed.
 2. For EACH active goal: did completed work fully satisfy it? If YES → call complete_goal NOW.
 3. What's the highest-priority active goal still outstanding?
-4. What agent should I dispatch to make progress on it?
-5. After dispatching and reviewing the result — does this complete any goal? → complete_goal.
+4. Can I make meaningful progress with a direct tool call, or does this need a specialist agent?
+5. Dispatch the right agent (or act directly), then review the result.
+6. After any work — does this complete a goal? → complete_goal immediately.
 
 Active goals still needing work: {active_count}"#,
         name = mission.name,
@@ -3805,54 +3954,34 @@ fn append_log_with_tokens(mission: &mut Mission, entry_type: &str, content: &str
 
 // ── Sub-agent execution ───────────────────────
 
-async fn run_sub_agent_for_mission(
-    template_id: &str,
+// Shared execution core — runs any AgentNodeData as a mission sub-agent
+async fn run_agent_data_for_mission(
+    data: AgentNodeData,
     task: &str,
     context: &str,
     mission_id: &str,
     agent_dispatch_id: &str,
-    manager_model: &ModelConfig,
     workspace_path: Option<&str>,
     state: &Arc<AppState>,
     app: &AppHandle,
     cancel: &Arc<AtomicBool>,
 ) -> Result<(String, Option<u32>), String> {
-    let templates = built_in_templates();
-    let template = templates.iter().find(|t| t.id == template_id)
-        .ok_or_else(|| format!("Template '{}' not found. Available: {}", template_id,
-            templates.iter().map(|t| t.id.as_str()).collect::<Vec<_>>().join(", ")))?;
-
-    let data = AgentNodeData {
-        name: template.name.clone(),
-        role_description: template.description.clone(),
-        system_prompt: template.system_prompt.clone(),
-        model: manager_model.clone(),
-        context_mode: "none".into(),
-        max_tokens: manager_model.max_tokens,
-        template_id: Some(template_id.into()),
-        tools_enabled: vec![],
-    };
-
-    // Build the user message with task + context
     let user_message = if context.trim().is_empty() {
         task.to_string()
     } else {
         format!("## Task\n{}\n\n## Context\n{}", task, context)
     };
 
-    // Register a temporary RunHandle so tool confirmations work
     let sub_run_id = format!("mission_{}_{}", mission_id, agent_dispatch_id);
-    let sub_cancel = cancel.clone();
     {
         let mut runs = state.active_runs.lock().unwrap();
         runs.insert(sub_run_id.clone(), RunHandle {
-            cancel_flag: sub_cancel.clone(),
+            cancel_flag: cancel.clone(),
             gate_senders: Mutex::new(HashMap::new()),
             tool_confirm_senders: Mutex::new(HashMap::new()),
         });
     }
 
-    // Run the agent using the same agentic loop
     let mut ctx = ExecCtx { input: user_message.clone(), chain: vec![] };
     let mut run = Run {
         id: sub_run_id.clone(),
@@ -3884,15 +4013,45 @@ async fn run_sub_agent_for_mission(
         workspace_path,
     ).await;
 
-    // Cleanup the temp run handle
     state.active_runs.lock().unwrap().remove(&sub_run_id);
 
-    // Extract total tokens from all steps
     let tokens = run.steps.iter()
         .filter_map(|s| s.tokens_used)
         .reduce(|a, b| a + b);
 
     result.map(|output| (output, tokens))
+}
+
+// Dispatch a built-in template agent
+async fn run_sub_agent_for_mission(
+    template_id: &str,
+    task: &str,
+    context: &str,
+    mission_id: &str,
+    agent_dispatch_id: &str,
+    manager_model: &ModelConfig,
+    workspace_path: Option<&str>,
+    state: &Arc<AppState>,
+    app: &AppHandle,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(String, Option<u32>), String> {
+    let templates = built_in_templates();
+    let template = templates.iter().find(|t| t.id == template_id)
+        .ok_or_else(|| format!("Template '{}' not found. Available: {}", template_id,
+            templates.iter().map(|t| t.id.as_str()).collect::<Vec<_>>().join(", ")))?;
+
+    let data = AgentNodeData {
+        name: template.name.clone(),
+        role_description: template.description.clone(),
+        system_prompt: template.system_prompt.clone(),
+        model: manager_model.clone(),
+        context_mode: "none".into(),
+        max_tokens: manager_model.max_tokens,
+        template_id: Some(template_id.into()),
+        tools_enabled: vec![],
+    };
+
+    run_agent_data_for_mission(data, task, context, mission_id, agent_dispatch_id, workspace_path, state, app, cancel).await
 }
 
 // ── Mission execution cycle ───────────────────
@@ -4083,6 +4242,100 @@ async fn execute_mission_cycle(
                                     );
                                     save_mission_to_disk(data_dir, &mission).ok();
                                     (format!("Agent '{}' failed: {}", template_name, e), true)
+                                }
+                            }
+                        }
+
+                        "create_agent" => {
+                            let name = tc.arguments["name"].as_str().unwrap_or("Custom Agent").to_string();
+                            let system_prompt = tc.arguments["system_prompt"].as_str().unwrap_or("").to_string();
+                            let task = tc.arguments["task"].as_str().unwrap_or("").to_string();
+                            let context = tc.arguments["context"].as_str().unwrap_or("").to_string();
+                            let agent_dispatch_id = Uuid::new_v4().to_string();
+
+                            let sub_agent = MissionSubAgent {
+                                id: agent_dispatch_id.clone(),
+                                template_id: "custom".into(),
+                                template_name: name.clone(),
+                                task: task.clone(),
+                                status: "running".into(),
+                                started_at: now(),
+                                completed_at: None,
+                                output: None,
+                                error: None,
+                            };
+                            mission.active_sub_agents.push(sub_agent.clone());
+
+                            let dispatch_entry = append_log(
+                                &mut mission, "agent_dispatched",
+                                &format!("Hired custom agent '{}' for: {}", name, task),
+                                Some(&name), Some("custom"), None,
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/log", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "entry": dispatch_entry }),
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/agent_status", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "agent": sub_agent }),
+                            );
+                            save_mission_to_disk(data_dir, &mission).ok();
+
+                            let data = AgentNodeData {
+                                name: name.clone(),
+                                role_description: format!("Custom agent created by Manager for this mission"),
+                                system_prompt: system_prompt.clone(),
+                                model: manager_model.clone(),
+                                context_mode: "none".into(),
+                                max_tokens: manager_model.max_tokens,
+                                template_id: None,
+                                tools_enabled: vec![],
+                            };
+
+                            let run_result = run_agent_data_for_mission(
+                                data, &task, &context,
+                                mission_id, &agent_dispatch_id,
+                                workspace.as_deref(),
+                                state, app, cancel,
+                            ).await;
+
+                            if let Some(sa) = mission.active_sub_agents.iter_mut().find(|s| s.id == agent_dispatch_id) {
+                                sa.completed_at = Some(now());
+                                match &run_result {
+                                    Ok((out, _)) => { sa.status = "completed".into(); sa.output = Some(safe_truncate(out, 500).to_string()); }
+                                    Err(e)       => { sa.status = "error".into(); sa.error = Some(e.clone()); }
+                                }
+                            }
+
+                            match run_result {
+                                Ok((output, tokens)) => {
+                                    let token_note = tokens.map(|t| format!(" ({} tokens)", t)).unwrap_or_default();
+                                    let done_entry = append_log_with_tokens(
+                                        &mut mission, "agent_completed",
+                                        &format!("{} completed task{}", name, token_note),
+                                        Some(&name), Some("custom"), None,
+                                        tokens,
+                                    );
+                                    let _ = app.emit(
+                                        &format!("conductor://mission/{}/log", mission_id),
+                                        serde_json::json!({ "missionId": mission_id, "entry": done_entry }),
+                                    );
+                                    save_mission_to_disk(data_dir, &mission).ok();
+                                    let truncated = safe_truncate(&output, 4000).to_string();
+                                    (format!("Custom agent '{}' completed task.\n\nOutput:\n{}", name, truncated), false)
+                                }
+                                Err(e) => {
+                                    let err_entry = append_log(
+                                        &mut mission, "agent_error",
+                                        &format!("{} failed: {}", name, e),
+                                        Some(&name), Some("custom"), None,
+                                    );
+                                    let _ = app.emit(
+                                        &format!("conductor://mission/{}/log", mission_id),
+                                        serde_json::json!({ "missionId": mission_id, "entry": err_entry }),
+                                    );
+                                    save_mission_to_disk(data_dir, &mission).ok();
+                                    (format!("Custom agent '{}' failed: {}", name, e), true)
                                 }
                             }
                         }
@@ -4355,7 +4608,38 @@ async fn execute_mission_cycle(
                             (format!("Waiting: {}", reason), false)
                         }
 
-                        unknown => (format!("Unknown tool: {}", unknown), true),
+                        // Direct filesystem / web tools — route to the shared tool executor
+                        tool_name => {
+                            let dummy_run_id = format!("mission_mgr_{}", mission_id);
+                            let result = execute_tool(
+                                tc,
+                                workspace.as_deref(),
+                                &[], // empty = all tools allowed (we control the list via manager_tool_definitions)
+                                &ToolPermissionConfig::default(),
+                                app,
+                                &dummy_run_id,
+                                "manager",
+                                "Manager",
+                                state,
+                            ).await;
+                            match result {
+                                Ok(output) => {
+                                    let preview = safe_truncate(&output, 300).to_string();
+                                    let entry = append_log(
+                                        &mut mission, "manager_tool",
+                                        &format!("Manager used {}: {}", tool_name, preview),
+                                        None, None, None,
+                                    );
+                                    let _ = app.emit(
+                                        &format!("conductor://mission/{}/log", mission_id),
+                                        serde_json::json!({ "missionId": mission_id, "entry": entry }),
+                                    );
+                                    save_mission_to_disk(data_dir, &mission).ok();
+                                    (output, false)
+                                }
+                                Err(e) => (format!("Tool '{}' error: {}", tool_name, e), true),
+                            }
+                        }
                     };
 
                     results.push(tool_result);

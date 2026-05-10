@@ -893,10 +893,10 @@ export function digitalJanitorWorkflow(preferredModel?: ModelConfig): Workflow {
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     nodes: [
       { id: startId, type: "start", position: { x: 60, y: 150 }, data: {} },
-      { id: scoutId, type: "agent", position: { x: 280, y: 150 }, data: agentFromTemplate("file-scanner", { model: { ...model }, toolsEnabled: ["list_directory", "read_file"] as ToolNameId[] }) },
-      { id: architectId, type: "agent", position: { x: 560, y: 150 }, data: agentFromTemplate("folder-architect", { model: { ...model }, toolsEnabled: ["write_file"] as ToolNameId[] }) },
+      { id: scoutId, type: "agent", position: { x: 280, y: 150 }, data: agentFromTemplate("file-scanner", { model: { ...model } }) },
+      { id: architectId, type: "agent", position: { x: 560, y: 150 }, data: agentFromTemplate("folder-architect", { model: { ...model } }) },
       { id: gateId, type: "review_gate", position: { x: 840, y: 150 }, data: { message: "Open Move_Plan.md in your workspace and review the proposed folder structure. Approve to execute the moves, or reject with feedback to revise the plan.", allowEdit: false } },
-      { id: moverId, type: "agent", position: { x: 1100, y: 150 }, data: agentFromTemplate("file-mover", { model: { ...model }, toolsEnabled: ["read_file", "create_directory", "move_file"] as ToolNameId[] }) },
+      { id: moverId, type: "agent", position: { x: 1100, y: 150 }, data: agentFromTemplate("file-mover", { model: { ...model } }) },
       { id: endId, type: "end", position: { x: 1360, y: 150 }, data: {} },
     ],
     edges: [
@@ -921,11 +921,11 @@ export function examPrepWorkflow(preferredModel?: ModelConfig): Workflow {
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     nodes: [
       { id: startId, type: "start", position: { x: 60, y: 250 }, data: {} },
-      { id: extractorId, type: "agent", position: { x: 280, y: 250 }, data: agentFromTemplate("knowledge-extractor", { model: { ...model }, toolsEnabled: ["list_directory", "read_file"] as ToolNameId[] }) },
+      { id: extractorId, type: "agent", position: { x: 280, y: 250 }, data: agentFromTemplate("knowledge-extractor", { model: { ...model } }) },
       { id: guideLoopId, type: "loop", position: { x: 560, y: 150 }, data: { targetNodeId: guideCreatorId, reviewerNodeId: reviewerId, maxRetries: 2, exitCondition: "reviewer_approves" } },
-      { id: guideCreatorId, type: "agent", position: { x: 30, y: 70 }, parentId: guideLoopId, extent: "parent", data: agentFromTemplate("study-guide-creator", { model: { ...model }, toolsEnabled: ["write_file"] as ToolNameId[] }) },
+      { id: guideCreatorId, type: "agent", position: { x: 30, y: 70 }, parentId: guideLoopId, extent: "parent", data: agentFromTemplate("study-guide-creator", { model: { ...model } }) },
       { id: reviewerId, type: "agent", position: { x: 274, y: 70 }, parentId: guideLoopId, extent: "parent", data: agentFromTemplate("editor", { model: { ...model } }) },
-      { id: quizId, type: "agent", position: { x: 1160, y: 250 }, data: agentFromTemplate("quiz-generator", { model: { ...model }, toolsEnabled: ["write_file"] as ToolNameId[] }) },
+      { id: quizId, type: "agent", position: { x: 1160, y: 250 }, data: agentFromTemplate("quiz-generator", { model: { ...model } }) },
       { id: endId, type: "end", position: { x: 1420, y: 250 }, data: {} },
     ],
     edges: [
@@ -949,11 +949,11 @@ export function creatorsEchoWorkflow(preferredModel?: ModelConfig): Workflow {
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     nodes: [
       { id: startId, type: "start", position: { x: 60, y: 250 }, data: {} },
-      { id: minerId, type: "agent", position: { x: 280, y: 250 }, data: agentFromTemplate("content-miner", { model: { ...model }, toolsEnabled: ["list_directory", "read_file"] as ToolNameId[] }) },
+      { id: minerId, type: "agent", position: { x: 280, y: 250 }, data: agentFromTemplate("content-miner", { model: { ...model } }) },
       { id: repurposerLoopId, type: "loop", position: { x: 560, y: 150 }, data: { targetNodeId: copywriterId, reviewerNodeId: editorId, maxRetries: 2, exitCondition: "reviewer_approves" } },
-      { id: copywriterId, type: "agent", position: { x: 30, y: 70 }, parentId: repurposerLoopId, extent: "parent", data: agentFromTemplate("social-repurposer", { model: { ...model }, toolsEnabled: ["write_file"] as ToolNameId[] }) },
+      { id: copywriterId, type: "agent", position: { x: 30, y: 70 }, parentId: repurposerLoopId, extent: "parent", data: agentFromTemplate("social-repurposer", { model: { ...model } }) },
       { id: editorId, type: "agent", position: { x: 274, y: 70 }, parentId: repurposerLoopId, extent: "parent", data: agentFromTemplate("editor", { model: { ...model } }) },
-      { id: formatterId, type: "agent", position: { x: 1160, y: 250 }, data: agentFromTemplate("social-formatter", { model: { ...model }, toolsEnabled: ["read_file", "create_directory", "write_file"] as ToolNameId[] }) },
+      { id: formatterId, type: "agent", position: { x: 1160, y: 250 }, data: agentFromTemplate("social-formatter", { model: { ...model } }) },
       { id: endId, type: "end", position: { x: 1420, y: 250 }, data: {} },
     ],
     edges: [
@@ -976,8 +976,8 @@ export function lifeAdminWorkflow(preferredModel?: ModelConfig): Workflow {
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     nodes: [
       { id: startId, type: "start", position: { x: 60, y: 150 }, data: {} },
-      { id: sorterId, type: "agent", position: { x: 300, y: 150 }, data: agentFromTemplate("inbox-sorter", { model: { ...model }, toolsEnabled: ["list_directory", "read_file"] as ToolNameId[] }) },
-      { id: processorId, type: "agent", position: { x: 600, y: 150 }, data: agentFromTemplate("task-processor", { model: { ...model }, toolsEnabled: ["write_file"] as ToolNameId[] }) },
+      { id: sorterId, type: "agent", position: { x: 300, y: 150 }, data: agentFromTemplate("inbox-sorter", { model: { ...model } }) },
+      { id: processorId, type: "agent", position: { x: 600, y: 150 }, data: agentFromTemplate("task-processor", { model: { ...model } }) },
       { id: endId, type: "end", position: { x: 900, y: 150 }, data: {} },
     ],
     edges: [
@@ -1003,7 +1003,7 @@ export function jobApplicationWorkflow(preferredModel?: ModelConfig): Workflow {
       { id: tailorLoopId, type: "loop", position: { x: 260, y: 150 }, data: { targetNodeId: tailorerId, reviewerNodeId: reviewerId, maxRetries: 2, exitCondition: "reviewer_approves" } },
       {
         id: tailorerId, type: "agent", position: { x: 30, y: 70 }, parentId: tailorLoopId, extent: "parent",
-        data: agentFromTemplate("resume-tailorer", { model: { ...model }, toolsEnabled: ["read_file", "write_file"] as ToolNameId[] }),
+        data: agentFromTemplate("resume-tailorer", { model: { ...model } }),
       },
       {
         id: reviewerId, type: "agent", position: { x: 274, y: 70 }, parentId: tailorLoopId, extent: "parent",
@@ -1017,7 +1017,7 @@ export function jobApplicationWorkflow(preferredModel?: ModelConfig): Workflow {
       },
       {
         id: coachId, type: "agent", position: { x: 1100, y: 250 },
-        data: agentFromTemplate("interview-prep-coach", { model: { ...model }, toolsEnabled: ["read_file", "write_file"] as ToolNameId[] }),
+        data: agentFromTemplate("interview-prep-coach", { model: { ...model } }),
       },
       { id: endId, type: "end", position: { x: 1380, y: 250 }, data: {} },
     ],
