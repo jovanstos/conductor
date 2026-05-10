@@ -17,6 +17,11 @@ import type {
   ToolCallStartedPayload,
   ToolCallDonePayload,
   ToolConfirmRequestPayload,
+  Mission,
+  WorkLogEntry,
+  MissionEscalation,
+  MissionSubAgent,
+  MissionGoalStatus,
 } from '../types'
 
 // Workflow CRUD
@@ -90,6 +95,102 @@ export const importWorkflow = (json: string) =>
 // Tool confirmation response
 export const respondToolConfirmation = (runId: string, toolCallId: string, approved: boolean) =>
   invoke<void>('respond_tool_confirmation', { runId, toolCallId, approved })
+
+// ── Mission commands ──────────────────────────────────────────────────
+export const listMissions  = () => invoke<Mission[]>('list_missions')
+export const getMission    = (id: string) => invoke<Mission | null>('get_mission', { id })
+export const saveMission   = (mission: Mission) => invoke<void>('save_mission', { mission })
+export const deleteMission = (id: string) => invoke<void>('delete_mission', { id })
+export const startMission  = (missionId: string) => invoke<void>('start_mission', { missionId })
+export const stopMission   = (missionId: string) => invoke<void>('stop_mission', { missionId })
+export const respondToMissionEscalation = (
+  missionId: string,
+  escalationId: string,
+  response: string,
+) => invoke<void>('respond_to_mission_escalation', { missionId, escalationId, response })
+export const addMissionGoal = (
+  missionId: string,
+  goalText: string,
+  priority: string,
+) => invoke<Mission>('add_mission_goal', { missionId, goalText, priority })
+export const completeMissionGoal = (
+  missionId: string,
+  goalId: string,
+) => invoke<Mission>('complete_mission_goal', { missionId, goalId })
+export const deleteMissionGoal = (
+  missionId: string,
+  goalId: string,
+) => invoke<Mission>('delete_mission_goal', { missionId, goalId })
+
+export const missionChatTurn = (
+  missionId: string,
+  userMessage: string,
+  chatHistory: import('../types').MissionChatMessage[],
+) => invoke<string>('mission_chat_turn', { missionId, userMessage, chatHistory })
+
+// ── Mission event listeners ───────────────────────────────────────────
+export type MissionEventHandlers = {
+  onStatusChange?:  (payload: { missionId: string; status: string }) => void
+  onLogEntry?:      (payload: { missionId: string; entry: WorkLogEntry }) => void
+  onEscalation?:    (payload: { missionId: string; escalation: MissionEscalation }) => void
+  onAgentStatus?:   (payload: { missionId: string; agent: MissionSubAgent }) => void
+  onGoalUpdate?:    (payload: { missionId: string; goalId?: string; status?: MissionGoalStatus; action?: string }) => void
+}
+
+export async function listenToMissionChat(
+  missionId: string,
+  onChunk: (chunk: string) => void,
+): Promise<() => void> {
+  const unlisten = await listen<{ chunk: string }>(
+    `conductor://studio/chat_${missionId}/chunk`,
+    (e) => onChunk(e.payload.chunk),
+  )
+  return unlisten
+}
+
+export async function listenToMission(
+  missionId: string,
+  handlers: MissionEventHandlers,
+): Promise<() => void> {
+  const unlisteners: UnlistenFn[] = await Promise.all([
+    handlers.onStatusChange
+      ? listen<{ missionId: string; status: string }>(
+          `conductor://mission/${missionId}/status`,
+          (e) => handlers.onStatusChange!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onLogEntry
+      ? listen<{ missionId: string; entry: WorkLogEntry }>(
+          `conductor://mission/${missionId}/log`,
+          (e) => handlers.onLogEntry!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onEscalation
+      ? listen<{ missionId: string; escalation: MissionEscalation }>(
+          `conductor://mission/${missionId}/escalation`,
+          (e) => handlers.onEscalation!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onAgentStatus
+      ? listen<{ missionId: string; agent: MissionSubAgent }>(
+          `conductor://mission/${missionId}/agent_status`,
+          (e) => handlers.onAgentStatus!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onGoalUpdate
+      ? listen<{ missionId: string; goalId?: string; status?: MissionGoalStatus; action?: string }>(
+          `conductor://mission/${missionId}/goal_update`,
+          (e) => handlers.onGoalUpdate!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+  ])
+
+  return () => unlisteners.forEach((u) => u())
+}
 
 // Tauri event listeners for run lifecycle
 export type RunEventHandlers = {

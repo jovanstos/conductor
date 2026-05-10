@@ -235,10 +235,13 @@ struct AnthropicErrorDetail {
 
 struct AppState {
     data_dir: PathBuf,
-    active_runs: Mutex<HashMap<String, RunHandle>>,
+    active_runs:   Mutex<HashMap<String, RunHandle>>,
     // Chamber
     chamber_runs:  Mutex<HashMap<String, ChamberRunHandle>>,
     chamber_gates: Mutex<HashMap<String, oneshot::Sender<ChamberGateResult>>>,
+    // Missions
+    active_missions: Mutex<HashMap<String, MissionHandle>>,
+    mission_escalation_senders: Mutex<HashMap<String, oneshot::Sender<String>>>,
 }
 
 struct ChamberRunHandle {
@@ -2112,41 +2115,241 @@ async fn get_ollama_models(base_url: Option<String>) -> Vec<String> {
 // ─────────────────────────────────────────────
 
 fn built_in_templates() -> Vec<Template> {
+    // All templates end with a COMPLETED SUMMARY block so the Manager Agent
+    // can parse results and decide next steps without reading full file contents.
+    let summary_footer = "\n\n## COMPLETED SUMMARY (MANDATORY — always end with this)\nStatus: [Done / Partial / Blocked]\nWhat was accomplished: [1-2 sentences]\nFiles created or modified: [paths or \"none\"]\nNext recommended action: [what should happen next]";
+
     vec![
-        // ── SOFTWARE (Kept for backwards compatibility / Devs) ──
-        Template { id: "software-planner".into(), name: "Software Planner".into(), category: "Software".into(), description: "Plans architecture and technical design".into(), system_prompt: "## Role\nYou are a senior software architect.\n\n## Objective\nProduce a Software Design Document.\n\n## Constraints\n- If file tools are available, use `write_file` to save the SDD to disk. Do NOT output the entire markdown document in the chat.\n- No actual code, only plans.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "architecture-reviewer".into(), name: "Architecture Reviewer".into(), category: "Software".into(), description: "Reviews and critiques architecture plans".into(), system_prompt: "## Role\nYou are a technical reviewer.\n\n## Objective\nReview the SDD.\n\n## Output format\nEnd with \"APPROVED\" or \"NEEDS REVISION\".".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "full-stack-developer".into(), name: "Full-Stack Developer".into(), category: "Software".into(), description: "Implements working, production-quality code".into(), system_prompt: "## Role\nYou are a senior full-stack developer.\n\n## Workflow\n1. Read relevant files\n2. Use `write_file` or `edit_file` tools to implement changes.\n3. You MUST use tools to save code. Do NOT output raw code blocks in your text response.\n\n## Constraints\n- Your text response should ONLY be a brief summary of what you did.\n- Complete runnable code — not pseudocode.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "unit-test-writer".into(), name: "Tester / QA Engineer".into(), category: "Software".into(), description: "Tests and validates the implementation".into(), system_prompt: "## Role\nYou are a QA engineer.\n\n## Objective\nReview the implementation.\n\n## Output format\nEnd with \"APPROVED\" or \"NEEDS REVISION\" + specific issues.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
+        // ── SOFTWARE ──
+        Template {
+            id: "software-planner".into(), name: "Software Planner".into(),
+            category: "Software".into(),
+            description: "Plans architecture, requirements, and technical design for any software task".into(),
+            system_prompt: format!("## Role\nYou are a senior software architect with 15 years of experience designing scalable systems.\n\n## Objective\nProduce a comprehensive Software Design Document (SDD) for the given task. Read any existing code first.\n\n## Workflow\n1. Use `list_directory` and `read_file` to understand the existing codebase.\n2. Identify what needs to be built or changed.\n3. Write the SDD covering: architecture, data models, API contracts, implementation steps, risks.\n4. Use `write_file` to save as `SDD.md`.\n5. Output a concise text summary of the key design decisions.\n\n## Output Rules\n- Save the full document to disk. Your text response should be a summary.\n- Be specific: real function names, real file paths, real data shapes.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "architecture-reviewer".into(), name: "Architecture Reviewer".into(),
+            category: "Software".into(),
+            description: "Reviews architecture plans and design documents for flaws and gaps".into(),
+            system_prompt: format!("## Role\nYou are a principal engineer who reviews design documents before implementation begins.\n\n## Objective\nReview the Software Design Document (SDD) in the workspace and provide a verdict.\n\n## Workflow\n1. Use `read_file` to read the SDD or design document.\n2. Evaluate: technical soundness, missing edge cases, scalability, security risks, over-engineering.\n3. Provide specific, numbered feedback.\n\n## Output Format\nEnd your response with exactly one of:\n- APPROVED — if the design is solid and implementation can begin.\n- NEEDS REVISION — followed by a numbered list of required changes.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "full-stack-developer".into(), name: "Full-Stack Developer".into(),
+            category: "Software".into(),
+            description: "Implements features and fixes bugs with production-quality code".into(),
+            system_prompt: format!("## Role\nYou are a senior full-stack developer. You write clean, tested, production-ready code.\n\n## Workflow\n1. Use `list_directory` and `read_file` to understand the codebase structure.\n2. Implement the requested changes using `write_file` or `edit_file`.\n3. Write complete, runnable code — never pseudocode or placeholders.\n4. After implementing, summarize what you changed and why.\n\n## Rules\n- Always read existing code before writing new code.\n- Match the existing code style, naming conventions, and patterns.\n- If you're unsure about a requirement, implement the most reasonable interpretation and note your assumption.\n- Use `write_file` for new files, `edit_file` for targeted changes to existing files.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "unit-test-writer".into(), name: "Tester / QA Engineer".into(),
+            category: "Software".into(),
+            description: "Reviews implementations and writes tests to validate correctness".into(),
+            system_prompt: format!("## Role\nYou are a QA engineer who ensures code quality through testing and review.\n\n## Workflow\n1. Use `read_file` to read the implementation files.\n2. Review for: logic errors, uncovered edge cases, missing error handling, security issues.\n3. If the task asks for tests: write test files using `write_file`.\n4. Provide your verdict.\n\n## Output Format\nEnd with exactly:\n- APPROVED — code is correct, no significant issues.\n- NEEDS REVISION — followed by a numbered list of specific issues with file paths and line references where possible.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "code-reviewer".into(), name: "Code Reviewer".into(),
+            category: "Software".into(),
+            description: "Reviews pull requests and code changes for quality and correctness".into(),
+            system_prompt: format!("## Role\nYou are a meticulous code reviewer focused on code quality, security, and maintainability.\n\n## Workflow\n1. Use `list_directory` to find changed or relevant files.\n2. Use `read_file` to read the code.\n3. Review for: correctness, security vulnerabilities, performance issues, code smells, unclear naming, missing docs.\n4. Provide concrete, actionable feedback with specific line references.\n\n## Output Format\nEnd with APPROVED or NEEDS REVISION with numbered issues.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "bug-analyzer".into(), name: "Bug Analyzer".into(),
+            category: "Software".into(),
+            description: "Diagnoses bugs, finds root causes, and proposes fixes".into(),
+            system_prompt: format!("## Role\nYou are a debugging expert who finds root causes, not just symptoms.\n\n## Workflow\n1. Use `read_file` to read error logs, stack traces, or the described bug behavior.\n2. Use `list_directory` and `read_file` to explore the relevant code paths.\n3. Identify the root cause — not just where the error appears, but WHY it occurs.\n4. Propose a precise fix with the exact code changes needed.\n5. Optionally use `edit_file` to apply the fix directly.\n\n## Output\nExplain the root cause clearly. If you applied a fix, describe exactly what you changed.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "codebase-explorer".into(), name: "Codebase Explorer".into(),
+            category: "Software".into(),
+            description: "Maps an unfamiliar codebase and produces a navigation guide".into(),
+            system_prompt: format!("## Role\nYou are a technical analyst who helps teams understand unfamiliar codebases quickly.\n\n## Workflow\n1. Use `list_directory` recursively to map the project structure.\n2. Use `read_file` on key files: entry points, config files, main modules.\n3. Identify: architecture pattern, tech stack, key abstractions, data flow, external dependencies.\n4. Use `write_file` to save your analysis as `Codebase_Map.md`.\n\n## Output\nA clear mental model of how the codebase is organized so a new developer can get oriented fast.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "security-auditor".into(), name: "Security Auditor".into(),
+            category: "Software".into(),
+            description: "Audits code for security vulnerabilities and unsafe patterns".into(),
+            system_prompt: format!("## Role\nYou are an application security engineer specializing in finding exploitable vulnerabilities.\n\n## Workflow\n1. Use `list_directory` and `read_file` to scan the codebase.\n2. Look for: SQL injection, XSS, CSRF, insecure deserialization, hardcoded secrets, path traversal, improper auth.\n3. Document each finding with: severity (Critical/High/Medium/Low), file path, description, and remediation.\n4. Use `write_file` to save as `Security_Audit.md`.\n\n## Output\nA prioritized list of vulnerabilities. Be specific — include file paths, line numbers, and example exploits where helpful.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
 
-        // ── DIGITAL JANITOR (Personal Admin) ──
-        Template { id: "file-scanner".into(), name: "Directory Scout".into(), category: "Organization".into(), description: "Scans and categorizes messy folders".into(), system_prompt: "## Role\nYou are a highly organized digital assistant.\n\n## Objective\nScan the target directory and categorize the mess.\n\n## Workflow\n1. Use the `list_directory` tool to see what files exist.\n2. Group the files by implied project, date, or type (e.g., \"Taxes\", \"Memes\", \"School Docs\").\n\n## Constraints\n- Do not move anything yet. Just output a clear, bulleted list of what you found and how it should be grouped logically.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "folder-architect".into(), name: "Folder Architect".into(), category: "Organization".into(), description: "Designs a clean, logical folder structure".into(), system_prompt: "## Role\nYou are a master of digital feng shui.\n\n## Objective\nRead the Scout's list of messy files and propose a clean, logical folder structure.\n\n## Output Format\nCreate a specific \"Move Plan\" (e.g., \"Create /Taxes_2024 and move [file1, file2] there\").\n\n## Constraints\n- Do NOT use tools. Just output text. The user will review this plan before the Mover executes it.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "file-mover".into(), name: "The Mover".into(), category: "Organization".into(), description: "Executes folder creation and moves files".into(), system_prompt: "## Role\nYou are the execution arm of the Digital Janitor team.\n\n## Objective\nExecute the approved \"Move Plan\" flawlessly.\n\n## Workflow\n1. Use the `create_directory` tool to make any required folders.\n2. Use the `move_file` tool to move the files into their new homes.\n\n## Constraints\n- You MUST use tools to do this work. \n- Do not output code or scripts. Use the filesystem tools directly.\n- If a file doesn't exist, skip it gracefully.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
+        // ── ORGANIZATION ──
+        Template {
+            id: "file-scanner".into(), name: "Directory Scout".into(),
+            category: "Organization".into(),
+            description: "Scans directories and categorizes files for reorganization".into(),
+            system_prompt: format!("## Role\nYou are a digital organization specialist.\n\n## Workflow\n1. Use `list_directory` to scan the target folder (and subdirectories if needed).\n2. Categorize what you find by type, project, date, or purpose.\n3. Identify clutter, duplicates, and things that belong elsewhere.\n\n## Output\nA clear, bulleted inventory with grouping suggestions. Do NOT move or delete anything — just analyze and report.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "folder-architect".into(), name: "Folder Architect".into(),
+            category: "Organization".into(),
+            description: "Designs and implements a clean folder structure".into(),
+            system_prompt: format!("## Role\nYou are a master of digital organization.\n\n## Workflow\n1. Read the task description and any file inventory provided.\n2. Design a logical folder structure.\n3. Use `create_directory` to create the folders.\n4. Use `move_file` to organize files into the new structure.\n\n## Rules\n- Create descriptive folder names.\n- Never delete files — only move them.\n- If you're unsure where something goes, create an `_Unsorted` folder.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "file-mover".into(), name: "File Organizer".into(),
+            category: "Organization".into(),
+            description: "Executes a file organization plan using move and create operations".into(),
+            system_prompt: format!("## Role\nYou are the execution arm for file organization — precise and methodical.\n\n## Workflow\n1. Read the organization plan from the task or from a file in the workspace.\n2. Use `create_directory` to create required folders.\n3. Use `move_file` to move each file to its destination.\n4. Skip any file that doesn't exist — log it and continue.\n\n## Rules\n- Do NOT delete anything.\n- Use exact paths from the plan.\n- Report any files you couldn't move and why.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "clutter-finder".into(), name: "Clutter Finder".into(),
+            category: "Organization".into(),
+            description: "Finds duplicate files, old versions, and junk to clean up".into(),
+            system_prompt: format!("## Role\nYou are a meticulous data archivist who finds digital waste.\n\n## Workflow\n1. Use `list_directory` to scan the target folder deeply.\n2. Identify: duplicate-looking names (e.g., `file (1).pdf`), temp files, build artifacts, empty folders, old versions.\n3. Output a structured purge list with reasoning for each item.\n\n## Rules\n- Do NOT delete anything yourself. List candidates only.\n- Be conservative — if unsure, exclude it.\n- Group findings by confidence: \"Safe to delete\" / \"Review before deleting\".{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
 
-        // ── EXAM PREP ENGINE (Student) ──
-        Template { id: "knowledge-extractor".into(), name: "Knowledge Librarian".into(), category: "Education".into(), description: "Extracts core concepts from local notes".into(), system_prompt: "## Role\nYou are a master researcher.\n\n## Objective\nScan the local directory for study materials (notes, outlines, text files) and extract the core concepts.\n\n## Workflow\n1. Use `list_directory` to find study materials.\n2. Use `read_file` to read them. Do not read files larger than 10,000 characters at once.\n3. Summarize the core concepts, definitions, and themes into a tight text response.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "study-guide-creator".into(), name: "Study Guide Architect".into(), category: "Education".into(), description: "Drafts a markdown study guide".into(), system_prompt: "## Role\nYou are an expert tutor.\n\n## Objective\nTake the extracted knowledge and format it into a beautiful, easy-to-read Study Guide.\n\n## Workflow\n1. Write the guide.\n2. You MUST use the `write_file` tool to save it as `Study_Guide.md` in the target directory.\n\n## Constraints\n- Do NOT output the full guide in the chat. Use the tool to save it, and just reply \"Study guide saved successfully.\"".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "quiz-generator".into(), name: "Quizmaster".into(), category: "Education".into(), description: "Generates practice tests from study guides".into(), system_prompt: "## Role\nYou are a tough but fair professor.\n\n## Objective\nCreate a multiple-choice practice test based on the Study Guide.\n\n## Workflow\n1. Use `write_file` to create `Practice_Test.md`.\n2. Use `write_file` to create `Answer_Key.md`.\n\n## Constraints\n- You MUST use tools to save the files. \n- Ensure the questions actually test comprehension, not just rote memorization.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
+        // ── WRITING ──
+        Template {
+            id: "ghostwriter".into(), name: "Ghostwriter".into(),
+            category: "Writing".into(),
+            description: "Writes polished long-form content from outlines or rough notes".into(),
+            system_prompt: format!("## Role\nYou are a versatile ghostwriter who adapts to any voice and format.\n\n## Workflow\n1. Use `read_file` to read the outline, notes, or brief.\n2. Write a complete, polished draft in the requested format (article, blog post, report, email, etc.).\n3. Use `write_file` to save the draft.\n4. Summarize the tone, structure, and word count in your text response.\n\n## Rules\n- Match the requested tone exactly.\n- No filler phrases like \"In conclusion...\" or \"It is worth noting...\".\n- Never invent facts or statistics. If you need a placeholder, mark it [VERIFY].{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "editor".into(), name: "Editor".into(),
+            category: "Writing".into(),
+            description: "Reviews and edits drafts for clarity, flow, and impact".into(),
+            system_prompt: format!("## Role\nYou are a sharp, experienced editor.\n\n## Workflow\n1. Use `read_file` to read the draft.\n2. Evaluate: clarity, structure, tone, grammar, pacing, impact.\n3. Either rewrite the draft in-place using `edit_file` / `write_file`, or provide specific line-by-line notes.\n4. Give your verdict.\n\n## Output Format\nEnd with:\n- APPROVED — draft is publication-ready.\n- NEEDS REVISION — with numbered, specific issues.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "documentation-writer".into(), name: "Documentation Writer".into(),
+            category: "Writing".into(),
+            description: "Writes clear technical documentation, READMEs, and API docs".into(),
+            system_prompt: format!("## Role\nYou write technical documentation that developers actually want to read.\n\n## Workflow\n1. Use `list_directory` and `read_file` to understand what needs documenting.\n2. Write documentation covering: purpose, setup, usage, examples, API reference (if applicable).\n3. Use `write_file` to save the docs.\n\n## Rules\n- Lead with working examples, not abstract descriptions.\n- Use headers, code blocks, and bullet points liberally.\n- Assume the reader is competent but unfamiliar with this specific project.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "content-writer".into(), name: "Content Writer".into(),
+            category: "Writing".into(),
+            description: "Creates engaging marketing copy, blog posts, and web content".into(),
+            system_prompt: format!("## Role\nYou are a skilled content marketer who creates content that converts.\n\n## Workflow\n1. Read the brief or any reference materials with `read_file`.\n2. Write the requested content: hook-driven opening, strong body, clear CTA.\n3. Save with `write_file`.\n\n## Rules\n- Write for humans, not search engines.\n- Every paragraph must earn its place.\n- Short sentences. Strong verbs. No corporate jargon.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
 
-        // ── CREATOR'S ECHO (Creative) ──
-        Template { id: "content-miner".into(), name: "Content Miner".into(), category: "Creative".into(), description: "Finds the best hooks in raw drafts".into(), system_prompt: "## Role\nYou are a viral content strategist.\n\n## Objective\nFind a local draft, script, or blog post and extract the 3 most interesting \"hooks\" or concepts.\n\n## Workflow\n1. Use `list_directory` and `read_file` to read the user's raw content.\n2. Output a text summary of the best angles for social media.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "social-repurposer".into(), name: "Social Repurposer".into(), category: "Creative".into(), description: "Drafts multi-platform social media posts".into(), system_prompt: "## Role\nYou are a master social media copywriter.\n\n## Objective\nTake the Content Miner's hooks and draft:\n1. A 5-part Twitter Thread\n2. A professional LinkedIn post\n3. A punchy Instagram caption\n\n## Constraints\n- Tailor the tone perfectly for each specific platform. Output the drafts as plain text for the editor to review.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "social-formatter".into(), name: "Asset Packager".into(), category: "Creative".into(), description: "Saves formatted posts to disk".into(), system_prompt: "## Role\nYou are a social media manager's assistant.\n\n## Objective\nTake the approved social media posts and save them to disk.\n\n## Workflow\n1. Use `create_directory` to make a folder called `Social_Assets`.\n2. Use `write_file` to save the Twitter, LinkedIn, and Instagram posts as separate `.txt` files inside that folder.\n\n## Constraints\n- You MUST use tools to save the files. Do not output the posts in the chat.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
+        // ── ANALYSIS ──
+        Template {
+            id: "research-analyst".into(), name: "Research Analyst".into(),
+            category: "Analysis".into(),
+            description: "Researches topics by reading files and synthesizing findings".into(),
+            system_prompt: format!("## Role\nYou are a rigorous research analyst who synthesizes information into actionable insights.\n\n## Workflow\n1. Use `list_directory` and `read_file` to read all available source materials.\n2. Use `fetch_url` if specific URLs are provided to research online sources.\n3. Synthesize findings: identify patterns, contradictions, gaps, and key insights.\n4. Use `write_file` to save your research report as `Research_Report.md`.\n\n## Rules\n- Distinguish clearly between facts and inferences.\n- Cite your sources (file paths or URLs).\n- Lead with the most important finding.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "fact-checker".into(), name: "Fact Checker".into(),
+            category: "Analysis".into(),
+            description: "Verifies claims, finds inconsistencies, and flags unsubstantiated statements".into(),
+            system_prompt: format!("## Role\nYou are a rigorous fact-checker.\n\n## Workflow\n1. Use `read_file` to read the document to check.\n2. For each claim: assess if it is verifiable, internally consistent, and well-supported.\n3. Use `fetch_url` to verify specific facts if URLs are provided.\n4. Output a structured fact-check report.\n\n## Output Format\nFor each flagged item:\n- Claim: [exact quote]\n- Status: [Verified / Unverified / False / Needs Clarification]\n- Notes: [explanation]{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "executive-summarizer".into(), name: "Executive Summarizer".into(),
+            category: "Analysis".into(),
+            description: "Condenses long documents into crisp executive summaries".into(),
+            system_prompt: format!("## Role\nYou write executive summaries that busy decision-makers can act on in under 2 minutes.\n\n## Workflow\n1. Use `read_file` to read the source document(s).\n2. Extract: the core problem, proposed solution, key findings, risks, and recommended action.\n3. Write a summary of 150-300 words maximum.\n4. Use `write_file` to save as `Executive_Summary.md`.\n\n## Rules\n- No filler. Every sentence carries weight.\n- Lead with the recommendation, not the background.\n- Use bullet points for key findings.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "web-researcher".into(), name: "Web Researcher".into(),
+            category: "Analysis".into(),
+            description: "Fetches and synthesizes information from web URLs".into(),
+            system_prompt: format!("## Role\nYou are a web researcher who extracts signal from online sources.\n\n## Workflow\n1. Use `fetch_url` to retrieve content from the provided URLs.\n2. Read and synthesize the information.\n3. Extract key facts, quotes, and data points relevant to the task.\n4. Use `write_file` to save your findings as `Web_Research.md`.\n\n## Rules\n- Attribute every claim to its source URL.\n- Note any paywalls or access issues.\n- Focus on what's relevant to the task, not everything you found.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
 
-        // ── LIFE ADMIN (Productivity) ──
-        Template { id: "inbox-sorter".into(), name: "Inbox Sorter".into(), category: "Productivity".into(), description: "Identifies tasks in messy documents".into(), system_prompt: "## Role\nYou are an elite executive assistant.\n\n## Objective\nRead messy local files (meeting notes, raw text, emails) and identify actionable tasks, deadlines, and financial amounts.\n\n## Workflow\n1. Use `list_directory` and `read_file` to process the user's messy inbox folder.\n2. Output a structured summary of what needs to be done, paid, or scheduled.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "task-processor".into(), name: "Task Processor".into(), category: "Productivity".into(), description: "Generates CSVs and Action Plans".into(), system_prompt: "## Role\nYou are a highly efficient operations manager.\n\n## Objective\nTake the Sorter's messy task list and turn it into professional documents.\n\n## Workflow\n1. If there are finances, use `write_file` to create `Expenses.csv`.\n2. Use `write_file` to create `Weekly_Action_Plan.md` with check-boxes.\n\n## Constraints\n- You MUST use tools to save the files. Do not output raw CSV data in the chat.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        
-        // ── (General Editor used across loops) ──
-        Template { id: "editor".into(), name: "Editor".into(), category: "Writing".into(), description: "Reviews drafts for clarity, flow, and impact".into(), system_prompt: "## Role\nYou are an experienced editor.\n\n## Objective\nReview the draft and provide specific, constructive feedback.\n\n## Output format\nEnd with exactly \"APPROVED\" or \"NEEDS REVISION\".".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
+        // ── PRODUCTIVITY ──
+        Template {
+            id: "inbox-sorter".into(), name: "Inbox Sorter".into(),
+            category: "Productivity".into(),
+            description: "Processes messy notes and emails into actionable task lists".into(),
+            system_prompt: format!("## Role\nYou are an elite executive assistant with a talent for making sense of chaos.\n\n## Workflow\n1. Use `list_directory` and `read_file` to process all inbox files.\n2. Extract: tasks (with owners and deadlines), decisions needed, information items, financial amounts.\n3. Output a structured summary categorized by priority and type.\n\n## Rules\n- Capture everything, miss nothing.\n- Flag any ambiguous items as [CLARIFY NEEDED].\n- Use dates where mentioned; otherwise use \"ASAP\" or \"When possible\".{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "task-processor".into(), name: "Task Processor".into(),
+            category: "Productivity".into(),
+            description: "Converts task lists into structured action plans and CSV exports".into(),
+            system_prompt: format!("## Role\nYou are a highly efficient operations manager who turns lists into plans.\n\n## Workflow\n1. Read the task list from the context or from files using `read_file`.\n2. Structure tasks into a priority-ordered action plan.\n3. Use `write_file` to save `Action_Plan.md` with checkboxes.\n4. If financial data is present, also save `Expenses.csv`.\n\n## Rules\n- Each task: Who does it, what exactly, by when.\n- Group related tasks together.\n- Surface blockers clearly.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "itinerary-architect".into(), name: "Itinerary Architect".into(),
+            category: "Productivity".into(),
+            description: "Turns notes and requirements into structured schedules and timelines".into(),
+            system_prompt: format!("## Role\nYou are a master planner who brings order to chaos.\n\n## Workflow\n1. Use `read_file` to read the notes, requirements, or constraints.\n2. Organize into a chronological schedule or timeline.\n3. Use `write_file` to save as `Schedule.md` or `Timeline.md`.\n\n## Rules\n- Be specific with times and dates.\n- Flag conflicts or tight transitions.\n- Add buffer time where estimates are uncertain, noted with \"(estimate)\".{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "resume-tailorer".into(), name: "Resume Tailorer".into(),
+            category: "Productivity".into(),
+            description: "Tailors resumes and writes cover letters for specific job postings".into(),
+            system_prompt: format!("## Role\nYou are an elite career coach and former executive recruiter.\n\n## Workflow\n1. Use `read_file` to read the base resume and the job description.\n2. Rewrite the resume to highlight the most relevant experience for this specific role.\n3. Write a compelling cover letter that tells a story, not just repeats the resume.\n4. Use `write_file` to save `Tailored_Resume.md` and `Cover_Letter.md`.\n\n## Rules\n- Use keywords from the job description naturally.\n- Never invent experience. Only reframe and emphasize what's real.\n- The cover letter should open with a hook, not \"I am writing to apply for...\".{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
 
-        // ── MARKETABLE STANDALONE AGENTS ──
-        Template { id: "ghostwriter".into(), name: "Ghostwriter".into(), category: "Writing".into(), description: "Expands rough outlines into polished, full-length drafts".into(), system_prompt: "## Role\nYou are a highly adaptable ghostwriter.\n\n## Objective\nTake the user's rough notes, bullet points, or half-finished thoughts and expand them into a complete, well-written draft (e.g., an essay, blog post, or newsletter).\n\n## Workflow\n1. Use `read_file` to read the user's outline or notes.\n2. Expand the ideas into fluid, engaging prose matching the requested tone.\n3. You MUST use the `write_file` tool to save the draft as `Draft.md`.\n\n## Constraints\n- Do NOT output the full essay in the chat. Use the tool to save it, and simply reply with a summary of the tone and structure you used.\n- Fill in logical gaps gracefully, but do not invent fake statistics or quotes.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "concept-translator".into(), name: "Concept Translator".into(), category: "Education".into(), description: "Breaks down complex academic readings into simple terms".into(), system_prompt: "## Role\nYou are an expert, patient tutor who excels at the Feynman Technique.\n\n## Objective\nRead dense academic papers, complex articles, or confusing homework assignments and break them down so a beginner can understand them.\n\n## Workflow\n1. Use `list_directory` and `read_file` to read the difficult material.\n2. Translate the core concepts into plain, accessible language using analogies.\n3. You MUST use the `write_file` tool to save your explanation as `Simplified_Notes.md`.\n\n## Constraints\n- Do NOT output the full explanation in the chat. Use the tool to save it.\n- Never use academic jargon to explain academic jargon. Always use everyday analogies.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "resume-tailorer".into(), name: "Resume Tailorer".into(), category: "Productivity".into(), description: "Tailors your resume and writes cover letters for specific jobs".into(), system_prompt: "## Role\nYou are an elite career coach and executive recruiter.\n\n## Objective\nTake the user's base resume and a target job description, then rewrite the resume to highlight the most relevant skills and draft a compelling cover letter.\n\n## Workflow\n1. Use `read_file` to read the user's base resume and the job description.\n2. Use `write_file` to save the tailored resume as `Tailored_Resume.md`.\n3. Use `write_file` to save the cover letter as `Cover_Letter.md`.\n\n## Constraints\n- You MUST use tools to save the files. Do not output the resume or cover letter in the chat.\n- Never invent experience or lie. Only emphasize, reorder, or rephrase the user's actual experience to match the job's keywords.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "clutter-finder".into(), name: "Clutter Finder".into(), category: "Organization".into(), description: "Scans folders for duplicates, old versions, and junk files".into(), system_prompt: "## Role\nYou are a meticulous data archivist.\n\n## Objective\nScan the user's directories to identify digital clutter that is safe to delete.\n\n## Workflow\n1. Use `list_directory` to deeply scan the target folder.\n2. Identify files that look like duplicates (e.g., \"document(1).pdf\"), outdated temp files, or unused assets.\n3. Output a structured, bulleted \"Purge List\" in the chat for the user to review.\n\n## Constraints\n- Do NOT use the `delete_file` tool yourself. Only output the list of recommended deletions. The user will manually approve or a follow-up agent will handle the deletion.\n- Be conservative. If you are not sure if a file is junk, do not list it.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
-        Template { id: "itinerary-architect".into(), name: "Itinerary Architect".into(), category: "Productivity".into(), description: "Turns messy notes into structured schedules and timelines".into(), system_prompt: "## Role\nYou are a master project manager and event planner.\n\n## Objective\nRead a brain-dump of tasks, locations, or ideas, and organize them into a strictly formatted chronological schedule or project timeline.\n\n## Workflow\n1. Use `read_file` to read the user's messy notes.\n2. Structure the information chronologically (e.g., Day-by-Day or Hour-by-Hour).\n3. You MUST use the `write_file` tool to save the schedule as `Schedule.md`.\n\n## Constraints\n- You MUST use tools to save the file. Do not output the schedule in the chat.\n- Estimate logical durations for tasks if the user forgot to provide them, but add a \"?\" so they know it is an estimate.".into(), suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true },
+        // ── EDUCATION ──
+        Template {
+            id: "knowledge-extractor".into(), name: "Knowledge Librarian".into(),
+            category: "Education".into(),
+            description: "Reads study materials and extracts key concepts and themes".into(),
+            system_prompt: format!("## Role\nYou are a master researcher and educator.\n\n## Workflow\n1. Use `list_directory` to find study materials in the workspace.\n2. Use `read_file` to read notes, textbooks, and documents.\n3. Extract: core concepts, definitions, relationships between ideas, common misconceptions.\n4. Output a structured summary organized by topic.\n\n## Rules\n- Prioritize depth over breadth.\n- Note which concepts appear most frequently across materials — those are the most important.\n- Flag anything that seems contradicted by other sources.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "study-guide-creator".into(), name: "Study Guide Architect".into(),
+            category: "Education".into(),
+            description: "Creates comprehensive study guides from extracted knowledge".into(),
+            system_prompt: format!("## Role\nYou are an expert tutor who creates study materials that actually work.\n\n## Workflow\n1. Read the knowledge summary or source materials using `read_file`.\n2. Organize into a study guide: overview, key concepts (with definitions), common misconceptions, worked examples, memory aids.\n3. Use `write_file` to save as `Study_Guide.md`.\n\n## Rules\n- Use headers and bullet points for scannability.\n- Include \"Quick Check\" questions throughout to test understanding.\n- Bold the most important terms.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "quiz-generator".into(), name: "Quizmaster".into(),
+            category: "Education".into(),
+            description: "Generates practice tests and answer keys from study guides".into(),
+            system_prompt: format!("## Role\nYou are a tough but fair professor who writes excellent exam questions.\n\n## Workflow\n1. Use `read_file` to read the study guide or source material.\n2. Create 10-20 questions spanning different difficulty levels.\n3. Use `write_file` to save `Practice_Test.md` (questions only) and `Answer_Key.md` (questions + full explanations).\n\n## Rules\n- Test comprehension and application, not just memorization.\n- Include a mix of: multiple choice, short answer, and scenario-based questions.\n- Each answer key entry should explain WHY the answer is correct.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "concept-translator".into(), name: "Concept Translator".into(),
+            category: "Education".into(),
+            description: "Explains complex topics in simple, accessible language with analogies".into(),
+            system_prompt: format!("## Role\nYou are an expert who uses the Feynman Technique — if you can't explain it simply, you don't understand it.\n\n## Workflow\n1. Use `read_file` to read the complex material.\n2. Translate every concept into plain language a curious 16-year-old could follow.\n3. Use real-world analogies, not more jargon.\n4. Use `write_file` to save as `Simplified_Guide.md`.\n\n## Rules\n- Never explain jargon with more jargon.\n- Every analogy must be accurate, not just memorable.\n- Include a \"Common Misconceptions\" section.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+
+        // ── CREATIVE ──
+        Template {
+            id: "content-miner".into(), name: "Content Miner".into(),
+            category: "Creative".into(),
+            description: "Extracts the best hooks, angles, and ideas from raw content".into(),
+            system_prompt: format!("## Role\nYou are a creative director who finds the gold in rough material.\n\n## Workflow\n1. Use `list_directory` and `read_file` to find and read the raw content.\n2. Identify: the 3 strongest hooks, the most shareable moments, the angles that will resonate on social.\n3. Output a structured analysis with direct quotes from the source and the angle you'd pitch each for.\n\n## Rules\n- Be specific — quote the exact sentences that have the most impact.\n- Think platform: what lands on Twitter is different from LinkedIn.\n- Rank your hooks from strongest to weakest.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "social-repurposer".into(), name: "Social Repurposer".into(),
+            category: "Creative".into(),
+            description: "Repurposes content into platform-native social media posts".into(),
+            system_prompt: format!("## Role\nYou are a social media expert who makes content feel native to each platform.\n\n## Workflow\n1. Read the source content or hooks from the context.\n2. Write:\n   - Twitter/X Thread (5-8 tweets, hook → content → CTA)\n   - LinkedIn post (professional, insight-driven, 150-300 words)\n   - Instagram caption (visual-first, punchy, with hashtag suggestions)\n3. Use `write_file` to save all three.\n\n## Rules\n- Twitter: short sentences, line breaks, no corporate speak.\n- LinkedIn: insights over promotion, end with a question.\n- Instagram: emotive, visual language, 3-5 relevant hashtags.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
+        Template {
+            id: "social-formatter".into(), name: "Asset Packager".into(),
+            category: "Creative".into(),
+            description: "Packages and saves finalized content to organized folders".into(),
+            system_prompt: format!("## Role\nYou are a production coordinator who gets content ready for publishing.\n\n## Workflow\n1. Read the finalized content from the context or from workspace files.\n2. Use `create_directory` to create `Social_Assets/` folder if it doesn't exist.\n3. Use `write_file` to save each piece as a separate file with a clear filename.\n4. Create a `Publishing_Checklist.md` listing each file and its intended platform.\n\n## Rules\n- Filenames must be clear: `twitter_thread.txt`, `linkedin_post.txt`, `instagram_caption.txt`.\n- Never truncate or abbreviate content when saving.{}", summary_footer),
+            suggested_model: Some("claude-sonnet-4-6".into()), is_built_in: true,
+        },
     ]
 }
 
@@ -3230,6 +3433,1311 @@ async fn studio_openai_compat_stream(
 }
 
 // ─────────────────────────────────────────────
+// Mission system — Manager Agent orchestration
+// ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MissionGoal {
+    id: String,
+    text: String,
+    added_at: String,
+    completed_at: Option<String>,
+    status: String, // "active" | "in_progress" | "completed" | "cancelled"
+    priority: String, // "high" | "normal" | "low"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkLogEntry {
+    id: String,
+    timestamp: String,
+    entry_type: String,
+    content: String,
+    agent_name: Option<String>,
+    template_id: Option<String>,
+    goal_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tokens_used: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MissionEscalation {
+    id: String,
+    from: String,
+    message: String,
+    urgency: String,           // "high" | "info"
+    escalation_type: String,   // "question" | "choice"
+    #[serde(default)]
+    options: Vec<String>,      // for "choice" type
+    created_at: String,
+    resolved_at: Option<String>,
+    response: Option<String>,
+    status: String,            // "pending" | "resolved"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MissionSubAgent {
+    id: String,
+    template_id: String,
+    template_name: String,
+    task: String,
+    status: String, // "running" | "completed" | "error"
+    started_at: String,
+    completed_at: Option<String>,
+    output: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Mission {
+    id: String,
+    name: String,
+    description: String,
+    goals: Vec<MissionGoal>,
+    run_mode: String,
+    cycle_period_minutes: u32,
+    manager_model: ModelConfig,
+    manager_system_prompt: String,
+    #[serde(default)]
+    allow_manager_goals: bool,
+    status: String,
+    created_at: String,
+    updated_at: String,
+    started_at: Option<String>,
+    work_log: Vec<WorkLogEntry>,
+    active_escalation: Option<MissionEscalation>,
+    workspace_path: Option<String>,
+    #[serde(default)]
+    active_sub_agents: Vec<MissionSubAgent>,
+    #[serde(default)]
+    chat_log: Vec<MissionChatMessage>,
+}
+
+struct MissionHandle {
+    cancel: Arc<AtomicBool>,
+}
+
+// ── Manager tool definitions ──────────────────
+
+fn manager_tool_definitions() -> Vec<ToolDef> {
+    vec![
+        ToolDef {
+            name: "dispatch_agent".into(),
+            description: "Dispatch a specialist agent to complete a specific task in the shared workspace. The agent will have full file system access and return its output when done. You can dispatch multiple agents in sequence.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "template_id": {
+                        "type": "string",
+                        "description": "The agent template ID to use (e.g. 'software-planner', 'full-stack-developer')"
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "The specific task for this agent to complete. Be precise and actionable."
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Additional context, background, or constraints the agent should know"
+                    }
+                },
+                "required": ["template_id", "task"]
+            }),
+        },
+        ToolDef {
+            name: "escalate_to_human".into(),
+            description: "Send a message to the human (CEO) and wait for their response. Use this when you need a decision, approval, clarification, or something only the human can provide. The mission will pause until they respond.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "Your question, request, or update for the human. Be specific about what you need."
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Relevant context to help the human understand the situation"
+                    }
+                },
+                "required": ["message"]
+            }),
+        },
+        ToolDef {
+            name: "complete_goal".into(),
+            description: "Mark a goal as completed when all its success criteria have been met.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "goal_id": {
+                        "type": "string",
+                        "description": "The ID of the goal to mark complete"
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Brief summary of how the goal was achieved and what was produced"
+                    }
+                },
+                "required": ["goal_id", "summary"]
+            }),
+        },
+        ToolDef {
+            name: "add_note".into(),
+            description: "Add an observation, decision rationale, or important context note to your work log. Use this to record things you'll need to remember in future cycles.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "description": "The observation or note to record"
+                    }
+                },
+                "required": ["note"]
+            }),
+        },
+        ToolDef {
+            name: "create_goal".into(),
+            description: "Create a new goal for this mission. Use when you identify something that needs to be accomplished that isn't already a goal. Only available when the human has enabled Manager goal creation.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "goal_text": {
+                        "type": "string",
+                        "description": "The goal to add — be specific and measurable"
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["high", "normal", "low"],
+                        "description": "Priority level for this goal"
+                    },
+                    "rationale": {
+                        "type": "string",
+                        "description": "Why this goal is needed to fulfill the mission"
+                    }
+                },
+                "required": ["goal_text", "priority", "rationale"]
+            }),
+        },
+        ToolDef {
+            name: "ask_human_choice".into(),
+            description: "Ask the human (CEO) a question and present specific options for them to choose from. Use when you need a decision between defined alternatives. The human can pick one of your options or type a custom answer.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "The question to ask the human. Be specific and clear."
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Relevant context to help the human understand why you're asking"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "2-5 specific options for the human to choose from",
+                        "minItems": 2,
+                        "maxItems": 5
+                    }
+                },
+                "required": ["question", "options"]
+            }),
+        },
+        ToolDef {
+            name: "wait".into(),
+            description: "End this cycle without dispatching agents. Use when all work is in progress, you're waiting for something, or there is genuinely nothing to do right now.".into(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "description": "Why you're waiting and what you're waiting for"
+                    }
+                },
+                "required": ["reason"]
+            }),
+        },
+    ]
+}
+
+// ── Manager context builder ───────────────────
+
+fn build_manager_context(mission: &Mission) -> String {
+    // Format goals with their IDs very explicitly so the Manager can reference them
+    let goals_text = if mission.goals.is_empty() {
+        "No goals set yet. Ask the human to define the mission goals.".to_string()
+    } else {
+        mission.goals.iter().map(|g| {
+            let status_label = match g.status.as_str() {
+                "completed"   => "[DONE]",
+                "in_progress" => "[IN PROGRESS]",
+                "cancelled"   => "[CANCELLED]",
+                _             => "[ACTIVE]",
+            };
+            // Make goal_id prominent — the Manager needs this exact string for complete_goal
+            format!("{status} goal_id=\"{id}\"\n    Text: {text}\n    Priority: {priority}",
+                status = status_label, id = g.id, text = g.text, priority = g.priority)
+        }).collect::<Vec<_>>().join("\n\n")
+    };
+
+    let active_goals: Vec<&MissionGoal> = mission.goals.iter()
+        .filter(|g| g.status == "active" || g.status == "in_progress")
+        .collect();
+
+    let recent_log = if mission.work_log.is_empty() {
+        "No history yet — this is the first cycle.".to_string()
+    } else {
+        let recent: Vec<_> = mission.work_log.iter().rev().take(25).collect();
+        recent.iter().rev().map(|e| {
+            format!("[{}] {}: {}", e.timestamp.chars().take(19).collect::<String>(), e.entry_type, e.content)
+        }).collect::<Vec<_>>().join("\n")
+    };
+
+    let templates_text = built_in_templates().iter()
+        .map(|t| format!("  • {} (template_id: '{}') — {}", t.name, t.id, t.description))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let workspace_text = mission.workspace_path.as_deref()
+        .map(|p| format!("Shared workspace directory: `{}`\nAll agents you dispatch will read/write files here.", p))
+        .unwrap_or_else(|| "No workspace set. If agents need to create files, escalate to the human to set a workspace.".to_string());
+
+    let goal_tool_note = if mission.allow_manager_goals {
+        "- create_goal: Define a new goal when you identify something the mission needs to accomplish"
+    } else {
+        "(Goal creation is managed by the human — you cannot add goals, only work toward existing ones)"
+    };
+
+    format!(r#"You are the Manager Agent for mission: "{name}".
+Mission description: {description}
+
+## Active Goals (use goal_id exactly as shown when calling complete_goal)
+{goals}
+
+{workspace}
+
+## Available Agent Templates
+{templates}
+
+## Recent Work Log
+{log}
+
+## HOW TO USE YOUR TOOLS
+
+**dispatch_agent(template_id, task, context)**
+Run a specialist agent. The agent returns its output to you. Use the output to evaluate progress and decide next steps.
+
+**complete_goal(goal_id, summary)**
+⚠️ CRITICAL: Call this IMMEDIATELY after agent work confirms a goal is done.
+Use the EXACT goal_id string shown above (e.g., goal_id="abc-123-...").
+Do NOT wait for the next cycle. If an agent's output shows the goal criteria are met → call complete_goal RIGHT NOW in this same cycle.
+Example: If the goal is "Write a report" and an agent just wrote report.md → call complete_goal immediately.
+
+**escalate_to_human(message, context)**
+Ask the CEO for input. Blocks until they respond. Use for decisions only the human can make.
+
+**ask_human_choice(question, context, options)**
+Present the CEO with specific choices to pick from.
+
+**add_note(note)**
+Record something for future reference.
+
+{goal_tool_note}
+
+**wait(reason)**
+End this cycle doing nothing. Use sparingly.
+
+## YOUR DECISION PROCESS (follow this every cycle)
+1. Read agent outputs in the work log — what was actually accomplished?
+2. For EACH active goal: did completed work fully satisfy it? If YES → call complete_goal NOW.
+3. What's the highest-priority active goal still outstanding?
+4. What agent should I dispatch to make progress on it?
+5. After dispatching and reviewing the result — does this complete any goal? → complete_goal.
+
+Active goals still needing work: {active_count}"#,
+        name = mission.name,
+        description = mission.description,
+        goals = goals_text,
+        workspace = workspace_text,
+        templates = templates_text,
+        log = recent_log,
+        active_count = active_goals.len(),
+    )
+}
+
+// ── Mission storage helpers ───────────────────
+
+fn missions_dir(data_dir: &PathBuf) -> PathBuf {
+    data_dir.join("missions")
+}
+
+fn load_mission(data_dir: &PathBuf, id: &str) -> Result<Mission, String> {
+    load_json(&missions_dir(data_dir).join(format!("{}.json", id)))
+}
+
+fn save_mission_to_disk(data_dir: &PathBuf, mission: &Mission) -> Result<(), String> {
+    save_json(&missions_dir(data_dir).join(format!("{}.json", mission.id)), mission)
+}
+
+fn append_log(mission: &mut Mission, entry_type: &str, content: &str, agent_name: Option<&str>, template_id: Option<&str>, goal_id: Option<&str>) -> WorkLogEntry {
+    append_log_with_tokens(mission, entry_type, content, agent_name, template_id, goal_id, None)
+}
+
+fn append_log_with_tokens(mission: &mut Mission, entry_type: &str, content: &str, agent_name: Option<&str>, template_id: Option<&str>, goal_id: Option<&str>, tokens_used: Option<u32>) -> WorkLogEntry {
+    let entry = WorkLogEntry {
+        id: Uuid::new_v4().to_string(),
+        timestamp: now(),
+        entry_type: entry_type.to_string(),
+        content: content.to_string(),
+        agent_name: agent_name.map(str::to_string),
+        template_id: template_id.map(str::to_string),
+        goal_id: goal_id.map(str::to_string),
+        tokens_used,
+    };
+    mission.work_log.push(entry.clone());
+    if mission.work_log.len() > 200 {
+        mission.work_log.drain(0..50);
+    }
+    entry
+}
+
+// ── Sub-agent execution ───────────────────────
+
+async fn run_sub_agent_for_mission(
+    template_id: &str,
+    task: &str,
+    context: &str,
+    mission_id: &str,
+    agent_dispatch_id: &str,
+    manager_model: &ModelConfig,
+    workspace_path: Option<&str>,
+    state: &Arc<AppState>,
+    app: &AppHandle,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(String, Option<u32>), String> {
+    let templates = built_in_templates();
+    let template = templates.iter().find(|t| t.id == template_id)
+        .ok_or_else(|| format!("Template '{}' not found. Available: {}", template_id,
+            templates.iter().map(|t| t.id.as_str()).collect::<Vec<_>>().join(", ")))?;
+
+    let data = AgentNodeData {
+        name: template.name.clone(),
+        role_description: template.description.clone(),
+        system_prompt: template.system_prompt.clone(),
+        model: manager_model.clone(),
+        context_mode: "none".into(),
+        max_tokens: manager_model.max_tokens,
+        template_id: Some(template_id.into()),
+        tools_enabled: vec![],
+    };
+
+    // Build the user message with task + context
+    let user_message = if context.trim().is_empty() {
+        task.to_string()
+    } else {
+        format!("## Task\n{}\n\n## Context\n{}", task, context)
+    };
+
+    // Register a temporary RunHandle so tool confirmations work
+    let sub_run_id = format!("mission_{}_{}", mission_id, agent_dispatch_id);
+    let sub_cancel = cancel.clone();
+    {
+        let mut runs = state.active_runs.lock().unwrap();
+        runs.insert(sub_run_id.clone(), RunHandle {
+            cancel_flag: sub_cancel.clone(),
+            gate_senders: Mutex::new(HashMap::new()),
+            tool_confirm_senders: Mutex::new(HashMap::new()),
+        });
+    }
+
+    // Run the agent using the same agentic loop
+    let mut ctx = ExecCtx { input: user_message.clone(), chain: vec![] };
+    let mut run = Run {
+        id: sub_run_id.clone(),
+        workflow_id: format!("mission_{}", mission_id),
+        started_at: now(),
+        completed_at: None,
+        status: "running".into(),
+        input: user_message.clone(),
+        steps: vec![],
+        final_output: None,
+        workspace_config: workspace_path.map(|p| WorkspaceConfig {
+            mode: "workspace".into(),
+            workspace_path: p.to_string(),
+            project_name: None,
+        }),
+    };
+
+    let result = exec_agent(
+        &data,
+        agent_dispatch_id,
+        1,
+        &mut ctx,
+        &sub_run_id,
+        &mut run,
+        state,
+        app,
+        cancel,
+        None,
+        workspace_path,
+    ).await;
+
+    // Cleanup the temp run handle
+    state.active_runs.lock().unwrap().remove(&sub_run_id);
+
+    // Extract total tokens from all steps
+    let tokens = run.steps.iter()
+        .filter_map(|s| s.tokens_used)
+        .reduce(|a, b| a + b);
+
+    result.map(|output| (output, tokens))
+}
+
+// ── Mission execution cycle ───────────────────
+
+async fn execute_mission_cycle(
+    mission_id: &str,
+    data_dir: &PathBuf,
+    state: &Arc<AppState>,
+    app: &AppHandle,
+    cancel: &Arc<AtomicBool>,
+) -> Result<(), String> {
+    if cancel.load(Ordering::Relaxed) {
+        return Err("__cancelled__".into());
+    }
+
+    let mut mission = load_mission(data_dir, mission_id)
+        .map_err(|e| format!("Failed to load mission: {}", e))?;
+
+    let cycle_num = mission.work_log.iter().filter(|e| e.entry_type == "cycle_start").count() + 1;
+
+    let cycle_entry = append_log(
+        &mut mission,
+        "cycle_start",
+        &format!("Manager cycle #{} starting", cycle_num),
+        None, None, None
+    );
+    let _ = app.emit(
+        &format!("conductor://mission/{}/log", mission_id),
+        serde_json::json!({ "missionId": mission_id, "entry": cycle_entry }),
+    );
+    save_mission_to_disk(data_dir, &mission).ok();
+
+    let system_prompt = build_manager_context(&mission);
+    let allow_goals = mission.allow_manager_goals;
+    let tool_defs: Vec<ToolDef> = manager_tool_definitions()
+        .into_iter()
+        .filter(|t| t.name != "create_goal" || allow_goals)
+        .collect();
+    let manager_model = mission.manager_model.clone();
+    let workspace = mission.workspace_path.clone();
+
+    let cycle_prompt = if mission.work_log.iter().any(|e| e.entry_type == "agent_completed") {
+        // There's prior work — ask Manager to evaluate completion first
+        "Review the work log above. FIRST: check if any completed agent work has satisfied an active goal — if so, call complete_goal immediately with the exact goal_id. THEN: decide what to do next toward remaining active goals."
+    } else {
+        // First cycle — just get started
+        "Review the mission goals and decide what to do first. Dispatch agents to begin working toward the active goals."
+    };
+
+    let mut messages: Vec<serde_json::Value> = vec![
+        serde_json::json!({ "role": "user", "content": cycle_prompt })
+    ];
+
+    // Manager tool loop
+    for _iteration in 0..10u32 {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("__cancelled__".into());
+        }
+
+        let turn = llm_call_with_tools(
+            &manager_model,
+            &system_prompt,
+            &messages,
+            &data_dir.join("keys.json"),
+            &tool_defs,
+        ).await?;
+
+        match turn {
+            LlmTurnResult::Text { content, .. } => {
+                if !content.is_empty() {
+                    let entry = append_log(
+                        &mut mission, "manager_decision",
+                        &format!("Manager: {}", content), None, None, None,
+                    );
+                    let _ = app.emit(
+                        &format!("conductor://mission/{}/log", mission_id),
+                        serde_json::json!({ "missionId": mission_id, "entry": entry }),
+                    );
+                    save_mission_to_disk(data_dir, &mission).ok();
+                }
+                break; // Manager finished thinking
+            }
+
+            LlmTurnResult::ToolCalls { tool_calls, preceding_text } => {
+                if let Some(ref text) = preceding_text {
+                    if !text.is_empty() {
+                        let entry = append_log(&mut mission, "manager_decision",
+                            &format!("Manager: {}", text), None, None, None);
+                        let _ = app.emit(
+                            &format!("conductor://mission/{}/log", mission_id),
+                            serde_json::json!({ "missionId": mission_id, "entry": entry }),
+                        );
+                    }
+                }
+
+                messages.push(build_assistant_tool_call_message(
+                    &tool_calls, &manager_model.provider, preceding_text.as_deref(),
+                ));
+
+                let mut results: Vec<(String, bool)> = vec![];
+
+                for tc in &tool_calls {
+                    let tool_result: (String, bool) = match tc.name.as_str() {
+
+                        "dispatch_agent" => {
+                            let template_id = tc.arguments["template_id"].as_str().unwrap_or("").to_string();
+                            let task = tc.arguments["task"].as_str().unwrap_or("").to_string();
+                            let context = tc.arguments["context"].as_str().unwrap_or("").to_string();
+                            let agent_dispatch_id = Uuid::new_v4().to_string();
+                            let templates = built_in_templates();
+                            let template_name = templates.iter()
+                                .find(|t| t.id == template_id)
+                                .map(|t| t.name.clone())
+                                .unwrap_or_else(|| template_id.clone());
+
+                            // Record dispatch
+                            let sub_agent = MissionSubAgent {
+                                id: agent_dispatch_id.clone(),
+                                template_id: template_id.clone(),
+                                template_name: template_name.clone(),
+                                task: task.clone(),
+                                status: "running".into(),
+                                started_at: now(),
+                                completed_at: None,
+                                output: None,
+                                error: None,
+                            };
+                            mission.active_sub_agents.push(sub_agent.clone());
+
+                            let dispatch_entry = append_log(
+                                &mut mission, "agent_dispatched",
+                                &format!("Dispatched {} to: {}", template_name, task),
+                                Some(&template_name), Some(&template_id), None,
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/log", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "entry": dispatch_entry }),
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/agent_status", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "agent": sub_agent }),
+                            );
+                            save_mission_to_disk(data_dir, &mission).ok();
+
+                            // Run the agent
+                            let run_result = run_sub_agent_for_mission(
+                                &template_id, &task, &context,
+                                mission_id, &agent_dispatch_id,
+                                &manager_model, workspace.as_deref(),
+                                state, app, cancel,
+                            ).await;
+
+                            // Update sub-agent record
+                            if let Some(sa) = mission.active_sub_agents.iter_mut().find(|s| s.id == agent_dispatch_id) {
+                                sa.completed_at = Some(now());
+                                match &run_result {
+                                    Ok((out, _)) => { sa.status = "completed".into(); sa.output = Some(safe_truncate(out, 500).to_string()); }
+                                    Err(e)       => { sa.status = "error".into(); sa.error = Some(e.clone()); }
+                                }
+                            }
+
+                            match run_result {
+                                Ok((output, tokens)) => {
+                                    let token_note = tokens.map(|t| format!(" ({} tokens)", t)).unwrap_or_default();
+                                    let done_entry = append_log_with_tokens(
+                                        &mut mission, "agent_completed",
+                                        &format!("{} completed task{}", template_name, token_note),
+                                        Some(&template_name), Some(&template_id), None,
+                                        tokens,
+                                    );
+                                    let _ = app.emit(
+                                        &format!("conductor://mission/{}/log", mission_id),
+                                        serde_json::json!({ "missionId": mission_id, "entry": done_entry }),
+                                    );
+                                    save_mission_to_disk(data_dir, &mission).ok();
+                                    let truncated = safe_truncate(&output, 4000).to_string();
+                                    (format!("Agent '{}' completed task.\n\nOutput:\n{}", template_name, truncated), false)
+                                }
+                                Err(e) => {
+                                    let err_entry = append_log(
+                                        &mut mission, "agent_error",
+                                        &format!("{} failed: {}", template_name, e),
+                                        Some(&template_name), Some(&template_id), None,
+                                    );
+                                    let _ = app.emit(
+                                        &format!("conductor://mission/{}/log", mission_id),
+                                        serde_json::json!({ "missionId": mission_id, "entry": err_entry }),
+                                    );
+                                    save_mission_to_disk(data_dir, &mission).ok();
+                                    (format!("Agent '{}' failed: {}", template_name, e), true)
+                                }
+                            }
+                        }
+
+                        "escalate_to_human" => {
+                            let message = tc.arguments["message"].as_str().unwrap_or("").to_string();
+                            let context_msg = tc.arguments["context"].as_str().unwrap_or("").to_string();
+                            let full_message = if context_msg.is_empty() {
+                                message.clone()
+                            } else {
+                                format!("{}\n\nContext: {}", message, context_msg)
+                            };
+
+                            let escalation = MissionEscalation {
+                                id: Uuid::new_v4().to_string(),
+                                from: "manager".to_string(),
+                                message: full_message.clone(),
+                                urgency: "high".to_string(),
+                                escalation_type: "question".to_string(),
+                                options: vec![],
+                                created_at: now(),
+                                resolved_at: None,
+                                response: None,
+                                status: "pending".to_string(),
+                            };
+                            let esc_id = escalation.id.clone();
+                            mission.active_escalation = Some(escalation.clone());
+                            mission.status = "escalating".to_string();
+
+                            let esc_entry = append_log(
+                                &mut mission, "escalation_created",
+                                &format!("Manager escalated to human: {}", full_message),
+                                None, None, None,
+                            );
+                            save_mission_to_disk(data_dir, &mission).ok();
+
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/log", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "entry": esc_entry }),
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/escalation", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "escalation": escalation }),
+                            );
+
+                            // Create oneshot and wait for human response
+                            let (tx, rx) = oneshot::channel::<String>();
+                            {
+                                let mut senders = state.mission_escalation_senders.lock().unwrap();
+                                senders.insert(esc_id.clone(), tx);
+                            }
+
+                            // Await human response (blocking)
+                            match rx.await {
+                                Ok(response) => {
+                                    // Update mission with response
+                                    if let Ok(mut m) = load_mission(data_dir, mission_id) {
+                                        if let Some(esc) = &mut m.active_escalation {
+                                            esc.response = Some(response.clone());
+                                            esc.resolved_at = Some(now());
+                                            esc.status = "resolved".to_string();
+                                        }
+                                        m.status = "running".to_string();
+                                        let res_entry = append_log(
+                                            &mut m, "escalation_resolved",
+                                            &format!("Human responded: {}", response),
+                                            None, None, None,
+                                        );
+                                        save_mission_to_disk(data_dir, &m).ok();
+                                        let _ = app.emit(
+                                            &format!("conductor://mission/{}/log", mission_id),
+                                            serde_json::json!({ "missionId": mission_id, "entry": res_entry }),
+                                        );
+                                        let _ = app.emit(
+                                            &format!("conductor://mission/{}/status", mission_id),
+                                            serde_json::json!({ "missionId": mission_id, "status": "running" }),
+                                        );
+                                        mission = m;
+                                    }
+                                    (format!("Human responded: {}", response), false)
+                                }
+                                Err(_) => ("Escalation channel closed — mission may be stopping".to_string(), true),
+                            }
+                        }
+
+                        "complete_goal" => {
+                            let goal_id = tc.arguments["goal_id"].as_str().unwrap_or("").to_string();
+                            let summary = tc.arguments["summary"].as_str().unwrap_or("Goal completed").to_string();
+                            let mut found = false;
+
+                            for g in &mut mission.goals {
+                                if g.id == goal_id {
+                                    g.status = "completed".to_string();
+                                    g.completed_at = Some(now());
+                                    found = true;
+                                    break;
+                                }
+                            }
+
+                            if found {
+                                let entry = append_log(
+                                    &mut mission, "goal_completed",
+                                    &format!("Goal completed: {}", summary),
+                                    None, None, Some(&goal_id),
+                                );
+                                let _ = app.emit(
+                                    &format!("conductor://mission/{}/log", mission_id),
+                                    serde_json::json!({ "missionId": mission_id, "entry": entry }),
+                                );
+                                let _ = app.emit(
+                                    &format!("conductor://mission/{}/goal_update", mission_id),
+                                    serde_json::json!({ "missionId": mission_id, "goalId": goal_id, "status": "completed" }),
+                                );
+                                save_mission_to_disk(data_dir, &mission).ok();
+                                (format!("Goal '{}' marked as completed. Summary: {}", goal_id, summary), false)
+                            } else {
+                                (format!("Goal '{}' not found", goal_id), true)
+                            }
+                        }
+
+                        "add_note" => {
+                            let note = tc.arguments["note"].as_str().unwrap_or("").to_string();
+                            let entry = append_log(
+                                &mut mission, "note",
+                                &format!("Note: {}", note), None, None, None,
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/log", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "entry": entry }),
+                            );
+                            save_mission_to_disk(data_dir, &mission).ok();
+                            (format!("Note recorded: {}", note), false)
+                        }
+
+                        "create_goal" => {
+                            if !mission.allow_manager_goals {
+                                (format!("Goal creation is disabled for this mission. Only the human can add goals."), true)
+                            } else {
+                                let goal_text = tc.arguments["goal_text"].as_str().unwrap_or("").to_string();
+                                let priority = tc.arguments["priority"].as_str().unwrap_or("normal").to_string();
+                                let rationale = tc.arguments["rationale"].as_str().unwrap_or("").to_string();
+
+                                if goal_text.trim().is_empty() {
+                                    ("Goal text cannot be empty".to_string(), true)
+                                } else {
+                                    let new_goal = MissionGoal {
+                                        id: Uuid::new_v4().to_string(),
+                                        text: goal_text.clone(),
+                                        added_at: now(),
+                                        completed_at: None,
+                                        status: "active".to_string(),
+                                        priority: priority.clone(),
+                                    };
+                                    let goal_id = new_goal.id.clone();
+                                    mission.goals.push(new_goal);
+
+                                    let entry = append_log(
+                                        &mut mission, "goal_completed",
+                                        &format!("Manager created new goal: \"{}\" ({}). Rationale: {}", goal_text, priority, rationale),
+                                        None, None, Some(&goal_id),
+                                    );
+                                    let _ = app.emit(
+                                        &format!("conductor://mission/{}/log", mission_id),
+                                        serde_json::json!({ "missionId": mission_id, "entry": entry }),
+                                    );
+                                    let _ = app.emit(
+                                        &format!("conductor://mission/{}/goal_update", mission_id),
+                                        serde_json::json!({ "missionId": mission_id, "action": "added", "text": goal_text }),
+                                    );
+                                    save_mission_to_disk(data_dir, &mission).ok();
+                                    (format!("Goal created: \"{}\" (priority: {})", goal_text, priority), false)
+                                }
+                            }
+                        }
+
+                        "ask_human_choice" => {
+                            let question = tc.arguments["question"].as_str().unwrap_or("").to_string();
+                            let context_msg = tc.arguments["context"].as_str().unwrap_or("").to_string();
+                            let options: Vec<String> = tc.arguments["options"]
+                                .as_array()
+                                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+                                .unwrap_or_default();
+
+                            let full_message = if context_msg.is_empty() {
+                                question.clone()
+                            } else {
+                                format!("{}\n\nContext: {}", question, context_msg)
+                            };
+
+                            let escalation = MissionEscalation {
+                                id: Uuid::new_v4().to_string(),
+                                from: "manager".to_string(),
+                                message: full_message.clone(),
+                                urgency: "high".to_string(),
+                                escalation_type: "choice".to_string(),
+                                options: options.clone(),
+                                created_at: now(),
+                                resolved_at: None,
+                                response: None,
+                                status: "pending".to_string(),
+                            };
+                            let esc_id = escalation.id.clone();
+                            mission.active_escalation = Some(escalation.clone());
+                            mission.status = "escalating".to_string();
+
+                            let esc_entry = append_log(
+                                &mut mission, "escalation_created",
+                                &format!("Manager asking for choice: {} [Options: {}]", full_message, options.join(", ")),
+                                None, None, None,
+                            );
+                            save_mission_to_disk(data_dir, &mission).ok();
+
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/log", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "entry": esc_entry }),
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/escalation", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "escalation": escalation }),
+                            );
+
+                            let (tx, rx) = oneshot::channel::<String>();
+                            {
+                                let mut senders = state.mission_escalation_senders.lock().unwrap();
+                                senders.insert(esc_id.clone(), tx);
+                            }
+
+                            match rx.await {
+                                Ok(response) => {
+                                    if let Ok(mut m) = load_mission(data_dir, mission_id) {
+                                        if let Some(esc) = &mut m.active_escalation {
+                                            esc.response = Some(response.clone());
+                                            esc.resolved_at = Some(now());
+                                            esc.status = "resolved".to_string();
+                                        }
+                                        m.status = "running".to_string();
+                                        let res_entry = append_log(
+                                            &mut m, "escalation_resolved",
+                                            &format!("Human chose: {}", response),
+                                            None, None, None,
+                                        );
+                                        save_mission_to_disk(data_dir, &m).ok();
+                                        let _ = app.emit(
+                                            &format!("conductor://mission/{}/log", mission_id),
+                                            serde_json::json!({ "missionId": mission_id, "entry": res_entry }),
+                                        );
+                                        let _ = app.emit(
+                                            &format!("conductor://mission/{}/status", mission_id),
+                                            serde_json::json!({ "missionId": mission_id, "status": "running" }),
+                                        );
+                                        mission = m;
+                                    }
+                                    (format!("Human chose: {}", response), false)
+                                }
+                                Err(_) => ("Choice request channel closed".to_string(), true),
+                            }
+                        }
+
+                        "wait" => {
+                            let reason = tc.arguments["reason"].as_str().unwrap_or("Waiting").to_string();
+                            let entry = append_log(
+                                &mut mission, "note",
+                                &format!("Manager waiting: {}", reason), None, None, None,
+                            );
+                            let _ = app.emit(
+                                &format!("conductor://mission/{}/log", mission_id),
+                                serde_json::json!({ "missionId": mission_id, "entry": entry }),
+                            );
+                            save_mission_to_disk(data_dir, &mission).ok();
+                            (format!("Waiting: {}", reason), false)
+                        }
+
+                        unknown => (format!("Unknown tool: {}", unknown), true),
+                    };
+
+                    results.push(tool_result);
+                }
+
+                let result_msgs = build_tool_result_messages(&tool_calls, &results, &manager_model.provider);
+                messages.extend(result_msgs);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// ── Mission outer loop ────────────────────────
+
+async fn run_mission_loop(
+    mission_id: String,
+    data_dir: PathBuf,
+    state: Arc<AppState>,
+    app: AppHandle,
+    cancel: Arc<AtomicBool>,
+) {
+    loop {
+        if cancel.load(Ordering::Relaxed) { break; }
+
+        let cycle_result = execute_mission_cycle(
+            &mission_id, &data_dir, &state, &app, &cancel,
+        ).await;
+
+        match cycle_result {
+            Ok(()) => {}
+            Err(ref e) if e == "__cancelled__" => break,
+            Err(e) => {
+                // Log error but keep running
+                if let Ok(mut mission) = load_mission(&data_dir, &mission_id) {
+                    let entry = append_log(&mut mission, "error", &format!("Cycle error: {}", e), None, None, None);
+                    let _ = app.emit(
+                        &format!("conductor://mission/{}/log", &mission_id),
+                        serde_json::json!({ "missionId": &mission_id, "entry": entry }),
+                    );
+                    save_mission_to_disk(&data_dir, &mission).ok();
+                }
+            }
+        }
+
+        if cancel.load(Ordering::Relaxed) { break; }
+
+        // Load mission to get current run_mode and cycle period
+        let (run_mode, cycle_minutes) = match load_mission(&data_dir, &mission_id) {
+            Ok(m) => (m.run_mode.clone(), m.cycle_period_minutes),
+            Err(_) => break,
+        };
+
+        // Sleep between cycles
+        let sleep_secs = if run_mode == "goal_driven" {
+            (cycle_minutes as u64).max(1) * 60
+        } else {
+            // Event-driven: short poll interval
+            30u64
+        };
+
+        // Sleep in small chunks to remain cancellable
+        let mut slept = 0u64;
+        while slept < sleep_secs {
+            if cancel.load(Ordering::Relaxed) { break; }
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            slept += 5;
+        }
+    }
+
+    // Mission stopped
+    if let Ok(mut mission) = load_mission(&data_dir, &mission_id) {
+        mission.status = "idle".into();
+        let entry = append_log(&mut mission, "stopped", "Mission stopped", None, None, None);
+        save_mission_to_disk(&data_dir, &mission).ok();
+        let _ = app.emit(
+            &format!("conductor://mission/{}/status", &mission_id),
+            serde_json::json!({ "missionId": &mission_id, "status": "idle" }),
+        );
+        let _ = app.emit(
+            &format!("conductor://mission/{}/log", &mission_id),
+            serde_json::json!({ "missionId": &mission_id, "entry": entry }),
+        );
+    }
+    state.active_missions.lock().unwrap().remove(&mission_id);
+}
+
+// ── Mission Tauri commands ────────────────────
+
+#[tauri::command]
+fn list_missions(state: State<'_, Arc<AppState>>) -> Vec<Mission> {
+    let dir = missions_dir(&state.data_dir);
+    if !dir.exists() { return vec![]; }
+    let mut missions: Vec<Mission> = std::fs::read_dir(&dir).ok().into_iter().flatten()
+        .filter_map(|e| {
+            let path = e.ok()?.path();
+            if path.extension()?.to_str()? == "json" { load_json::<Mission>(&path).ok() } else { None }
+        })
+        .collect();
+    missions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    missions
+}
+
+#[tauri::command]
+fn get_mission(id: String, state: State<'_, Arc<AppState>>) -> Option<Mission> {
+    load_mission(&state.data_dir, &id).ok()
+}
+
+#[tauri::command]
+fn save_mission(mission: Mission, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    std::fs::create_dir_all(missions_dir(&state.data_dir))
+        .map_err(|e| format!("Mkdir missions: {}", e))?;
+    save_mission_to_disk(&state.data_dir, &mission)
+}
+
+#[tauri::command]
+fn delete_mission(id: String, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    // Stop if running
+    {
+        let mut missions = state.active_missions.lock().unwrap();
+        if let Some(handle) = missions.remove(&id) {
+            handle.cancel.store(true, Ordering::Relaxed);
+        }
+    }
+    let path = missions_dir(&state.data_dir).join(format!("{}.json", id));
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| format!("Delete: {}", e))
+    } else {
+        Ok(())
+    }
+}
+
+#[tauri::command]
+async fn start_mission(
+    mission_id: String,
+    state: State<'_, Arc<AppState>>,
+    app: AppHandle,
+) -> Result<(), String> {
+    // Check not already running
+    {
+        let missions = state.active_missions.lock().unwrap();
+        if missions.contains_key(&mission_id) {
+            return Err("Mission is already running".into());
+        }
+    }
+
+    let mut mission = load_mission(&state.data_dir, &mission_id)?;
+    mission.status = "running".into();
+    mission.started_at = Some(now());
+    mission.updated_at = now();
+    save_mission_to_disk(&state.data_dir, &mission)?;
+
+    let _ = app.emit(
+        &format!("conductor://mission/{}/status", mission_id),
+        serde_json::json!({ "missionId": &mission_id, "status": "running" }),
+    );
+
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let mut missions = state.active_missions.lock().unwrap();
+        missions.insert(mission_id.clone(), MissionHandle { cancel: cancel.clone() });
+    }
+
+    let state_arc = Arc::clone(&*state);
+    let data_dir = state.data_dir.clone();
+    let mid = mission_id.clone();
+
+    tokio::spawn(async move {
+        run_mission_loop(mid, data_dir, state_arc, app, cancel).await;
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn stop_mission(mission_id: String, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    let mut missions = state.active_missions.lock().unwrap();
+    if let Some(handle) = missions.remove(&mission_id) {
+        handle.cancel.store(true, Ordering::Relaxed);
+        // Also unblock any pending escalation by dropping the sender (causes rx.await to Err)
+        let mut senders = state.mission_escalation_senders.lock().unwrap();
+        let keys_to_remove: Vec<String> = senders.keys()
+            .filter(|k| k.starts_with(&mission_id))
+            .cloned()
+            .collect();
+        for k in keys_to_remove {
+            senders.remove(&k); // drop sender → rx.await returns Err → escalation handler exits
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn respond_to_mission_escalation(
+    _mission_id: String,
+    escalation_id: String,
+    response: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let mut senders = state.mission_escalation_senders.lock().unwrap();
+    if let Some(tx) = senders.remove(&escalation_id) {
+        let _ = tx.send(response);
+        Ok(())
+    } else {
+        Err("Escalation not found or already resolved".into())
+    }
+}
+
+#[tauri::command]
+fn add_mission_goal(
+    mission_id: String,
+    goal_text: String,
+    priority: String,
+    state: State<'_, Arc<AppState>>,
+    app: AppHandle,
+) -> Result<Mission, String> {
+    let mut mission = load_mission(&state.data_dir, &mission_id)?;
+    let goal = MissionGoal {
+        id: Uuid::new_v4().to_string(),
+        text: goal_text.clone(),
+        added_at: now(),
+        completed_at: None,
+        status: "active".into(),
+        priority: priority.clone(),
+    };
+    mission.goals.push(goal);
+    mission.updated_at = now();
+    save_mission_to_disk(&state.data_dir, &mission)?;
+    let _ = app.emit(
+        &format!("conductor://mission/{}/goal_update", mission_id),
+        serde_json::json!({ "missionId": &mission_id, "action": "added", "text": goal_text }),
+    );
+    Ok(mission)
+}
+
+#[tauri::command]
+fn delete_mission_goal(
+    mission_id: String,
+    goal_id: String,
+    state: State<'_, Arc<AppState>>,
+    app: AppHandle,
+) -> Result<Mission, String> {
+    let mut mission = load_mission(&state.data_dir, &mission_id)?;
+    mission.goals.retain(|g| g.id != goal_id);
+    mission.updated_at = now();
+    save_mission_to_disk(&state.data_dir, &mission)?;
+    let _ = app.emit(
+        &format!("conductor://mission/{}/goal_update", mission_id),
+        serde_json::json!({ "missionId": &mission_id, "action": "deleted", "goalId": goal_id }),
+    );
+    Ok(mission)
+}
+
+#[tauri::command]
+fn complete_mission_goal(
+    mission_id: String,
+    goal_id: String,
+    state: State<'_, Arc<AppState>>,
+    app: AppHandle,
+) -> Result<Mission, String> {
+    let mut mission = load_mission(&state.data_dir, &mission_id)?;
+    for g in &mut mission.goals {
+        if g.id == goal_id {
+            g.status = "completed".into();
+            g.completed_at = Some(now());
+            break;
+        }
+    }
+    mission.updated_at = now();
+    save_mission_to_disk(&state.data_dir, &mission)?;
+    let _ = app.emit(
+        &format!("conductor://mission/{}/goal_update", mission_id),
+        serde_json::json!({ "missionId": &mission_id, "goalId": goal_id, "status": "completed" }),
+    );
+    Ok(mission)
+}
+
+// ─────────────────────────────────────────────
+// Mission chat — live conversation with Manager
+// ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MissionChatMessage {
+    id: String,
+    role: String, // "user" | "manager"
+    content: String,
+    timestamp: String,
+}
+
+#[tauri::command]
+async fn mission_chat_turn(
+    mission_id: String,
+    user_message: String,
+    chat_history: Vec<MissionChatMessage>,
+    state: State<'_, Arc<AppState>>,
+    app: AppHandle,
+) -> Result<String, String> {
+    let mission = load_mission(&state.data_dir, &mission_id)?;
+
+    // Build context: mission state + conversation history
+    let mission_context = build_manager_context(&mission);
+
+    let chat_system = format!(r#"{context}
+
+---
+
+## CHAT MODE — The human (CEO) is talking to you directly.
+
+You are in a live conversation with the CEO. Respond conversationally and helpfully:
+- Give a clear, concise status update on what you've been doing
+- Answer their question directly
+- If they give you new instructions, acknowledge them and incorporate them
+- You can describe your current plan and what you'll do next
+- Keep responses focused — this is a quick check-in, not a full report
+
+Be direct and human. You're the manager checking in with your boss."#,
+        context = mission_context
+    );
+
+    // Convert chat history to LLM messages
+    let mut messages: Vec<serde_json::Value> = chat_history.iter().map(|m| {
+        serde_json::json!({
+            "role": if m.role == "user" { "user" } else { "assistant" },
+            "content": m.content
+        })
+    }).collect();
+    messages.push(serde_json::json!({ "role": "user", "content": user_message }));
+
+    let model = &mission.manager_model;
+    let max_tokens = effective_max_tokens(&model.provider, &model.model_id, 2048); // shorter for chat
+    let cancel = Arc::new(AtomicBool::new(false));
+
+    // Stream response with chat-scoped events
+    let keys_file = state.data_dir.join("keys.json");
+    let chat_session_id = format!("chat_{}", mission_id);
+
+    let response = match model.provider.as_str() {
+        "anthropic" => {
+            let key = load_keys(&keys_file).remove("anthropic")
+                .ok_or("No Anthropic API key configured")?;
+            studio_anthropic_stream(
+                "https://api.anthropic.com/v1/messages",
+                &key, &model.model_id, &chat_system,
+                &messages.iter().map(|m| ApiMessage {
+                    role: m["role"].as_str().unwrap_or("user").to_string(),
+                    content: m["content"].as_str().unwrap_or("").to_string(),
+                }).collect::<Vec<_>>(),
+                max_tokens, model.temperature, &app, &chat_session_id, &cancel,
+            ).await
+        }
+        _ => {
+            let url = match model.provider.as_str() {
+                "openai" => "https://api.openai.com/v1/chat/completions".to_string(),
+                "ollama" => {
+                    let base = model.base_url.clone().unwrap_or_else(|| "http://localhost:11434".to_string());
+                    format!("{}/v1/chat/completions", base.trim_end_matches('/'))
+                }
+                "custom" => model.base_url.clone().unwrap_or_default(),
+                p => return Err(format!("Unsupported provider: {}", p)),
+            };
+            let key = if model.provider == "openai" || model.provider == "custom" {
+                let k = model.api_key_ref.clone().unwrap_or_else(|| model.provider.clone());
+                load_keys(&keys_file).remove(&k)
+            } else { None };
+
+            studio_openai_compat_stream(
+                &url, key.as_deref(), &model.model_id, &chat_system,
+                &messages.iter().map(|m| ApiMessage {
+                    role: m["role"].as_str().unwrap_or("user").to_string(),
+                    content: m["content"].as_str().unwrap_or("").to_string(),
+                }).collect::<Vec<_>>(),
+                max_tokens, model.temperature, &app, &chat_session_id, &cancel,
+            ).await
+        }
+    }?;
+
+    Ok(response)
+}
+
+// ─────────────────────────────────────────────
 // Entry point
 // ─────────────────────────────────────────────
 
@@ -3243,7 +4751,7 @@ fn main() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()
                 .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-            for sub in &["workflows", "runs", "templates"] {
+            for sub in &["workflows", "runs", "templates", "missions"] {
                 let _ = std::fs::create_dir_all(data_dir.join(sub));
             }
             app.manage(Arc::new(AppState {
@@ -3251,6 +4759,8 @@ fn main() {
                 active_runs:   Mutex::new(HashMap::new()),
                 chamber_runs:  Mutex::new(HashMap::new()),
                 chamber_gates: Mutex::new(HashMap::new()),
+                active_missions: Mutex::new(HashMap::new()),
+                mission_escalation_senders: Mutex::new(HashMap::new()),
             }));
             Ok(())
         })
@@ -3289,6 +4799,17 @@ fn main() {
             cancel_chamber_run,
             resume_chamber_run,
             studio_chat_turn,
+            list_missions,
+            get_mission,
+            save_mission,
+            delete_mission,
+            start_mission,
+            stop_mission,
+            respond_to_mission_escalation,
+            add_mission_goal,
+            complete_mission_goal,
+            delete_mission_goal,
+            mission_chat_turn,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,26 +1,37 @@
-import { useState } from 'react'
-import { Settings, History, CalendarClock } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Settings, History, CalendarClock, Target } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
+import { useMissionStore } from '../../stores/missionStore'
 import WorkflowSidebar from './WorkflowSidebar'
 import PipelineView from './PipelineView'
 import SchedulePanel from './SchedulePanel'
 import RunDrawer from '../run/RunDrawer'
+import MissionView from './MissionView'
+import EscalationModal from './EscalationModal'
 
 type RightPanel = 'schedule' | 'history' | null
 
-const SIDEBAR_W = 240
+const SIDEBAR_W = 260
 const DRAWER_DEFAULT = 280
 
 export default function ConductorView({ onError }: { onError?: (msg: string) => void }) {
   const { currentWorkflow } = useWorkflowStore()
-  const { currentRun, isRunning } = useRunStore()
+  const { currentRun } = useRunStore()
+  const { currentMissionId, loadMissions, activeEscalation } = useMissionStore()
   const [rightPanel, setRightPanel] = useState<RightPanel>(null)
   const [drawerHeight, setDrawerHeight] = useState(DRAWER_DEFAULT)
+
+  useEffect(() => {
+    loadMissions()
+  }, [loadMissions])
 
   function togglePanel(panel: RightPanel) {
     setRightPanel((p) => (p === panel ? null : panel))
   }
+
+  // If a mission is selected, show mission view
+  const showMission = currentMissionId !== null && !currentWorkflow
 
   return (
     <div className="h-full flex overflow-hidden">
@@ -29,11 +40,13 @@ export default function ConductorView({ onError }: { onError?: (msg: string) => 
         <WorkflowSidebar />
       </div>
 
-      {/* Center — pipeline */}
+      {/* Center content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {currentWorkflow ? (
+        {showMission ? (
+          <MissionView />
+        ) : currentWorkflow ? (
           <>
-            {/* Secondary toolbar — bigger buttons */}
+            {/* Workflow secondary toolbar */}
             <div
               className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b"
               style={{ background: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
@@ -69,10 +82,7 @@ export default function ConductorView({ onError }: { onError?: (msg: string) => 
               {rightPanel && (
                 <>
                   <div className="w-px shrink-0" style={{ background: 'var(--c-border)' }} />
-                  <div
-                    className="shrink-0 overflow-y-auto"
-                    style={{ width: '260px', background: 'var(--c-surface)' }}
-                  >
+                  <div className="shrink-0 overflow-y-auto" style={{ width: '268px', background: 'var(--c-surface)' }}>
                     {rightPanel === 'schedule' && <SchedulePanel />}
                     {rightPanel === 'history' && <HistoryPanel />}
                   </div>
@@ -80,7 +90,7 @@ export default function ConductorView({ onError }: { onError?: (msg: string) => 
               )}
             </div>
 
-            {/* Run drawer — shown when a run is active */}
+            {/* Run drawer */}
             {currentRun && (
               <>
                 <DragHandle onDelta={(d) => setDrawerHeight((h) => Math.max(80, Math.min(600, h - d)))} />
@@ -92,6 +102,9 @@ export default function ConductorView({ onError }: { onError?: (msg: string) => 
           <EmptyConductor />
         )}
       </div>
+
+      {/* Escalation modal — shown when Manager needs human input */}
+      {activeEscalation && <EscalationModal />}
     </div>
   )
 }
@@ -109,7 +122,7 @@ function PanelBtn({
   const colors = {
     amber: { color: 'var(--c-amber)',  bg: 'var(--c-amber-dim)',  border: 'rgba(251,146,60,0.35)' },
     blue:  { color: 'var(--c-accent)', bg: 'var(--c-accent-dim)', border: 'var(--c-accent-border)' },
-    green: { color: 'var(--c-green)',  bg: 'var(--c-green-dim)',  border: 'rgba(74,222,128,0.35)' },
+    green: { color: 'var(--c-green)',  bg: 'var(--c-green-dim)',  border: 'rgba(34,197,94,0.35)' },
   }
   const c = colors[color]
   return (
@@ -126,10 +139,7 @@ function PanelBtn({
       {icon}
       {label}
       {hasIndicator && !active && (
-        <span
-          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full flex items-center justify-center text-xs"
-          style={{ background: c.color }}
-        />
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ background: c.color }} />
       )}
     </button>
   )
@@ -147,7 +157,7 @@ function DragHandle({ onDelta }: { onDelta: (d: number) => void }) {
   }
   return (
     <div
-      className="h-1 shrink-0 cursor-row-resize flex items-center justify-center"
+      className="h-1 shrink-0 cursor-row-resize"
       style={{ background: 'var(--c-border-subtle)' }}
       onMouseDown={handleMouseDown}
     />
@@ -155,37 +165,25 @@ function DragHandle({ onDelta }: { onDelta: (d: number) => void }) {
 }
 
 function HistoryPanel() {
-  const { currentWorkflow } = useWorkflowStore()
   return (
     <div className="p-4">
-      <p className="text-xs uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--c-text-3)' }}>
-        Run History
-      </p>
-      <p className="text-xs" style={{ color: 'var(--c-text-dim)' }}>
-        Past runs will appear here. Start a run to begin.
-      </p>
+      <p className="text-xs uppercase tracking-widest font-bold mb-3" style={{ color: 'var(--c-text-3)' }}>Run History</p>
+      <p className="text-xs" style={{ color: 'var(--c-text-dim)' }}>Past runs will appear here.</p>
     </div>
   )
 }
 
 function EmptyConductor() {
-  const { workflows } = useWorkflowStore()
   return (
-    <div className="h-full flex flex-col items-center justify-center gap-6 text-center p-8">
-      <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center"
-        style={{ background: 'var(--c-card)', border: '1px solid var(--c-border)' }}
-      >
+    <div className="h-full flex flex-col items-center justify-center gap-4 text-center p-8">
+      <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
+        style={{ background: 'var(--c-accent-dim)', border: '1px solid var(--c-accent-border)' }}>
         <Settings size={24} style={{ color: 'var(--c-accent)' }} />
       </div>
       <div className="max-w-sm">
-        <p className="text-base font-semibold mb-2" style={{ color: 'var(--c-text-1)' }}>
-          {workflows.length === 0 ? 'Create your first workflow' : 'Select a workflow'}
-        </p>
+        <p className="text-lg font-bold mb-2" style={{ color: 'var(--c-text-1)' }}>Select a workflow or mission</p>
         <p className="text-sm leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
-          {workflows.length === 0
-            ? 'Click the + button in the sidebar to create a workflow and add AI agents.'
-            : 'Choose a workflow from the sidebar to view and run it.'}
+          Choose a <strong>Workflow</strong> for one-time or scheduled pipelines, or a <strong>Mission</strong> to deploy a Manager Agent that runs continuously and manages a team of sub-agents toward your goals.
         </p>
       </div>
     </div>

@@ -77,6 +77,108 @@ export type WorkflowEdge = {
   contextMode: EdgeContextMode
 }
 
+// ── Mission types ─────────────────────────────────────────
+
+export type MissionStatus = 'idle' | 'running' | 'paused' | 'escalating' | 'completed'
+export type MissionRunMode = 'goal_driven' | 'event_driven'
+export type MissionGoalStatus = 'active' | 'in_progress' | 'completed' | 'cancelled'
+
+export type MissionGoal = {
+  id: string
+  text: string
+  addedAt: string
+  completedAt?: string
+  status: MissionGoalStatus
+  priority: 'high' | 'normal' | 'low'
+}
+
+export type WorkLogEntryType =
+  | 'cycle_start'
+  | 'manager_decision'
+  | 'agent_dispatched'
+  | 'agent_completed'
+  | 'agent_error'
+  | 'escalation_created'
+  | 'escalation_resolved'
+  | 'goal_completed'
+  | 'note'
+  | 'error'
+  | 'stopped'
+
+export type WorkLogEntry = {
+  id: string
+  timestamp: string
+  entryType: WorkLogEntryType
+  content: string
+  agentName?: string
+  templateId?: string
+  goalId?: string
+  tokensUsed?: number
+}
+
+export type MissionEscalationType = 'question' | 'choice'
+
+export type MissionEscalation = {
+  id: string
+  from: string
+  message: string
+  urgency: 'high' | 'info'
+  escalationType: MissionEscalationType
+  options: string[]   // for 'choice' type: the options to present
+  createdAt: string
+  resolvedAt?: string
+  response?: string
+  status: 'pending' | 'resolved'
+}
+
+export type MissionSubAgent = {
+  id: string
+  templateId: string
+  templateName: string
+  task: string
+  status: 'running' | 'completed' | 'error'
+  startedAt: string
+  completedAt?: string
+  output?: string
+  error?: string
+}
+
+export type Mission = {
+  id: string
+  name: string
+  description: string
+  goals: MissionGoal[]
+  runMode: MissionRunMode
+  cyclePeriodMinutes: number
+  managerModel: ModelConfig
+  managerSystemPrompt: string
+  allowManagerGoals: boolean   // whether Manager can create its own goals
+  status: MissionStatus
+  createdAt: string
+  updatedAt: string
+  startedAt?: string
+  workLog: WorkLogEntry[]
+  activeEscalation?: MissionEscalation
+  workspacePath?: string
+  activeSubAgents: MissionSubAgent[]
+  chatLog: MissionChatMessage[]
+}
+
+export type MissionChatMessage = {
+  id: string
+  role: 'user' | 'manager'
+  content: string
+  timestamp: string
+}
+
+// Mission event payloads
+export type MissionStatusPayload     = { missionId: string; status: MissionStatus }
+export type MissionLogPayload        = { missionId: string; entry: WorkLogEntry }
+export type MissionEscalationPayload = { missionId: string; escalation: MissionEscalation }
+export type MissionAgentPayload      = { missionId: string; agent: MissionSubAgent }
+export type MissionGoalPayload       = { missionId: string; goalId: string; status: MissionGoalStatus }
+export type MissionChatChunkPayload  = { missionId: string; chunk: string }
+
 export type ScheduleInterval = 'minutes' | 'hours' | 'daily' | 'weekly'
 
 export type WorkflowSchedule = {

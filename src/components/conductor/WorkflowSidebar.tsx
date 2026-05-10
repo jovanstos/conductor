@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import {
-  Plus, Trash2, Copy, MoreHorizontal, Play, Clock, ChevronDown, ChevronRight,
-  Upload, Download, CalendarClock
+  Plus, Trash2, Copy, MoreHorizontal, Clock, ChevronDown, ChevronRight,
+  Upload, Download, CalendarClock, Target, Play, Square
 } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
+import { useMissionStore } from '../../stores/missionStore'
 import type { Workflow } from '../../types'
 import NewWorkflowModal from '../workflow/NewWorkflowModal'
+import CreateMissionModal from './CreateMissionModal'
 
 export default function WorkflowSidebar() {
   const {
@@ -14,14 +16,19 @@ export default function WorkflowSidebar() {
     deleteWorkflow, duplicateWorkflow, importWorkflow, exportWorkflow,
   } = useWorkflowStore()
   const { currentRun, isRunning } = useRunStore()
+  const { missions, currentMissionId, selectMission, deleteMission, liveStatus } = useMissionStore()
+  const [deletingMissionId, setDeletingMissionId] = useState<string | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [showNewMissionModal, setShowNewMissionModal] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [showSchedules, setShowSchedules] = useState(true)
+  const [showMissions, setShowMissions] = useState(true)
 
   const scheduledWorkflows = workflows.filter((w) => w.settings?.schedule?.enabled)
 
   function handleSelect(w: Workflow) {
     setCurrentWorkflow(w)
+    selectMission(null) // deselect mission when selecting workflow
     setMenuOpenId(null)
   }
 
@@ -215,7 +222,124 @@ export default function WorkflowSidebar() {
         )}
       </div>
 
+      {/* ── Missions section ── */}
+      <div className="shrink-0 border-t" style={{ borderColor: 'var(--c-border)' }}>
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <Target size={12} style={{ color: 'var(--c-accent)' }} />
+          <button
+            onClick={() => setShowMissions(!showMissions)}
+            className="flex items-center gap-1 text-xs uppercase tracking-widest font-semibold"
+            style={{ color: 'var(--c-text-3)' }}
+          >
+            Missions
+          </button>
+          {missions.length > 0 && (
+            <span className="text-xs px-1.5 rounded"
+              style={{ background: 'var(--c-accent-dim)', color: 'var(--c-accent)' }}>
+              {missions.length}
+            </span>
+          )}
+          <div className="ml-auto">
+            {showMissions
+              ? <ChevronDown size={11} style={{ color: 'var(--c-text-3)' }} />
+              : <ChevronRight size={11} style={{ color: 'var(--c-text-3)' }} />}
+          </div>
+          <button
+            onClick={() => setShowNewMissionModal(true)}
+            className="w-6 h-6 flex items-center justify-center rounded"
+            style={{ color: 'var(--c-text-3)' }}
+            title="New mission"
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--c-accent)'; e.currentTarget.style.background = 'var(--c-accent-dim)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--c-text-3)'; e.currentTarget.style.background = 'transparent' }}
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+
+        {showMissions && (
+          <div className="pb-3">
+            {missions.length === 0 ? (
+              <p className="px-4 py-2 text-xs" style={{ color: 'var(--c-text-dim)' }}>
+                No missions yet
+              </p>
+            ) : (
+              missions.map((m) => {
+                const mStatus = liveStatus[m.id] ?? m.status
+                const isActive = currentMissionId === m.id
+                const mRunning = mStatus === 'running' || mStatus === 'escalating'
+                const statusColor = mRunning ? 'var(--c-accent)' : mStatus === 'completed' ? 'var(--c-green)' : 'var(--c-text-3)'
+                const isConfirmingDelete = deletingMissionId === m.id
+
+                return (
+                  <div key={m.id} className="relative group px-1">
+                    {isConfirmingDelete ? (
+                      <div className="px-2 py-2">
+                        <p className="text-xs mb-1.5 truncate" style={{ color: 'var(--c-red)' }}>Delete "{m.name}"?</p>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={async () => { await deleteMission(m.id); setDeletingMissionId(null) }}
+                            className="flex-1 py-1 rounded text-xs font-semibold"
+                            style={{ background: 'var(--c-red)', color: '#fff' }}
+                          >
+                            Delete
+                          </button>
+                          <button
+                            onClick={() => setDeletingMissionId(null)}
+                            className="flex-1 py-1 rounded text-xs"
+                            style={{ background: 'var(--c-elevated)', color: 'var(--c-text-2)' }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { selectMission(m.id); setCurrentWorkflow(null) }}
+                        className="w-full flex items-center gap-2 px-2 py-2.5 text-left rounded-lg transition-all"
+                        style={{
+                          background: isActive ? 'var(--c-card)' : 'transparent',
+                          borderLeft: isActive ? '3px solid var(--c-accent)' : '3px solid transparent',
+                        }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <div className="shrink-0 flex items-center justify-center w-4">
+                          {mRunning
+                            ? <span className="pulse-accent w-2 h-2 rounded-full" style={{ background: 'var(--c-accent)', display: 'inline-block' }} />
+                            : <Target size={12} style={{ color: statusColor }} />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: isActive ? 'var(--c-text-1)' : 'var(--c-text-2)' }}>
+                            {m.name}
+                          </p>
+                          <p className="text-xs" style={{ color: 'var(--c-text-dim)' }}>
+                            {m.goals.filter(g => g.status === 'active').length} active
+                            <span style={{ marginLeft: '6px', color: statusColor }}>{mStatus}</span>
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeletingMissionId(m.id) }}
+                          className="w-6 h-6 flex items-center justify-center rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          style={{ color: 'var(--c-text-3)' }}
+                          onMouseEnter={e => { e.currentTarget.style.color = 'var(--c-red)'; e.currentTarget.style.background = 'var(--c-red-dim)' }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--c-text-3)'; e.currentTarget.style.background = 'transparent' }}
+                          title="Delete mission"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </button>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+        )}
+      </div>
+
       {showNewModal && <NewWorkflowModal onClose={() => setShowNewModal(false)} />}
+      {showNewMissionModal && <CreateMissionModal onClose={() => setShowNewMissionModal(false)} />}
     </div>
   )
 }
