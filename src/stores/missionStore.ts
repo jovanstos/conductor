@@ -1,8 +1,7 @@
 import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
-import type { Mission, MissionGoal, WorkLogEntry, MissionEscalation, MissionSubAgent, ModelConfig } from '../types'
+import type { Mission, WorkLogEntry, MissionEscalation, MissionSubAgent, MissionBriefing, ModelConfig } from '../types'
 import * as tauri from '../lib/tauri'
-import { DEFAULT_MODEL } from '../lib/defaults'
 
 const DEFAULT_MANAGER_SYSTEM_PROMPT = `You are a Manager Agent — the operational backbone of this mission. Think of yourself as a skilled middle manager: you receive goals from the human, break them down into executable tasks, dispatch specialist agents to complete those tasks, review their work, and keep everything moving forward.
 
@@ -32,12 +31,12 @@ interface MissionStore {
   missions: Mission[]
   currentMissionId: string | null
   activeEscalation: MissionEscalation | null
+  activeBriefings: Record<string, MissionBriefing | null>
   isLoading: boolean
 
-  // Current mission live state (updated by events)
-  liveStatus: Record<string, string>           // missionId -> status
-  liveLog: Record<string, WorkLogEntry[]>       // missionId -> recent entries
-  liveSubAgents: Record<string, MissionSubAgent[]> // missionId -> active sub-agents
+  liveStatus: Record<string, string>
+  liveLog: Record<string, WorkLogEntry[]>
+  liveSubAgents: Record<string, MissionSubAgent[]>
 
   loadMissions: () => Promise<void>
   selectMission: (id: string | null) => void
@@ -48,6 +47,7 @@ interface MissionStore {
     cyclePeriodMinutes: number
     managerModel: ModelConfig
     allowManagerGoals: boolean
+    autoBriefing: boolean
     workspacePath?: string
   }) => Promise<Mission>
   deleteMission: (id: string) => Promise<void>
@@ -58,9 +58,9 @@ interface MissionStore {
   deleteGoal: (missionId: string, goalId: string) => Promise<void>
   respondToEscalation: (missionId: string, escalationId: string, response: string) => Promise<void>
   dismissEscalation: () => void
+  approveBriefing: (missionId: string, briefingId: string, redirect?: string) => Promise<void>
 
-  // Event listener management
-  _listeners: Record<string, () => void>  // missionId -> unlisten fn
+  _listeners: Record<string, () => void>
   attachListeners: (missionId: string) => Promise<void>
   detachListeners: (missionId: string) => void
   detachAllListeners: () => void
@@ -70,6 +70,7 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
   missions: [],
   currentMissionId: null,
   activeEscalation: null,
+  activeBriefings: {},
   isLoading: false,
   liveStatus: {},
   liveLog: {},
@@ -87,7 +88,7 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
   },
 
   selectMission: (id) => {
-    const { currentMissionId, detachListeners, attachListeners } = get()
+    const { attachListeners } = get()
     set({ currentMissionId: id, activeEscalation: null })
     if (id) attachListeners(id)
   },
@@ -103,6 +104,7 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
       managerModel: params.managerModel,
       managerSystemPrompt: DEFAULT_MANAGER_SYSTEM_PROMPT,
       allowManagerGoals: params.allowManagerGoals,
+      autoBriefing: params.autoBriefing,
       status: 'idle',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -141,47 +143,49 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
     set((s) => ({
       missions: s.missions.map((m) => m.id === id ? { ...m, status: 'idle' } : m),
       liveStatus: { ...s.liveStatus, [id]: 'idle' },
+      activeBriefings: { ...s.activeBriefings, [id]: null },
     }))
   },
 
   addGoal: async (missionId, text, priority) => {
     const updated = await tauri.addMissionGoal(missionId, text, priority)
-    set((s) => ({
-      missions: s.missions.map((m) => m.id === missionId ? updated : m),
-    }))
+    set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
   },
 
   completeGoal: async (missionId, goalId) => {
     const updated = await tauri.completeMissionGoal(missionId, goalId)
-    set((s) => ({
-      missions: s.missions.map((m) => m.id === missionId ? updated : m),
-    }))
+    set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
   },
 
   deleteGoal: async (missionId, goalId) => {
     const updated = await tauri.deleteMissionGoal(missionId, goalId)
-    set((s) => ({
-      missions: s.missions.map((m) => m.id === missionId ? updated : m),
-    }))
+    set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
   },
 
   respondToEscalation: async (missionId, escalationId, response) => {
     await tauri.respondToMissionEscalation(missionId, escalationId, response)
     set({ activeEscalation: null })
-    // Reload mission state
     const updated = await tauri.getMission(missionId)
     if (updated) {
-      set((s) => ({
-        missions: s.missions.map((m) => m.id === missionId ? updated : m),
-      }))
+      set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
     }
   },
 
   dismissEscalation: () => set({ activeEscalation: null }),
 
+  approveBriefing: async (missionId, briefingId, redirect) => {
+    // Always clear the briefing panel — even if the backend call fails (e.g. mission restarted)
+    set((s) => ({ activeBriefings: { ...s.activeBriefings, [missionId]: null } }))
+    try {
+      await tauri.approveMissionBriefing(briefingId, redirect)
+    } catch {
+      // Briefing channel already closed (mission was stopped/restarted) — silently ignore
+    }
+  },
+
   attachListeners: async (missionId) => {
     const { _listeners, detachListeners } = get()
-    if (_listeners[missionId]) detachListeners(missionId) // re-attach
+    if (_listeners[missionId]) detachListeners(missionId)
 
     const unlisten = await tauri.listenToMission(missionId, {
       onStatusChange: ({ status }) => {
@@ -196,7 +200,7 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
       onLogEntry: ({ entry }) => {
         set((s) => {
           const prev = s.liveLog[missionId] ?? []
-          const updated = [...prev, entry].slice(-100) // keep last 100
+          const updated = [...prev, entry].slice(-100)
           return { liveLog: { ...s.liveLog, [missionId]: updated } }
         })
       },
@@ -205,7 +209,6 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
         if (escalation.urgency === 'high' && escalation.status === 'pending') {
           set({ activeEscalation: escalation })
         }
-        // Reload mission to get updated escalation state
         tauri.getMission(missionId).then((m) => {
           if (m) set((s) => ({ missions: s.missions.map((ms) => ms.id === missionId ? m : ms) }))
         })
@@ -223,10 +226,18 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
       },
 
       onGoalUpdate: () => {
-        // Reload mission to get latest goal state
         tauri.getMission(missionId).then((m) => {
           if (m) set((s) => ({ missions: s.missions.map((ms) => ms.id === missionId ? m : ms) }))
         })
+      },
+
+      onBriefing: ({ briefingId, plan }) => {
+        set((s) => ({
+          activeBriefings: {
+            ...s.activeBriefings,
+            [missionId]: { briefingId, plan },
+          },
+        }))
       },
     })
 

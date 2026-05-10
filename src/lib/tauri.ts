@@ -128,6 +128,9 @@ export const missionChatTurn = (
   chatHistory: import('../types').MissionChatMessage[],
 ) => invoke<string>('mission_chat_turn', { missionId, userMessage, chatHistory })
 
+export const approveMissionBriefing = (briefingId: string, redirect?: string) =>
+  invoke<void>('approve_mission_briefing', { briefingId, redirect: redirect ?? null })
+
 // ── Mission event listeners ───────────────────────────────────────────
 export type MissionEventHandlers = {
   onStatusChange?:  (payload: { missionId: string; status: string }) => void
@@ -135,6 +138,7 @@ export type MissionEventHandlers = {
   onEscalation?:    (payload: { missionId: string; escalation: MissionEscalation }) => void
   onAgentStatus?:   (payload: { missionId: string; agent: MissionSubAgent }) => void
   onGoalUpdate?:    (payload: { missionId: string; goalId?: string; status?: MissionGoalStatus; action?: string }) => void
+  onBriefing?:      (payload: { missionId: string; briefingId: string; plan: string }) => void
 }
 
 export async function listenToMissionChat(
@@ -185,6 +189,13 @@ export async function listenToMission(
       ? listen<{ missionId: string; goalId?: string; status?: MissionGoalStatus; action?: string }>(
           `conductor://mission/${missionId}/goal_update`,
           (e) => handlers.onGoalUpdate!(e.payload),
+        )
+      : Promise.resolve<UnlistenFn>(() => {}),
+
+    handlers.onBriefing
+      ? listen<{ missionId: string; briefingId: string; plan: string }>(
+          `conductor://mission/${missionId}/briefing`,
+          (e) => handlers.onBriefing!(e.payload),
         )
       : Promise.resolve<UnlistenFn>(() => {}),
   ])

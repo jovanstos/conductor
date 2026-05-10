@@ -242,6 +242,7 @@ struct AppState {
     // Missions
     active_missions: Mutex<HashMap<String, MissionHandle>>,
     mission_escalation_senders: Mutex<HashMap<String, oneshot::Sender<String>>>,
+    mission_briefing_senders: Mutex<HashMap<String, oneshot::Sender<Option<String>>>>,
 }
 
 struct ChamberRunHandle {
@@ -3489,6 +3490,8 @@ struct MissionSubAgent {
     completed_at: Option<String>,
     output: Option<String>,
     error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    run_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3504,6 +3507,8 @@ struct Mission {
     manager_system_prompt: String,
     #[serde(default)]
     allow_manager_goals: bool,
+    #[serde(default)]
+    auto_briefing: bool,
     status: String,
     created_at: String,
     updated_at: String,
@@ -3687,100 +3692,44 @@ fn manager_tool_definitions() -> Vec<ToolDef> {
         },
 
         // ── Direct filesystem / web tools ──────────────────────────────────────
-        // Use these for quick lookups and simple writes. Dispatch a specialist
-        // agent when the task requires domain expertise or many tool calls.
-
+        // Read-only reconnaissance — manager LOOKS, agents WRITE
         ToolDef {
             name: "read_file".into(),
-            description: "Read a file in the workspace. Use for quick checks before deciding what to do next — no need to dispatch an agent just to read a file.".into(),
+            description: "Read a file. Use once for orientation before dispatching. Do not call repeatedly.".into(),
             parameters: serde_json::json!({
                 "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "File path (relative to workspace or absolute)" }
-                },
+                "properties": { "path": { "type": "string" } },
                 "required": ["path"]
             }),
         },
         ToolDef {
             name: "list_directory".into(),
-            description: "List files and folders in a directory. Use to understand workspace contents before deciding what agents to dispatch.".into(),
+            description: "List a directory. One call to understand workspace state.".into(),
             parameters: serde_json::json!({
                 "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "Directory path to list" }
-                },
+                "properties": { "path": { "type": "string" } },
                 "required": ["path"]
             }),
         },
         ToolDef {
             name: "search_files".into(),
-            description: "Search for a text pattern across files in the workspace.".into(),
+            description: "Search for text across workspace files.".into(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string", "description": "Directory to search in" },
-                    "pattern": { "type": "string", "description": "Text pattern to search for (case-insensitive)" },
-                    "file_glob": { "type": "string", "description": "Optional glob filter (e.g. '*.md')" }
+                    "path": { "type": "string" },
+                    "pattern": { "type": "string" },
+                    "file_glob": { "type": "string" }
                 },
                 "required": ["path", "pattern"]
             }),
         },
         ToolDef {
-            name: "write_file".into(),
-            description: "Create or overwrite a file. Use for writing summaries, progress notes, or simple output documents directly.".into(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "File path (relative to workspace or absolute)" },
-                    "content": { "type": "string", "description": "Content to write" }
-                },
-                "required": ["path", "content"]
-            }),
-        },
-        ToolDef {
-            name: "edit_file".into(),
-            description: "Replace a specific string in an existing file.".into(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "File path" },
-                    "old_str": { "type": "string", "description": "The exact string to find" },
-                    "new_str": { "type": "string", "description": "The replacement string" }
-                },
-                "required": ["path", "old_str", "new_str"]
-            }),
-        },
-        ToolDef {
-            name: "create_directory".into(),
-            description: "Create a directory (and any needed parents).".into(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "path": { "type": "string", "description": "Directory path to create" }
-                },
-                "required": ["path"]
-            }),
-        },
-        ToolDef {
-            name: "move_file".into(),
-            description: "Move or rename a file.".into(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "src": { "type": "string", "description": "Source path" },
-                    "dst": { "type": "string", "description": "Destination path" }
-                },
-                "required": ["src", "dst"]
-            }),
-        },
-        ToolDef {
             name: "fetch_url".into(),
-            description: "Fetch text content from a URL.".into(),
+            description: "Fetch text from a URL.".into(),
             parameters: serde_json::json!({
                 "type": "object",
-                "properties": {
-                    "url": { "type": "string", "description": "URL to fetch" }
-                },
+                "properties": { "url": { "type": "string" } },
                 "required": ["url"]
             }),
         },
@@ -3838,13 +3787,18 @@ fn build_manager_context(mission: &Mission) -> String {
     format!(r#"You are the Manager Agent for mission: "{name}".
 Mission description: {description}
 
-You mange other AI agents and should act like a boss to these agents. You are in charge of getting the work done in any way possible. 
-The human is your boss and CEO — they set the mission and will review your work, 
-but they are not involved in day-to-day decisions. 
-Your job is to figure out how to accomplish the mission goals by dispatching specialist agents,
-managing their work, and escalating to the human when needed. 
-You have a set of tools you can use to manage agents, ask the human questions, 
-and manipulate files in the shared workspace. Use them freely and creatively to get the job done.
+## YOUR ROLE — READ THIS FIRST
+You are a MANAGER. You dispatch agents. You review their output. You complete goals.
+You do NOT write code. You do NOT implement features. You do NOT explore files in loops.
+When there is work to do, you dispatch an agent. That is the entire job.
+
+## HARD RULES
+1. Active goals present → dispatch an agent this cycle. No exceptions. "Planning" is not progress.
+2. Direct file tools (read_file, list_directory, search_files) are for ONE orientation check only. Never call them more than once per cycle, never on the same path twice.
+3. NEVER write code files, Python scripts, HTML, or any implementation yourself. Those are for developer agents.
+4. NEVER use escalate_to_human or ask_human_choice to ask about project scope, what to build, or goal definition. The mission description tells you what to build — figure it out and dispatch.
+5. After an agent completes work that satisfies a goal → call complete_goal in the SAME cycle.
+6. Use exact template_id strings from the Available Agent Templates list below when calling dispatch_agent.
 
 ## Active Goals (use goal_id exactly as shown when calling complete_goal)
 {goals}
@@ -3859,51 +3813,30 @@ and manipulate files in the shared workspace. Use them freely and creatively to 
 
 ## YOUR TOOLS
 
-### Mission management
-**dispatch_agent(template_id, task, context)** — Run a built-in specialist agent. The agent has full file system access and returns its output when done. Use when a template matches the work well.
+**dispatch_agent(template_id, task, context)** — Your PRIMARY tool. Run a specialist agent to do the actual work. Give them a clear, specific task. Agents have full file system access.
 
-**create_agent(name, system_prompt, task, context?)** — Hire a custom agent when no built-in template is the right fit. You write the system prompt — define their expertise, approach, and what to produce. Think of it as bringing in a contractor with exactly the skills this job needs.
+**create_agent(name, system_prompt, task, context?)** — When no template fits, create a custom agent. You write their role and instructions. Use this rather than doing complex work yourself.
 
-**complete_goal(goal_id, summary)** — ⚠️ CRITICAL: Call this IMMEDIATELY after work confirms a goal is done. Use the EXACT goal_id shown above. Do NOT wait for the next cycle — if an agent's output satisfies a goal, call complete_goal RIGHT NOW.
+**complete_goal(goal_id, summary)** — Call this IMMEDIATELY when agent output satisfies a goal. Use the exact goal_id. Do NOT wait for the next cycle.
 
-**escalate_to_human(message, context)** — Ask the CEO for input. Blocks the mission until they respond. Use only for decisions you cannot make yourself.
+**escalate_to_human(message, context)** — Only when you genuinely cannot make a decision yourself.
 
-**ask_human_choice(question, context, options)** — Present the CEO with specific options to pick from.
+**ask_human_choice(question, context, options)** — Present specific choices when the human must decide.
 
-**add_note(note)** — Record an observation, decision, or context for future cycles.
+**add_note(note)** — Log a short observation. Not a substitute for action.
 
 {goal_tool_note}
 
-**wait(reason)** — End this cycle without acting. Use when all work is in progress and there is nothing left to start.
+**wait(reason)** — Only when ALL active work is in-flight and there is truly nothing to start.
 
-### Direct tools (use yourself without dispatching an agent)
-These are for quick, self-contained actions. If a task is small enough to do in a single tool call, just do it directly rather than spinning up an agent.
+**read_file / list_directory / search_files / fetch_url** — Read-only orientation. One call per cycle max. Never for implementation — agents handle all writing.
 
-**read_file(path)** — Read any file in the workspace. Use before dispatching agents so you understand the current state.
-
-**list_directory(path)** — List the contents of a directory.
-
-**search_files(path, pattern, file_glob?)** — Search for text across files.
-
-**write_file(path, content)** — Write a file directly (summaries, plans, notes, status docs).
-
-**edit_file(path, old_str, new_str)** — Replace a specific string in an existing file.
-
-**create_directory(path)** — Create a new directory.
-
-**move_file(src, dst)** — Move or rename a file.
-
-**fetch_url(url)** — Fetch content from a URL.
-
-**Rule:** Use direct tools for reconnaissance and simple writes. Dispatch specialist agents for work that requires expertise, iteration, or a long sequence of tool calls.
-
-## YOUR DECISION PROCESS (follow this every cycle)
-1. Use list_directory or read_file to understand the current workspace state if needed.
-2. For EACH active goal: did completed work fully satisfy it? If YES → call complete_goal NOW.
-3. What's the highest-priority active goal still outstanding?
-4. Can I make meaningful progress with a direct tool call, or does this need a specialist agent?
-5. Dispatch the right agent (or act directly), then review the result.
-6. After any work — does this complete a goal? → complete_goal immediately.
+## WHAT TO DO THIS CYCLE
+1. Glance at the work log — did any agent complete work that satisfies a goal? → complete_goal NOW.
+2. Pick the highest-priority active goal.
+3. Dispatch the right agent for it with a specific, actionable task description.
+4. If the agent just returned output → evaluate it, complete the goal if done, dispatch the next agent.
+5. Do not loop on the same files. Do not re-read. Move forward.
 
 Active goals still needing work: {active_count}"#,
         name = mission.name,
@@ -4094,15 +4027,82 @@ async fn execute_mission_cycle(
     let workspace = mission.workspace_path.clone();
 
     let cycle_prompt = if mission.work_log.iter().any(|e| e.entry_type == "agent_completed") {
-        // There's prior work — ask Manager to evaluate completion first
-        "Review the work log above. FIRST: check if any completed agent work has satisfied an active goal — if so, call complete_goal immediately with the exact goal_id. THEN: decide what to do next toward remaining active goals."
+        "Agent work has been completed. STEP 1: Check if any completed work satisfies an active goal — if so, call complete_goal NOW with the exact goal_id. STEP 2: Dispatch the next agent toward the next active goal. Do not read files in a loop. Do not write summaries. Dispatch and complete goals."
     } else {
-        // First cycle — just get started
-        "Review the mission goals and decide what to do first. Dispatch agents to begin working toward the active goals."
+        "You have active goals. Dispatch an agent NOW to start working on the highest-priority goal. Pick a template, write a specific task description, and call dispatch_agent. Do not read files first. Do not plan. Act."
+    };
+
+    // ── Briefing step: Manager states its plan before acting ──────────
+    let briefing_prompt = "State your plan for this cycle in 2 sentences: \
+        sentence 1 — which goal you are working on; \
+        sentence 2 — which agent you will dispatch (use exact template_id from the list) and what task you will give them. \
+        Write plain English only. No JSON. No IDs. No preamble. No questions.";
+
+    let brief_turn = llm_call_with_tools(
+        &manager_model,
+        &system_prompt,
+        &[serde_json::json!({ "role": "user", "content": briefing_prompt })],
+        &data_dir.join("keys.json"),
+        &[], // text-only, no tools
+    ).await?;
+
+    let plan_text = match brief_turn {
+        LlmTurnResult::Text { content, .. } => content,
+        LlmTurnResult::ToolCalls { preceding_text, .. } => preceding_text.unwrap_or_else(|| "Ready to begin.".into()),
+    };
+
+    // Log briefing to work log
+    let brief_entry = append_log(&mut mission, "briefing", &format!("Manager's plan: {}", plan_text), None, None, None);
+    let _ = app.emit(
+        &format!("conductor://mission/{}/log", mission_id),
+        serde_json::json!({ "missionId": mission_id, "entry": brief_entry }),
+    );
+
+    // If not auto_briefing, wait for human approval before acting
+    let redirect_text: Option<String> = if !mission.auto_briefing {
+        let briefing_id = Uuid::new_v4().to_string();
+
+        mission.status = "briefing".into();
+        save_mission_to_disk(data_dir, &mission).ok();
+        let _ = app.emit(
+            &format!("conductor://mission/{}/status", mission_id),
+            serde_json::json!({ "missionId": mission_id, "status": "briefing" }),
+        );
+        let _ = app.emit(
+            &format!("conductor://mission/{}/briefing", mission_id),
+            serde_json::json!({ "missionId": mission_id, "briefingId": briefing_id, "plan": plan_text }),
+        );
+
+        let (tx, rx) = oneshot::channel::<Option<String>>();
+        { state.mission_briefing_senders.lock().unwrap().insert(briefing_id, tx); }
+
+        match rx.await {
+            Ok(redirect) => {
+                mission = load_mission(data_dir, mission_id)
+                    .map_err(|e| format!("Failed to reload mission: {}", e))?;
+                mission.status = "running".into();
+                save_mission_to_disk(data_dir, &mission).ok();
+                let _ = app.emit(
+                    &format!("conductor://mission/{}/status", mission_id),
+                    serde_json::json!({ "missionId": mission_id, "status": "running" }),
+                );
+                redirect
+            }
+            Err(_) => return Err("__cancelled__".into()),
+        }
+    } else {
+        None
+    };
+
+    // Briefing is informational for the human — do NOT inject it into the cycle context.
+    // The model's cycle starts fresh so the briefing text can't corrupt tool call arguments.
+    let cycle_content = match &redirect_text {
+        Some(r) => format!("{}\n\n## CEO Directive\n{}", cycle_prompt, r),
+        None => cycle_prompt.to_string(),
     };
 
     let mut messages: Vec<serde_json::Value> = vec![
-        serde_json::json!({ "role": "user", "content": cycle_prompt })
+        serde_json::json!({ "role": "user", "content": cycle_content }),
     ];
 
     // Manager tool loop
@@ -4161,6 +4161,7 @@ async fn execute_mission_cycle(
                             let task = tc.arguments["task"].as_str().unwrap_or("").to_string();
                             let context = tc.arguments["context"].as_str().unwrap_or("").to_string();
                             let agent_dispatch_id = Uuid::new_v4().to_string();
+                            let sub_run_id = format!("mission_{}_{}", mission_id, agent_dispatch_id);
                             let templates = built_in_templates();
                             let template_name = templates.iter()
                                 .find(|t| t.id == template_id)
@@ -4178,6 +4179,7 @@ async fn execute_mission_cycle(
                                 completed_at: None,
                                 output: None,
                                 error: None,
+                                run_id: Some(sub_run_id),
                             };
                             mission.active_sub_agents.push(sub_agent.clone());
 
@@ -4252,6 +4254,7 @@ async fn execute_mission_cycle(
                             let task = tc.arguments["task"].as_str().unwrap_or("").to_string();
                             let context = tc.arguments["context"].as_str().unwrap_or("").to_string();
                             let agent_dispatch_id = Uuid::new_v4().to_string();
+                            let sub_run_id = format!("mission_{}_{}", mission_id, agent_dispatch_id);
 
                             let sub_agent = MissionSubAgent {
                                 id: agent_dispatch_id.clone(),
@@ -4263,6 +4266,7 @@ async fn execute_mission_cycle(
                                 completed_at: None,
                                 output: None,
                                 error: None,
+                                run_id: Some(sub_run_id),
                             };
                             mission.active_sub_agents.push(sub_agent.clone());
 
@@ -4820,17 +4824,35 @@ fn stop_mission(mission_id: String, state: State<'_, Arc<AppState>>) -> Result<(
     let mut missions = state.active_missions.lock().unwrap();
     if let Some(handle) = missions.remove(&mission_id) {
         handle.cancel.store(true, Ordering::Relaxed);
-        // Also unblock any pending escalation by dropping the sender (causes rx.await to Err)
-        let mut senders = state.mission_escalation_senders.lock().unwrap();
-        let keys_to_remove: Vec<String> = senders.keys()
-            .filter(|k| k.starts_with(&mission_id))
-            .cloned()
-            .collect();
-        for k in keys_to_remove {
-            senders.remove(&k); // drop sender → rx.await returns Err → escalation handler exits
+        // Unblock any pending escalation
+        {
+            let mut senders = state.mission_escalation_senders.lock().unwrap();
+            let keys: Vec<String> = senders.keys().filter(|k| k.starts_with(&mission_id)).cloned().collect();
+            for k in keys { senders.remove(&k); }
+        }
+        // Unblock any pending briefing approval
+        {
+            let mut senders = state.mission_briefing_senders.lock().unwrap();
+            let keys: Vec<String> = senders.keys().cloned().collect(); // briefing_id keys — drop all, mission is stopping
+            for k in keys { senders.remove(&k); }
         }
     }
     Ok(())
+}
+
+#[tauri::command]
+fn approve_mission_briefing(
+    briefing_id: String,
+    redirect: Option<String>,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
+    let mut senders = state.mission_briefing_senders.lock().unwrap();
+    if let Some(tx) = senders.remove(&briefing_id) {
+        let _ = tx.send(redirect);
+        Ok(())
+    } else {
+        Err("Briefing not found or already approved".into())
+    }
 }
 
 #[tauri::command]
@@ -5045,6 +5067,7 @@ fn main() {
                 chamber_gates: Mutex::new(HashMap::new()),
                 active_missions: Mutex::new(HashMap::new()),
                 mission_escalation_senders: Mutex::new(HashMap::new()),
+                mission_briefing_senders: Mutex::new(HashMap::new()),
             }));
             Ok(())
         })
@@ -5094,6 +5117,7 @@ fn main() {
             complete_mission_goal,
             delete_mission_goal,
             mission_chat_turn,
+            approve_mission_briefing,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

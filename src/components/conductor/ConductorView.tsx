@@ -1,52 +1,38 @@
-import { useState, useEffect } from 'react'
-import { Settings, History, CalendarClock, Target } from 'lucide-react'
+import { useState } from 'react'
+import { Settings, History, CalendarClock } from 'lucide-react'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { useRunStore } from '../../stores/runStore'
-import { useMissionStore } from '../../stores/missionStore'
 import WorkflowSidebar from './WorkflowSidebar'
 import PipelineView from './PipelineView'
 import SchedulePanel from './SchedulePanel'
 import RunDrawer from '../run/RunDrawer'
-import MissionView from './MissionView'
-import EscalationModal from './EscalationModal'
 
 type RightPanel = 'schedule' | 'history' | null
 
-const SIDEBAR_W = 260
 const DRAWER_DEFAULT = 280
 
 export default function ConductorView({ onError }: { onError?: (msg: string) => void }) {
   const { currentWorkflow } = useWorkflowStore()
   const { currentRun } = useRunStore()
-  const { currentMissionId, loadMissions, activeEscalation } = useMissionStore()
   const [rightPanel, setRightPanel] = useState<RightPanel>(null)
   const [drawerHeight, setDrawerHeight] = useState(DRAWER_DEFAULT)
-
-  useEffect(() => {
-    loadMissions()
-  }, [loadMissions])
 
   function togglePanel(panel: RightPanel) {
     setRightPanel((p) => (p === panel ? null : panel))
   }
 
-  // If a mission is selected, show mission view
-  const showMission = currentMissionId !== null && !currentWorkflow
-
   return (
     <div className="h-full flex overflow-hidden">
       {/* Left sidebar */}
-      <div className="shrink-0 overflow-hidden" style={{ width: SIDEBAR_W }}>
+      <div className="shrink-0 overflow-hidden" style={{ width: 260 }}>
         <WorkflowSidebar />
       </div>
 
       {/* Center content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {showMission ? (
-          <MissionView />
-        ) : currentWorkflow ? (
+        {currentWorkflow ? (
           <>
-            {/* Workflow secondary toolbar */}
+            {/* Secondary toolbar */}
             <div
               className="shrink-0 flex items-center gap-2 px-4 py-2.5 border-b"
               style={{ background: 'var(--c-surface)', borderColor: 'var(--c-border)' }}
@@ -102,9 +88,6 @@ export default function ConductorView({ onError }: { onError?: (msg: string) => 
           <EmptyConductor />
         )}
       </div>
-
-      {/* Escalation modal — shown when Manager needs human input */}
-      {activeEscalation && <EscalationModal />}
     </div>
   )
 }
@@ -116,13 +99,12 @@ function PanelBtn({
   onClick: () => void
   icon: React.ReactNode
   label: string
-  color: 'amber' | 'blue' | 'green'
+  color: 'amber' | 'blue'
   hasIndicator?: boolean
 }) {
   const colors = {
     amber: { color: 'var(--c-amber)',  bg: 'var(--c-amber-dim)',  border: 'rgba(251,146,60,0.35)' },
     blue:  { color: 'var(--c-accent)', bg: 'var(--c-accent-dim)', border: 'var(--c-accent-border)' },
-    green: { color: 'var(--c-green)',  bg: 'var(--c-green-dim)',  border: 'rgba(34,197,94,0.35)' },
   }
   const c = colors[color]
   return (
@@ -156,11 +138,7 @@ function DragHandle({ onDelta }: { onDelta: (d: number) => void }) {
     window.addEventListener('mouseup', onUp)
   }
   return (
-    <div
-      className="h-1 shrink-0 cursor-row-resize"
-      style={{ background: 'var(--c-border-subtle)' }}
-      onMouseDown={handleMouseDown}
-    />
+    <div className="h-1 shrink-0 cursor-row-resize" style={{ background: 'var(--c-border-subtle)' }} onMouseDown={handleMouseDown} />
   )
 }
 
@@ -181,9 +159,9 @@ function EmptyConductor() {
         <Settings size={24} style={{ color: 'var(--c-accent)' }} />
       </div>
       <div className="max-w-sm">
-        <p className="text-lg font-bold mb-2" style={{ color: 'var(--c-text-1)' }}>Select a workflow or mission</p>
+        <p className="text-lg font-bold mb-2" style={{ color: 'var(--c-text-1)' }}>Select a workflow</p>
         <p className="text-sm leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
-          Choose a <strong>Workflow</strong> for one-time or scheduled pipelines, or a <strong>Mission</strong> to deploy a Manager Agent that runs continuously and manages a team of sub-agents toward your goals.
+          Choose a workflow from the sidebar to build and run your agent pipeline. For autonomous Manager-driven missions, use the <strong>Manager</strong> tab.
         </p>
       </div>
     </div>

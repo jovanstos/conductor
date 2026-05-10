@@ -16,6 +16,7 @@ export default function CreateMissionModal({ onClose }: { onClose: () => void })
   const [cyclePeriodMinutes, setCyclePeriodMinutes] = useState(30)
   const [managerModel, setManagerModel] = useState<ModelConfig>({ ...defaultModel })
   const [allowManagerGoals, setAllowManagerGoals] = useState(false)
+  const [autoBriefing, setAutoBriefing] = useState(false)
   const [workspacePath, setWorkspacePath] = useState('')
   const [creating, setCreating] = useState(false)
 
@@ -30,6 +31,7 @@ export default function CreateMissionModal({ onClose }: { onClose: () => void })
         cyclePeriodMinutes,
         managerModel,
         allowManagerGoals,
+        autoBriefing,
         workspacePath: workspacePath.trim() || undefined,
       })
       selectMission(mission.id)
@@ -203,6 +205,38 @@ export default function CreateMissionModal({ onClose }: { onClose: () => void })
                     width: '14px', height: '14px',
                     background: allowManagerGoals ? 'var(--c-accent)' : 'var(--c-text-3)',
                     left: allowManagerGoals ? 'calc(100% - 18px)' : '3px',
+                  }}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Auto briefing toggle */}
+          <div className="p-4 rounded-xl" style={{ background: 'var(--c-card)', border: '1px solid var(--c-border)' }}>
+            <div className="flex items-start gap-3">
+              <div className="flex-1">
+                <p className="text-sm font-semibold mb-1" style={{ color: 'var(--c-text-1)' }}>
+                  Auto mode (skip briefing)
+                </p>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--c-text-3)' }}>
+                  When disabled (default), the Manager presents its plan before each cycle and waits for your approval.
+                  When enabled, it skips the review step and acts immediately — faster, but less oversight.
+                </p>
+              </div>
+              <button
+                onClick={() => setAutoBriefing(!autoBriefing)}
+                className="relative shrink-0 w-12 h-6 rounded-full transition-all mt-0.5"
+                style={{
+                  background: autoBriefing ? 'var(--c-green-dim)' : 'var(--c-elevated)',
+                  border: `1px solid ${autoBriefing ? 'rgba(34,197,94,0.35)' : 'var(--c-border)'}`,
+                }}
+              >
+                <span
+                  className="absolute top-1 rounded-full transition-all"
+                  style={{
+                    width: '14px', height: '14px',
+                    background: autoBriefing ? 'var(--c-green)' : 'var(--c-text-3)',
+                    left: autoBriefing ? 'calc(100% - 18px)' : '3px',
                   }}
                 />
               </button>

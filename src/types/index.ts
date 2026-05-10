@@ -79,7 +79,7 @@ export type WorkflowEdge = {
 
 // ── Mission types ─────────────────────────────────────────
 
-export type MissionStatus = 'idle' | 'running' | 'paused' | 'escalating' | 'completed'
+export type MissionStatus = 'idle' | 'running' | 'paused' | 'escalating' | 'briefing' | 'completed'
 export type MissionRunMode = 'goal_driven' | 'event_driven'
 export type MissionGoalStatus = 'active' | 'in_progress' | 'completed' | 'cancelled'
 
@@ -94,7 +94,9 @@ export type MissionGoal = {
 
 export type WorkLogEntryType =
   | 'cycle_start'
+  | 'briefing'
   | 'manager_decision'
+  | 'manager_tool'
   | 'agent_dispatched'
   | 'agent_completed'
   | 'agent_error'
@@ -141,6 +143,12 @@ export type MissionSubAgent = {
   completedAt?: string
   output?: string
   error?: string
+  runId?: string
+}
+
+export type MissionBriefing = {
+  briefingId: string
+  plan: string
 }
 
 export type Mission = {
@@ -152,7 +160,8 @@ export type Mission = {
   cyclePeriodMinutes: number
   managerModel: ModelConfig
   managerSystemPrompt: string
-  allowManagerGoals: boolean   // whether Manager can create its own goals
+  allowManagerGoals: boolean
+  autoBriefing: boolean
   status: MissionStatus
   createdAt: string
   updatedAt: string
@@ -178,6 +187,7 @@ export type MissionEscalationPayload = { missionId: string; escalation: MissionE
 export type MissionAgentPayload      = { missionId: string; agent: MissionSubAgent }
 export type MissionGoalPayload       = { missionId: string; goalId: string; status: MissionGoalStatus }
 export type MissionChatChunkPayload  = { missionId: string; chunk: string }
+export type MissionBriefingPayload   = { missionId: string; briefingId: string; plan: string }
 
 export type ScheduleInterval = 'minutes' | 'hours' | 'daily' | 'weekly'
 
