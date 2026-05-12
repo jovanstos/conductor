@@ -30,6 +30,8 @@ struct ModelConfig {
     base_url: Option<String>,
     max_tokens: u32,
     temperature: f64,
+    #[serde(default)]
+    simple_tool_format: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -739,9 +741,10 @@ async fn call_openai_compat_with_tools(
     max_tokens: u32,
     temperature: f64,
     tools: &[ToolDef],
+    timeout_secs: u64,
 ) -> Result<LlmTurnResult, String> {
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(300))
+        .timeout(std::time::Duration::from_secs(timeout_secs))
         .build()
         .map_err(|e| format!("HTTP client: {}", e))?;
 
@@ -802,6 +805,85 @@ async fn call_openai_compat_with_tools(
     Ok(LlmTurnResult::Text { content: text, tokens_used: tokens })
 }
 
+// ── Simple tool format helpers ────────────────────────────────────────
+// Used for small local models that can't reliably use native function calling.
+// The model is told to output <tool_call>{...}</tool_call> blocks instead.
+
+fn tools_to_simple_prompt(tools: &[ToolDef]) -> String {
+    let tool_list = tools.iter().map(|t| {
+        // Collect required params
+        let required: Vec<&str> = t.parameters["required"]
+            .as_array()
+            .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
+            .unwrap_or_default();
+
+        let props = t.parameters["properties"].as_object()
+            .map(|obj| {
+                obj.iter().map(|(k, v)| {
+                    let desc = v["description"].as_str().unwrap_or("");
+                    let req = if required.contains(&k.as_str()) { ", required" } else { ", optional" };
+                    format!("  - {} (string{}): {}", k, req, desc)
+                }).collect::<Vec<_>>().join("\n")
+            })
+            .unwrap_or_default();
+
+        format!("**{}**: {}\n{}", t.name, t.description, props)
+    }).collect::<Vec<_>>().join("\n\n");
+
+    format!(
+        "\n\n## HOW TO CALL TOOLS\n\
+        To use a tool, output a JSON block wrapped in <tool_call> tags. Use this EXACT format:\n\
+        <tool_call>{{\"name\": \"tool_name\", \"args\": {{\"param\": \"value\"}}}}</tool_call>\n\
+        You may include multiple <tool_call> blocks in one response.\n\
+        Only use tool names listed below. Do not invent tools.\n\n\
+        ## Available Tools\n{}", tool_list
+    )
+}
+
+fn parse_simple_tool_calls(text: &str) -> (String, Vec<ToolCall>) {
+    let mut tool_calls: Vec<ToolCall> = vec![];
+    let mut remaining = text.to_string();
+    let mut counter = 0u32;
+
+    while let Some(start) = remaining.find("<tool_call>") {
+        let after_open = &remaining[start + "<tool_call>".len()..];
+        if let Some(end) = after_open.find("</tool_call>") {
+            let json_str = &after_open[..end];
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                if let Some(name) = val["name"].as_str() {
+                    counter += 1;
+                    let arguments = val["args"].clone();
+                    tool_calls.push(ToolCall {
+                        id: format!("simple_{}", counter),
+                        name: name.to_string(),
+                        arguments: if arguments.is_null() { serde_json::json!({}) } else { arguments },
+                    });
+                }
+            }
+            // Remove this block from remaining text
+            let full_block_len = start + "<tool_call>".len() + end + "</tool_call>".len();
+            remaining = format!("{}{}", &remaining[..start], &remaining[full_block_len..]);
+        } else {
+            break; // Unclosed tag — stop
+        }
+    }
+
+    let preceding = remaining.trim().to_string();
+    (preceding, tool_calls)
+}
+
+fn build_simple_tool_results(tool_calls: &[ToolCall], results: &[(String, bool)]) -> Vec<serde_json::Value> {
+    let parts: Vec<String> = tool_calls.iter().zip(results.iter())
+        .map(|(tc, (content, is_error))| {
+            let prefix = if *is_error { "ERROR" } else { "OK" };
+            format!("[{}] {}: {}", prefix, tc.name, content)
+        })
+        .collect();
+    vec![serde_json::json!({ "role": "user", "content": parts.join("\n\n") })]
+}
+
+// ─────────────────────────────────────────────
+
 async fn llm_call_with_tools(
     model: &ModelConfig,
     system: &str,
@@ -810,6 +892,29 @@ async fn llm_call_with_tools(
     tools: &[ToolDef],
 ) -> Result<LlmTurnResult, String> {
     let max_tokens = effective_max_tokens(&model.provider, &model.model_id, model.max_tokens);
+
+    // Simple tool format: inject tool schema into system prompt, send no tool defs,
+    // then parse <tool_call> blocks from the text response.
+    if model.simple_tool_format && !tools.is_empty() {
+        let augmented_system = format!("{}{}", system, tools_to_simple_prompt(tools));
+        // Call as plain text (no tool definitions)
+        let text_result = llm_call_text(model, &augmented_system, messages, keys_file, max_tokens).await?;
+        let (preceding, parsed_calls) = parse_simple_tool_calls(&text_result.0);
+        if !parsed_calls.is_empty() {
+            return Ok(LlmTurnResult::ToolCalls {
+                tool_calls: parsed_calls,
+                preceding_text: if preceding.is_empty() { None } else { Some(preceding) },
+            });
+        }
+        return Ok(LlmTurnResult::Text { content: text_result.0, tokens_used: text_result.1 });
+    }
+
+    // Local/Ollama models benefit from a much longer timeout — they can be slow thinkers.
+    let timeout_secs: u64 = match model.provider.as_str() {
+        "ollama" | "custom" => 1800, // 30 minutes for local models
+        _ => 300,                     // 5 minutes for API providers
+    };
+
     match model.provider.as_str() {
         "anthropic" => {
             let key = model.api_key_ref.as_deref()
@@ -823,20 +928,65 @@ async fn llm_call_with_tools(
                 .and_then(|r| load_keys(keys_file).remove(r))
                 .or_else(|| std::env::var("OPENAI_API_KEY").ok())
                 .ok_or_else(|| "No OpenAI API key — open Settings (⚙) to add one.".to_string())?;
-            call_openai_compat_with_tools("https://api.openai.com/v1/chat/completions", Some(&key), &model.model_id, system, messages, max_tokens, model.temperature, tools).await
+            call_openai_compat_with_tools("https://api.openai.com/v1/chat/completions", Some(&key), &model.model_id, system, messages, max_tokens, model.temperature, tools, timeout_secs).await
         }
         "ollama" => {
             let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
             let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
-            call_openai_compat_with_tools(&url, None, &model.model_id, system, messages, max_tokens, model.temperature, tools).await
+            call_openai_compat_with_tools(&url, None, &model.model_id, system, messages, max_tokens, model.temperature, tools, timeout_secs).await
         }
         "custom" => {
             let base = model.base_url.as_deref().unwrap_or("http://localhost:8080");
             let url = format!("{}/v1/chat/completions", base.trim_end_matches('/'));
             let key = model.api_key_ref.as_deref().and_then(|r| load_keys(keys_file).remove(r));
-            call_openai_compat_with_tools(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature, tools).await
+            call_openai_compat_with_tools(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature, tools, timeout_secs).await
         }
         p => Err(format!("Unsupported provider: {}", p)),
+    }
+}
+
+// Plain text call — used by simple_tool_format path and briefing (no tool defs sent)
+async fn llm_call_text(
+    model: &ModelConfig,
+    system: &str,
+    messages: &[serde_json::Value],
+    keys_file: &PathBuf,
+    max_tokens: u32,
+) -> Result<(String, Option<u32>), String> {
+    let timeout_secs: u64 = match model.provider.as_str() {
+        "ollama" | "custom" => 1800,
+        _ => 300,
+    };
+    match model.provider.as_str() {
+        "anthropic" => {
+            let key = model.api_key_ref.as_deref()
+                .and_then(|r| load_keys(keys_file).remove(r))
+                .or_else(|| std::env::var("ANTHROPIC_API_KEY").ok())
+                .ok_or_else(|| "No Anthropic API key".to_string())?;
+            let r = call_anthropic_with_tools(&model.model_id, &key, system, messages, max_tokens, model.temperature, &[]).await?;
+            Ok(match r { LlmTurnResult::Text { content, tokens_used } => (content, tokens_used), _ => ("".into(), None) })
+        }
+        _ => {
+            let (url, key) = match model.provider.as_str() {
+                "openai" => {
+                    let key = model.api_key_ref.as_deref()
+                        .and_then(|r| load_keys(keys_file).remove(r))
+                        .or_else(|| std::env::var("OPENAI_API_KEY").ok());
+                    ("https://api.openai.com/v1/chat/completions".to_string(), key)
+                }
+                "ollama" => {
+                    let base = model.base_url.as_deref().unwrap_or("http://localhost:11434");
+                    (format!("{}/v1/chat/completions", base.trim_end_matches('/')), None)
+                }
+                _ => {
+                    let base = model.base_url.as_deref().unwrap_or("http://localhost:8080");
+                    let k = model.api_key_ref.as_deref().and_then(|r| load_keys(keys_file).remove(r));
+                    (format!("{}/v1/chat/completions", base.trim_end_matches('/')), k)
+                }
+            };
+            let r = call_openai_compat_with_tools(&url, key.as_deref(), &model.model_id, system, messages, max_tokens, model.temperature, &[], timeout_secs).await?;
+            Ok(match r { LlmTurnResult::Text { content, tokens_used } => (content, tokens_used), _ => ("".into(), None) })
+        }
     }
 }
 
@@ -1478,9 +1628,15 @@ async fn exec_agent(
                         }
                     }
 
-                    messages.push(build_assistant_tool_call_message(
-                        &tool_calls, &provider, preceding_text.as_deref()
-                    ));
+                    if data.model.simple_tool_format {
+                        // In simple mode the full text (with embedded <tool_call> blocks) is the assistant turn
+                        let full = preceding_text.as_deref().unwrap_or("").to_string();
+                        messages.push(serde_json::json!({ "role": "assistant", "content": full }));
+                    } else {
+                        messages.push(build_assistant_tool_call_message(
+                            &tool_calls, &provider, preceding_text.as_deref()
+                        ));
+                    }
 
                     let mut had_write = false;
                     let mut results: Vec<(String, bool)> = vec![];
@@ -1544,7 +1700,11 @@ async fn exec_agent(
                         read_only_streak += 1;
                     }
 
-                    let result_msgs = build_tool_result_messages(&tool_calls, &results, &provider);
+                    let result_msgs = if data.model.simple_tool_format {
+                        build_simple_tool_results(&tool_calls, &results)
+                    } else {
+                        build_tool_result_messages(&tool_calls, &results, &provider)
+                    };
                     messages.extend(result_msgs);
                 }
             }
@@ -2105,6 +2265,46 @@ async fn get_ollama_models(base_url: Option<String>) -> Vec<String> {
     data["models"].as_array()
         .map(|arr| arr.iter().filter_map(|m| m["name"].as_str().map(|s| s.to_string())).collect())
         .unwrap_or_default()
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OllamaModelInfo {
+    parameter_size: Option<String>,   // e.g. "7.2B", "13.0B"
+    parameter_billions: Option<f64>,  // e.g. 7.2, 13.0
+    family: Option<String>,
+    quantization: Option<String>,
+}
+
+#[tauri::command]
+async fn get_ollama_model_info(model_id: String, base_url: Option<String>) -> OllamaModelInfo {
+    let base = base_url.as_deref().unwrap_or("http://localhost:11434");
+    let client = match reqwest::Client::builder().timeout(std::time::Duration::from_secs(5)).build() {
+        Ok(c) => c,
+        Err(_) => return OllamaModelInfo { parameter_size: None, parameter_billions: None, family: None, quantization: None },
+    };
+    let Ok(resp) = client
+        .post(&format!("{}/api/show", base.trim_end_matches('/')))
+        .json(&serde_json::json!({ "name": model_id }))
+        .send().await
+    else {
+        return OllamaModelInfo { parameter_size: None, parameter_billions: None, family: None, quantization: None };
+    };
+    let Ok(data) = resp.json::<serde_json::Value>().await else {
+        return OllamaModelInfo { parameter_size: None, parameter_billions: None, family: None, quantization: None };
+    };
+    let details = &data["details"];
+    let parameter_size = details["parameter_size"].as_str().map(str::to_string);
+    let parameter_billions = parameter_size.as_deref().and_then(|s| {
+        let s = s.trim_end_matches('B').trim_end_matches('b');
+        s.parse::<f64>().ok()
+    });
+    OllamaModelInfo {
+        parameter_size,
+        parameter_billions,
+        family: details["family"].as_str().map(str::to_string),
+        quantization: details["quantization_level"].as_str().map(str::to_string),
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -4147,9 +4347,14 @@ async fn execute_mission_cycle(
                     }
                 }
 
-                messages.push(build_assistant_tool_call_message(
-                    &tool_calls, &manager_model.provider, preceding_text.as_deref(),
-                ));
+                if manager_model.simple_tool_format {
+                    let full = preceding_text.as_deref().unwrap_or("").to_string();
+                    messages.push(serde_json::json!({ "role": "assistant", "content": full }));
+                } else {
+                    messages.push(build_assistant_tool_call_message(
+                        &tool_calls, &manager_model.provider, preceding_text.as_deref(),
+                    ));
+                }
 
                 let mut results: Vec<(String, bool)> = vec![];
 
@@ -4649,7 +4854,11 @@ async fn execute_mission_cycle(
                     results.push(tool_result);
                 }
 
-                let result_msgs = build_tool_result_messages(&tool_calls, &results, &manager_model.provider);
+                let result_msgs = if manager_model.simple_tool_format {
+                    build_simple_tool_results(&tool_calls, &results)
+                } else {
+                    build_tool_result_messages(&tool_calls, &results, &manager_model.provider)
+                };
                 messages.extend(result_msgs);
             }
         }
@@ -5118,6 +5327,7 @@ fn main() {
             delete_mission_goal,
             mission_chat_turn,
             approve_mission_briefing,
+            get_ollama_model_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

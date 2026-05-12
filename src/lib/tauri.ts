@@ -72,6 +72,9 @@ export const listProjects = (basePath?: string) =>
   invoke<ProjectEntry[]>('list_projects', { basePath })
 export const validateApiKey = (provider: string) =>
   invoke<string>('validate_api_key', { provider })
+
+export const getOllamaModelInfo = (modelId: string, baseUrl?: string) =>
+  invoke<import('../types').OllamaModelInfo>('get_ollama_model_info', { modelId, baseUrl })
 export const openProject = (projectPath: string) =>
   invoke<FileEntry[]>('open_project', { projectPath })
 export const openProjectTree = (projectPath: string) =>

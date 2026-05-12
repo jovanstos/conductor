@@ -7,6 +7,14 @@ export type ModelConfig = {
   baseUrl?: string
   maxTokens: number
   temperature: number
+  simpleToolFormat?: boolean
+}
+
+export type OllamaModelInfo = {
+  parameterSize: string | null
+  parameterBillions: number | null
+  family: string | null
+  quantization: string | null
 }
 
 export type CustomHostConfig = {
