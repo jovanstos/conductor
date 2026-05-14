@@ -108,7 +108,10 @@ pub(crate) async fn studio_provider_stream(
                     .unwrap_or_else(|| "http://localhost:11434".to_string());
                 format!("{}/v1/chat/completions", base.trim_end_matches('/'))
             }
-            "custom" => model.base_url.clone().unwrap_or_default(),
+            "custom" => {
+                let base = model.base_url.clone().unwrap_or_default();
+                format!("{}/v1/chat/completions", base.trim_end_matches('/'))
+            }
             p => return Err(format!("Unsupported provider: {}", p)),
         };
         studio_openai_compat_stream(

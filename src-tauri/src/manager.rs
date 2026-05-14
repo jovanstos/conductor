@@ -544,6 +544,16 @@ pub(crate) async fn execute_mission_cycle(
                         &format!("conductor://mission/{}/log", mission_id),
                         serde_json::json!({ "missionId": mission_id, "entry": entry }),
                     );
+                    // Merge user-added goals before the final cycle save
+                    if let Ok(disk) = load_mission(data_dir, mission_id) {
+                        let mem_ids: std::collections::HashSet<String> =
+                            mission.goals.iter().map(|g| g.id.clone()).collect();
+                        for disk_goal in disk.goals {
+                            if !mem_ids.contains(&disk_goal.id) {
+                                mission.goals.push(disk_goal);
+                            }
+                        }
+                    }
                     save_mission_to_disk(data_dir, &mission).ok();
                 }
                 break;
@@ -571,6 +581,19 @@ pub(crate) async fn execute_mission_cycle(
                 }
 
                 let mut results: Vec<(String, bool)> = vec![];
+
+                // Merge any goals added externally (e.g. by the user via UI) since this
+                // cycle loaded the mission. We only ADD missing goals — we never overwrite
+                // status changes the manager already made in-memory this cycle.
+                if let Ok(disk) = load_mission(data_dir, mission_id) {
+                    let mem_ids: std::collections::HashSet<String> =
+                        mission.goals.iter().map(|g| g.id.clone()).collect();
+                    for disk_goal in disk.goals {
+                        if !mem_ids.contains(&disk_goal.id) {
+                            mission.goals.push(disk_goal);
+                        }
+                    }
+                }
 
                 for tc in &tool_calls {
                     let tool_result: (String, bool) = match tc.name.as_str() {
@@ -910,7 +933,7 @@ pub(crate) async fn execute_mission_cycle(
                                     mission.goals.push(new_goal);
 
                                     let entry = append_log(
-                                        &mut mission, "goal_completed",
+                                        &mut mission, "goal_created",
                                         &format!("Manager created new goal: \"{}\" ({}). Rationale: {}", goal_text, priority, rationale),
                                         None, None, Some(&goal_id),
                                     );
@@ -1409,7 +1432,10 @@ Be direct and human. You're the manager checking in with your boss."#,
                     let base = model.base_url.clone().unwrap_or_else(|| "http://localhost:11434".to_string());
                     format!("{}/v1/chat/completions", base.trim_end_matches('/'))
                 }
-                "custom" => model.base_url.clone().unwrap_or_default(),
+                "custom" => {
+                    let base = model.base_url.clone().unwrap_or_default();
+                    format!("{}/v1/chat/completions", base.trim_end_matches('/'))
+                }
                 p => return Err(format!("Unsupported provider: {}", p)),
             };
             let key = if model.provider == "openai" || model.provider == "custom" {
