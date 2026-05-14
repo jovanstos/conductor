@@ -17,43 +17,40 @@ export default function PipelineView({ onError }: { onError?: (msg: string) => v
   const { defaultModel } = useSettingsStore()
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState(false)
-  const [showAddMenu, setShowAddMenu] = useState(false)
 
   if (!currentWorkflow) return null
 
   const steps = getOrderedSteps(currentWorkflow)
   const selectedNode = selectedNodeId ? currentWorkflow.nodes.find((n) => n.id === selectedNodeId) : null
 
-  function applyPatch(newWorkflow: typeof currentWorkflow) {
+  function applyPatch(newWorkflow: NonNullable<typeof currentWorkflow>) {
     applyWorkflowPatch(newWorkflow.nodes, newWorkflow.edges)
   }
 
   function handleAddAgent() {
-    const updated = appendAgentToPipeline(currentWorkflow, undefined, defaultModel)
+    const updated = appendAgentToPipeline(currentWorkflow!, undefined, defaultModel)
     applyPatch(updated)
     const newSteps = getOrderedSteps(updated)
     if (newSteps.length > 0) setSelectedNodeId(newSteps[newSteps.length - 1].id)
-    setShowAddMenu(false)
   }
 
   function handleAddLoop() {
-    const updated = appendLoopToPipeline(currentWorkflow, defaultModel)
+    const updated = appendLoopToPipeline(currentWorkflow!, defaultModel)
     applyPatch(updated)
-    setShowAddMenu(false)
   }
 
   function handleRemove(nodeId: string) {
     if (selectedNodeId === nodeId) setSelectedNodeId(null)
-    const updated = removeStepFromPipeline(currentWorkflow, nodeId)
+    const updated = removeStepFromPipeline(currentWorkflow!, nodeId)
     applyPatch(updated)
   }
 
   function handleMoveUp(nodeId: string) {
-    applyPatch(moveStepUp(currentWorkflow, nodeId))
+    applyPatch(moveStepUp(currentWorkflow!, nodeId))
   }
 
   function handleMoveDown(nodeId: string) {
-    applyPatch(moveStepDown(currentWorkflow, nodeId))
+    applyPatch(moveStepDown(currentWorkflow!, nodeId))
   }
 
   async function handleRun() {
@@ -180,11 +177,10 @@ export default function PipelineView({ onError }: { onError?: (msg: string) => v
                   key={step.id}
                   node={step}
                   index={idx}
-                  totalSteps={steps.length}
+
                   isFirst={idx === 0}
                   isLast={idx === steps.length - 1}
                   runStep={runStepMap.get(step.id)}
-                  streamChunk={currentRun?.steps.find((s) => s.nodeId === step.id)?.output}
                   onConfigure={() => setSelectedNodeId(step.id === selectedNodeId ? null : step.id)}
                   onMoveUp={() => handleMoveUp(step.id)}
                   onMoveDown={() => handleMoveDown(step.id)}

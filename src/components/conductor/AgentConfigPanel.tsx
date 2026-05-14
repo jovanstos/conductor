@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { X, ChevronDown, ChevronRight, Zap, Shield, ShieldAlert } from 'lucide-react'
+import { X, ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react'
 import type { WorkflowNode, AgentNodeData, LoopNodeData, Template, ToolNameId } from '../../types'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { BUILT_IN_TEMPLATES, TOOL_REGISTRY, TOOL_GROUPS } from '../../lib/defaults'
-import { getTemplates, saveTemplate, deleteTemplate } from '../../lib/tauri'
+import { getTemplates, saveTemplate } from '../../lib/tauri'
 import ModelPicker from '../shared/ModelPicker'
 
 const CONTEXT_OPTIONS = [
@@ -19,8 +19,6 @@ export default function AgentConfigPanel({
   node: WorkflowNode
   onClose: () => void
 }) {
-  const { updateNode, getChildNodes } = useWorkflowStore()
-
   if (node.type === 'loop') {
     return <LoopConfigPanel node={node} onClose={onClose} />
   }
@@ -375,7 +373,7 @@ function LoopConfigPanel({ node, onClose }: { node: WorkflowNode; onClose: () =>
   )
 }
 
-function ReviewGateConfigPanel({ node, onClose }: { node: WorkflowNode; onClose: () => void }) {
+function ReviewGateConfigPanel({ onClose }: { node?: WorkflowNode; onClose: () => void }) {
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: 'var(--c-surface)' }}>
       <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0" style={{ borderColor: 'var(--c-border)' }}>

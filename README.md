@@ -46,11 +46,11 @@ The main tab. Build and run your agent workforce.
 
 Multi-agent thinking room. Three formats:
 
-| Format | How it works |
-|---|---|
+| Format             | How it works                                                                                       |
+| ------------------ | -------------------------------------------------------------------------------------------------- |
 | **Blind Audition** | All agents generate in parallel, then each scores all solutions anonymously. Highest average wins. |
-| **War Room** | Two agents debate: one proposes, one critiques, for N rounds until the answer is hardened. |
-| **Syndicate** | Agents contribute sequentially by specialty, each building on the previous output. |
+| **War Room**       | Two agents debate: one proposes, one critiques, for N rounds until the answer is hardened.         |
+| **Syndicate**      | Agents contribute sequentially by specialty, each building on the previous output.                 |
 
 Add agents from templates or build custom ones with their own name, system prompt, and model. Watch them stream live in the Arena, then read the Ledger for final rankings and the winning output.
 
@@ -60,13 +60,13 @@ Add agents from templates or build custom ones with their own name, system promp
 
 Not a generic chat. Studio uses expert-tuned system prompts to guide productive conversations and generate polished final documents.
 
-| Goal type | Output |
-|---|---|
-| **Agent Prompt** | Production-ready system prompt for any AI agent |
-| **Project Plan** | Structured plan with goals, milestones, risks, timeline |
-| **Design Doc** | Technical design with alternatives and trade-offs |
+| Goal type          | Output                                                          |
+| ------------------ | --------------------------------------------------------------- |
+| **Agent Prompt**   | Production-ready system prompt for any AI agent                 |
+| **Project Plan**   | Structured plan with goals, milestones, risks, timeline         |
+| **Design Doc**     | Technical design with alternatives and trade-offs               |
 | **Research Brief** | Focused research question with methodology and success criteria |
-| **Free Form** | Open-ended idea exploration and summary |
+| **Free Form**      | Open-ended idea exploration and summary                         |
 
 Pick a goal type, start a session, converse with the AI, then click **Generate Document** to produce a full formatted document. All sessions are saved locally, listed in the sidebar, and can be deleted. While the AI is streaming a **Stop** button cancels mid-response. Hover any message to copy or edit it.
 
@@ -76,12 +76,12 @@ Pick a goal type, start a session, converse with the AI, then click **Generate D
 
 Keys are stored locally and called directly from the Rust backend.
 
-| Provider | Key required | Models |
-|---|---|---|
-| **Anthropic** | Yes | Claude Opus 4.7 · Sonnet 4.6 · Haiku 4.5 |
-| **OpenAI** | Yes | GPT-4o · GPT-4o mini |
-| **Ollama** | No — local, auto-detected | Any model you've pulled (`ollama pull llama3.2`) |
-| **Custom** | Optional | Any OpenAI-compatible endpoint (Groq, Together, LM Studio, OpenRouter…) |
+| Provider      | Key required              | Models                                                                  |
+| ------------- | ------------------------- | ----------------------------------------------------------------------- |
+| **Anthropic** | Yes                       | Claude Opus 4.7 · Sonnet 4.6 · Haiku 4.5                                |
+| **OpenAI**    | Yes                       | GPT-4o · GPT-4o mini                                                    |
+| **Ollama**    | No — local, auto-detected | Any model you've pulled (`ollama pull llama3.2`)                        |
+| **Custom**    | Optional                  | Any OpenAI-compatible endpoint (Groq, Together, LM Studio, OpenRouter…) |
 
 Open **Settings → API Connections**. Each provider shows a colored glow card when connected. Click **Add Key**, paste your key, optionally **Test Key**, then **Save**. Set your **Default Model** in Settings — it appears in the nav bar and auto-fills when you add new agents.
 
@@ -89,13 +89,13 @@ Open **Settings → API Connections**. Each provider shows a colored glow card w
 
 ## Agent tools
 
-| Tool | Category | Requires approval |
-|---|---|---|
-| Read / Write / Edit File | Filesystem | No |
-| List Directory · Search Files · Create Directory · Move File | Filesystem | No |
-| Delete File | Filesystem | **Yes — blocking modal** |
-| Run Shell Command | Shell | **Yes — blocking modal** |
-| Fetch URL | Web | No |
+| Tool                                                         | Category   | Requires approval        |
+| ------------------------------------------------------------ | ---------- | ------------------------ |
+| Read / Write / Edit File                                     | Filesystem | No                       |
+| List Directory · Search Files · Create Directory · Move File | Filesystem | No                       |
+| Delete File                                                  | Filesystem | **Yes — blocking modal** |
+| Run Shell Command                                            | Shell      | **Yes — blocking modal** |
+| Fetch URL                                                    | Web        | No                       |
 
 All tools are enabled by default per agent. Restrict them in the agent config panel.
 
@@ -103,25 +103,25 @@ All tools are enabled by default per agent. Restrict them in the agent config pa
 
 ## Agent context modes
 
-| Mode | What the agent sees |
-|---|---|
-| `Full chain` | Original task + every prior agent's output |
+| Mode            | What the agent sees                                      |
+| --------------- | -------------------------------------------------------- |
+| `Full chain`    | Original task + every prior agent's output               |
 | `Previous only` | Original task + the immediately preceding agent's output |
-| `None` | Only the original task |
+| `None`          | Only the original task                                   |
 
 ---
 
 ## Tech stack
 
-| Layer | Technology |
-|---|---|
-| Desktop shell | Tauri 2 (Rust) |
-| Frontend | React 19 + TypeScript 5.8 |
-| Styling | Tailwind CSS v4 |
-| State | Zustand v5 |
-| Build | Vite 7 |
+| Layer           | Technology                    |
+| --------------- | ----------------------------- |
+| Desktop shell   | Tauri 2 (Rust)                |
+| Frontend        | React 19 + TypeScript 5.8     |
+| Styling         | Tailwind CSS v4               |
+| State           | Zustand v5                    |
+| Build           | Vite 7                        |
 | HTTP / AI calls | reqwest (Rust, streaming SSE) |
-| Concurrency | tokio (Rust async runtime) |
+| Concurrency     | tokio (Rust async runtime)    |
 
 ---
 
@@ -146,11 +146,11 @@ npm run tauri build        # production build → src-tauri/target/release/bundl
 
 **Data location**
 
-| Platform | Path |
-|---|---|
-| Windows | `%APPDATA%\com.jovan.conductor\` |
-| macOS | `~/Library/Application Support/com.jovan.conductor/` |
-| Linux | `~/.local/share/com.jovan.conductor/` |
+| Platform | Path                                                 |
+| -------- | ---------------------------------------------------- |
+| Windows  | `%APPDATA%\com.jovan.conductor\`                     |
+| macOS    | `~/Library/Application Support/com.jovan.conductor/` |
+| Linux    | `~/.local/share/com.jovan.conductor/`                |
 
 Subdirectories: `workflows/`, `runs/`, `templates/`, `config.json`, `keys.json`. Studio sessions are in browser `localStorage`.
 
@@ -158,26 +158,26 @@ Subdirectories: `workflows/`, `runs/`, `templates/`, `config.json`, `keys.json`.
 
 ## Built-in workflow templates
 
-| Template | Agents | What it does |
-|---|---|---|
-| **Software Factory** | Planner · Reviewer · Developer · Tester | Plan → review gate → implement → test loop |
-| **Bug Fix Pipeline** | Explorer · Analyzer · Developer · Reviewer | Diagnose → fix → review loop |
-| **Content Factory** | Writer · Editor · Polish | Write → edit loop → final copyedit |
-| **Research Lab** | Analyst · Fact Checker · Writer | Research → verify loop → report |
-| **Marketing Campaign** | Copywriter · Editor · Social · Email | Approved copy → social → email |
+| Template               | Agents                                     | What it does                               |
+| ---------------------- | ------------------------------------------ | ------------------------------------------ |
+| **Software Factory**   | Planner · Reviewer · Developer · Tester    | Plan → review gate → implement → test loop |
+| **Bug Fix Pipeline**   | Explorer · Analyzer · Developer · Reviewer | Diagnose → fix → review loop               |
+| **Content Factory**    | Writer · Editor · Polish                   | Write → edit loop → final copyedit         |
+| **Research Lab**       | Analyst · Fact Checker · Writer            | Research → verify loop → report            |
+| **Marketing Campaign** | Copywriter · Editor · Social · Email       | Approved copy → social → email             |
 
 ---
 
 ## Built-in agent templates (24)
 
-| Category | Templates |
-|---|---|
-| **Software** | Software Planner, Architecture Reviewer, Full-Stack Developer, Tester/QA, Code Reviewer, Bug Analyzer, Codebase Explorer, Refactoring Specialist, Security Auditor |
-| **DevOps** | DevOps Engineer |
-| **Writing** | Documentation Writer, Content Writer, Editor |
-| **Analysis** | Research Analyst, Fact Checker, Executive Summarizer, Web Researcher |
-| **Business** | Product Manager |
-| **Marketing** | Marketing Copywriter, Email Writer, Social Media Manager, Sales Pitch Writer |
+| Category      | Templates                                                                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Software**  | Software Planner, Architecture Reviewer, Full-Stack Developer, Tester/QA, Code Reviewer, Bug Analyzer, Codebase Explorer, Refactoring Specialist, Security Auditor |
+| **DevOps**    | DevOps Engineer                                                                                                                                                    |
+| **Writing**   | Documentation Writer, Content Writer, Editor                                                                                                                       |
+| **Analysis**  | Research Analyst, Fact Checker, Executive Summarizer, Web Researcher                                                                                               |
+| **Business**  | Product Manager                                                                                                                                                    |
+| **Marketing** | Marketing Copywriter, Email Writer, Social Media Manager, Sales Pitch Writer                                                                                       |
 
 ---
 
@@ -215,8 +215,6 @@ Subdirectories: `workflows/`, `runs/`, `templates/`, `config.json`, `keys.json`.
 2. Enter a name, base URL (e.g. `https://api.groq.com/openai/v1`), and model IDs
 3. Add the API key for that endpoint
 4. Select it in any agent's model picker
-
-Supported: Groq, Together AI, LM Studio, OpenRouter, Mistral, or any OpenAI-compatible endpoint.
 
 ---
 

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Send, Plus, Download, FileText, ChevronRight,
   Zap, Map, BookOpen, Search, FileQuestion, Sparkles, Copy, Check,
-  ArrowRight, Square, Trash2, Edit3, X
+  ArrowRight, Square, Trash2, Edit3
 } from 'lucide-react'
 import { useStudioStore } from '../../stores/studioStore'
 import type { StudioTemplateId, StudioMessage } from '../../types'

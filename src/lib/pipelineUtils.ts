@@ -91,7 +91,7 @@ export function appendAgentToPipeline(
 }
 
 // Append a loop group to the end of the pipeline
-export function appendLoopToPipeline(workflow: Workflow, defaultModel?: import('../types').ModelConfig): Workflow {
+export function appendLoopToPipeline(workflow: Workflow, _defaultModel?: import('../types').ModelConfig): Workflow {
   const endNode = workflow.nodes.find((n) => n.type === 'end')
   if (!endNode) return workflow
 

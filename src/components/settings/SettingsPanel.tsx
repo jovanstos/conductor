@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import {
   X, FolderOpen, Check, Plus, Trash2, ChevronDown, ChevronUp,
-  Eye, EyeOff, Zap, AlertCircle, CheckCircle2, Link, Server,
+  Eye, EyeOff, AlertCircle, CheckCircle2, Link, Server,
   Key, Cpu
 } from 'lucide-react'
 import { open as openFolderDialog } from '@tauri-apps/plugin-dialog'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { validateApiKey, validateCustomHost } from '../../lib/tauri'
+import { validateApiKey } from '../../lib/tauri'
 import type { CustomHostConfig } from '../../types'
-import { pickHostColor, ANTHROPIC_MODELS, OPENAI_MODELS } from '../../lib/defaults'
+import { pickHostColor, ANTHROPIC_MODELS } from '../../lib/defaults'
 import { v4 as uuidv4 } from 'uuid'
 import ModelPicker from '../shared/ModelPicker'
 
@@ -410,7 +410,7 @@ function CustomHostsSection({
 
   return (
     <div className="space-y-2">
-      {hosts.map((host, idx) => (
+      {hosts.map((host) => (
         <CustomHostRow
           key={host.id}
           host={host}

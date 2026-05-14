@@ -38,7 +38,7 @@ export default function SchedulePanel() {
     }
     updateWorkflowMeta({
       settings: {
-        ...currentWorkflow.settings,
+        ...currentWorkflow!.settings,
         schedule: newSched,
       },
     })
