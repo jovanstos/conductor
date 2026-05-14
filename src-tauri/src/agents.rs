@@ -154,7 +154,7 @@ pub(crate) async fn exec_agent(
 
     let mut accumulated_text = String::new();
     let mut read_only_streak = 0u32;
-    const READ_LIMIT: u32 = 4;
+    const READ_LIMIT: u32 = 8;
 
     let tool_loop_result: Result<String, String> = 'tool_loop: {
         for _iteration in 0..20u32 {
@@ -166,11 +166,11 @@ pub(crate) async fn exec_agent(
                 let mut msgs = messages.clone();
                 msgs.push(serde_json::json!({
                     "role": "user",
-                    "content": "You have done enough research. Do NOT call any more tools. \
-                    Write your complete, detailed output as a text response right now. \
-                    Include everything the next agent needs to know."
+                    "content": "You have read enough. Stop reading and take action now: \
+                    use write_file to save your deliverable to disk, then respond with a \
+                    brief text summary of what you wrote. Do not keep reading — write the file."
                 }));
-                (false, msgs)
+                (true, msgs)
             } else {
                 (true, messages.clone())
             };

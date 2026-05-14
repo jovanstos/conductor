@@ -653,6 +653,12 @@ pub(crate) async fn execute_mission_cycle(
                                     Err(e)       => { sa.status = "error".into(); sa.error = Some(e.clone()); }
                                 }
                             }
+                            if let Some(sa) = mission.active_sub_agents.iter().find(|s| s.id == agent_dispatch_id) {
+                                let _ = app.emit(
+                                    &format!("conductor://mission/{}/agent_status", mission_id),
+                                    serde_json::json!({ "missionId": mission_id, "agent": sa }),
+                                );
+                            }
 
                             match run_result {
                                 Ok((output, tokens)) => {
@@ -748,6 +754,12 @@ pub(crate) async fn execute_mission_cycle(
                                     Ok((out, _)) => { sa.status = "completed".into(); sa.output = Some(safe_truncate(out, 500).to_string()); }
                                     Err(e)       => { sa.status = "error".into(); sa.error = Some(e.clone()); }
                                 }
+                            }
+                            if let Some(sa) = mission.active_sub_agents.iter().find(|s| s.id == agent_dispatch_id) {
+                                let _ = app.emit(
+                                    &format!("conductor://mission/{}/agent_status", mission_id),
+                                    serde_json::json!({ "missionId": mission_id, "agent": sa }),
+                                );
                             }
 
                             match run_result {
