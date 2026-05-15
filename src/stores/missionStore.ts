@@ -1,7 +1,14 @@
-import { create } from 'zustand'
-import { v4 as uuidv4 } from 'uuid'
-import type { Mission, WorkLogEntry, MissionEscalation, MissionSubAgent, MissionBriefing, ModelConfig } from '../types'
-import * as tauri from '../lib/tauri'
+import { create } from "zustand";
+import { v4 as uuidv4 } from "uuid";
+import type {
+  Mission,
+  WorkLogEntry,
+  MissionEscalation,
+  MissionSubAgent,
+  MissionBriefing,
+  ModelConfig,
+} from "../types";
+import * as tauri from "../lib/tauri";
 
 const DEFAULT_MANAGER_SYSTEM_PROMPT = `You are a Manager Agent — the operational backbone of this mission. Think of yourself as a skilled middle manager: you receive goals from the human, break them down into executable tasks, dispatch specialist agents to complete those tasks, review their work, and keep everything moving forward.
 
@@ -25,45 +32,57 @@ const DEFAULT_MANAGER_SYSTEM_PROMPT = `You are a Manager Agent — the operation
 ## Be Strategic
 Don't do everything at once. Focus on what matters most right now.
 Quality over speed — make sure each agent has clear, detailed instructions.
-If an agent's output needs follow-up, dispatch another agent to continue the work.`
+If an agent's output needs follow-up, dispatch another agent to continue the work.`;
 
 interface MissionStore {
-  missions: Mission[]
-  currentMissionId: string | null
-  activeEscalation: MissionEscalation | null
-  activeBriefings: Record<string, MissionBriefing | null>
-  isLoading: boolean
+  missions: Mission[];
+  currentMissionId: string | null;
+  activeEscalation: MissionEscalation | null;
+  activeBriefings: Record<string, MissionBriefing | null>;
+  isLoading: boolean;
 
-  liveStatus: Record<string, string>
-  liveLog: Record<string, WorkLogEntry[]>
-  liveSubAgents: Record<string, MissionSubAgent[]>
+  liveStatus: Record<string, string>;
+  liveLog: Record<string, WorkLogEntry[]>;
+  liveSubAgents: Record<string, MissionSubAgent[]>;
 
-  loadMissions: () => Promise<void>
-  selectMission: (id: string | null) => void
+  loadMissions: () => Promise<void>;
+  selectMission: (id: string | null) => void;
   createMission: (params: {
-    name: string
-    description: string
-    runMode: 'goal_driven' | 'event_driven'
-    cyclePeriodMinutes: number
-    managerModel: ModelConfig
-    allowManagerGoals: boolean
-    autoBriefing: boolean
-    workspacePath?: string
-  }) => Promise<Mission>
-  deleteMission: (id: string) => Promise<void>
-  startMission: (id: string) => Promise<void>
-  stopMission: (id: string) => Promise<void>
-  addGoal: (missionId: string, text: string, priority: 'high' | 'normal' | 'low') => Promise<void>
-  completeGoal: (missionId: string, goalId: string) => Promise<void>
-  deleteGoal: (missionId: string, goalId: string) => Promise<void>
-  respondToEscalation: (missionId: string, escalationId: string, response: string) => Promise<void>
-  dismissEscalation: () => void
-  approveBriefing: (missionId: string, briefingId: string, redirect?: string) => Promise<void>
+    name: string;
+    description: string;
+    runMode: "goal_driven" | "event_driven";
+    cyclePeriodMinutes: number;
+    managerModel: ModelConfig;
+    allowManagerGoals: boolean;
+    autoBriefing: boolean;
+    workspacePath?: string;
+  }) => Promise<Mission>;
+  deleteMission: (id: string) => Promise<void>;
+  startMission: (id: string) => Promise<void>;
+  stopMission: (id: string) => Promise<void>;
+  addGoal: (
+    missionId: string,
+    text: string,
+    priority: "high" | "normal" | "low",
+  ) => Promise<void>;
+  completeGoal: (missionId: string, goalId: string) => Promise<void>;
+  deleteGoal: (missionId: string, goalId: string) => Promise<void>;
+  respondToEscalation: (
+    missionId: string,
+    escalationId: string,
+    response: string,
+  ) => Promise<void>;
+  dismissEscalation: () => void;
+  approveBriefing: (
+    missionId: string,
+    briefingId: string,
+    redirect?: string,
+  ) => Promise<void>;
 
-  _listeners: Record<string, () => void>
-  attachListeners: (missionId: string) => Promise<void>
-  detachListeners: (missionId: string) => void
-  detachAllListeners: () => void
+  _listeners: Record<string, () => void>;
+  attachListeners: (missionId: string) => Promise<void>;
+  detachListeners: (missionId: string) => void;
+  detachAllListeners: () => void;
 }
 
 export const useMissionStore = create<MissionStore>()((set, get) => ({
@@ -78,19 +97,21 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
   _listeners: {},
 
   loadMissions: async () => {
-    set({ isLoading: true })
+    set({ isLoading: true });
     try {
-      const missions = await tauri.listMissions()
-      set({ missions, isLoading: false })
+      const missions = await tauri.listMissions();
+      set({ missions, isLoading: false });
     } catch {
-      set({ isLoading: false })
+      set({ isLoading: false });
     }
   },
 
   selectMission: (id) => {
-    const { attachListeners } = get()
-    set({ currentMissionId: id, activeEscalation: null })
-    if (id) attachListeners(id)
+    const { attachListeners, detachListeners, currentMissionId } = get();
+    // Detach listeners from the previously selected mission
+    if (currentMissionId) detachListeners(currentMissionId);
+    set({ currentMissionId: id, activeEscalation: null });
+    if (id) attachListeners(id);
   },
 
   createMission: async (params) => {
@@ -105,69 +126,81 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
       managerSystemPrompt: DEFAULT_MANAGER_SYSTEM_PROMPT,
       allowManagerGoals: params.allowManagerGoals,
       autoBriefing: params.autoBriefing,
-      status: 'idle',
+      status: "idle",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       workLog: [],
       activeSubAgents: [],
       chatLog: [],
       workspacePath: params.workspacePath,
-    }
-    await tauri.saveMission(mission)
-    set((s) => ({ missions: [mission, ...s.missions] }))
-    return mission
+    };
+    await tauri.saveMission(mission);
+    set((s) => ({ missions: [mission, ...s.missions] }));
+    return mission;
   },
 
   deleteMission: async (id) => {
-    const { detachListeners } = get()
-    detachListeners(id)
-    await tauri.deleteMission(id)
+    const { detachListeners } = get();
+    detachListeners(id);
+    await tauri.deleteMission(id);
     set((s) => ({
       missions: s.missions.filter((m) => m.id !== id),
       currentMissionId: s.currentMissionId === id ? null : s.currentMissionId,
-    }))
+    }));
   },
 
   startMission: async (id) => {
-    await tauri.startMission(id)
-    const { attachListeners } = get()
-    await attachListeners(id)
+    await tauri.startMission(id);
+    const { attachListeners } = get();
+    await attachListeners(id);
     set((s) => ({
-      missions: s.missions.map((m) => m.id === id ? { ...m, status: 'running' } : m),
-      liveStatus: { ...s.liveStatus, [id]: 'running' },
-    }))
+      missions: s.missions.map((m) =>
+        m.id === id ? { ...m, status: "running" } : m,
+      ),
+      liveStatus: { ...s.liveStatus, [id]: "running" },
+    }));
   },
 
   stopMission: async (id) => {
-    await tauri.stopMission(id)
+    await tauri.stopMission(id);
     set((s) => ({
-      missions: s.missions.map((m) => m.id === id ? { ...m, status: 'idle' } : m),
-      liveStatus: { ...s.liveStatus, [id]: 'idle' },
+      missions: s.missions.map((m) =>
+        m.id === id ? { ...m, status: "idle" } : m,
+      ),
+      liveStatus: { ...s.liveStatus, [id]: "idle" },
       activeBriefings: { ...s.activeBriefings, [id]: null },
-    }))
+    }));
   },
 
   addGoal: async (missionId, text, priority) => {
-    const updated = await tauri.addMissionGoal(missionId, text, priority)
-    set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
+    const updated = await tauri.addMissionGoal(missionId, text, priority);
+    set((s) => ({
+      missions: s.missions.map((m) => (m.id === missionId ? updated : m)),
+    }));
   },
 
   completeGoal: async (missionId, goalId) => {
-    const updated = await tauri.completeMissionGoal(missionId, goalId)
-    set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
+    const updated = await tauri.completeMissionGoal(missionId, goalId);
+    set((s) => ({
+      missions: s.missions.map((m) => (m.id === missionId ? updated : m)),
+    }));
   },
 
   deleteGoal: async (missionId, goalId) => {
-    const updated = await tauri.deleteMissionGoal(missionId, goalId)
-    set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
+    const updated = await tauri.deleteMissionGoal(missionId, goalId);
+    set((s) => ({
+      missions: s.missions.map((m) => (m.id === missionId ? updated : m)),
+    }));
   },
 
   respondToEscalation: async (missionId, escalationId, response) => {
-    await tauri.respondToMissionEscalation(missionId, escalationId, response)
-    set({ activeEscalation: null })
-    const updated = await tauri.getMission(missionId)
+    await tauri.respondToMissionEscalation(missionId, escalationId, response);
+    set({ activeEscalation: null });
+    const updated = await tauri.getMission(missionId);
     if (updated) {
-      set((s) => ({ missions: s.missions.map((m) => m.id === missionId ? updated : m) }))
+      set((s) => ({
+        missions: s.missions.map((m) => (m.id === missionId ? updated : m)),
+      }));
     }
   },
 
@@ -175,60 +208,73 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
 
   approveBriefing: async (missionId, briefingId, redirect) => {
     // Always clear the briefing panel — even if the backend call fails (e.g. mission restarted)
-    set((s) => ({ activeBriefings: { ...s.activeBriefings, [missionId]: null } }))
+    set((s) => ({
+      activeBriefings: { ...s.activeBriefings, [missionId]: null },
+    }));
     try {
-      await tauri.approveMissionBriefing(briefingId, redirect)
+      await tauri.approveMissionBriefing(briefingId, redirect);
     } catch {
       // Briefing channel already closed (mission was stopped/restarted) — silently ignore
     }
   },
 
   attachListeners: async (missionId) => {
-    const { _listeners, detachListeners } = get()
-    if (_listeners[missionId]) detachListeners(missionId)
+    const { _listeners, detachListeners } = get();
+    if (_listeners[missionId]) detachListeners(missionId);
 
     const unlisten = await tauri.listenToMission(missionId, {
       onStatusChange: ({ status }) => {
         set((s) => ({
           liveStatus: { ...s.liveStatus, [missionId]: status },
           missions: s.missions.map((m) =>
-            m.id === missionId ? { ...m, status: status as Mission['status'] } : m
+            m.id === missionId
+              ? { ...m, status: status as Mission["status"] }
+              : m,
           ),
-        }))
+        }));
       },
 
       onLogEntry: ({ entry }) => {
         set((s) => {
-          const prev = s.liveLog[missionId] ?? []
-          const updated = [...prev, entry].slice(-100)
-          return { liveLog: { ...s.liveLog, [missionId]: updated } }
-        })
+          const prev = s.liveLog[missionId] ?? [];
+          const updated = [...prev, entry].slice(-100);
+          return { liveLog: { ...s.liveLog, [missionId]: updated } };
+        });
       },
 
       onEscalation: ({ escalation }) => {
-        if (escalation.urgency === 'high' && escalation.status === 'pending') {
-          set({ activeEscalation: escalation })
+        if (escalation.urgency === "high" && escalation.status === "pending") {
+          set({ activeEscalation: escalation });
         }
         tauri.getMission(missionId).then((m) => {
-          if (m) set((s) => ({ missions: s.missions.map((ms) => ms.id === missionId ? m : ms) }))
-        })
+          if (m)
+            set((s) => ({
+              missions: s.missions.map((ms) => (ms.id === missionId ? m : ms)),
+            }));
+        });
       },
 
       onAgentStatus: ({ agent }) => {
         set((s) => {
-          const prev = s.liveSubAgents[missionId] ?? []
-          const existing = prev.findIndex((a) => a.id === agent.id)
-          const updated = existing >= 0
-            ? prev.map((a) => a.id === agent.id ? agent : a)
-            : [...prev, agent]
-          return { liveSubAgents: { ...s.liveSubAgents, [missionId]: updated } }
-        })
+          const prev = s.liveSubAgents[missionId] ?? [];
+          const existing = prev.findIndex((a) => a.id === agent.id);
+          const updated =
+            existing >= 0
+              ? prev.map((a) => (a.id === agent.id ? agent : a))
+              : [...prev, agent];
+          return {
+            liveSubAgents: { ...s.liveSubAgents, [missionId]: updated },
+          };
+        });
       },
 
       onGoalUpdate: () => {
         tauri.getMission(missionId).then((m) => {
-          if (m) set((s) => ({ missions: s.missions.map((ms) => ms.id === missionId ? m : ms) }))
-        })
+          if (m)
+            set((s) => ({
+              missions: s.missions.map((ms) => (ms.id === missionId ? m : ms)),
+            }));
+        });
       },
 
       onBriefing: ({ briefingId, plan }) => {
@@ -237,25 +283,25 @@ export const useMissionStore = create<MissionStore>()((set, get) => ({
             ...s.activeBriefings,
             [missionId]: { briefingId, plan },
           },
-        }))
+        }));
       },
-    })
+    });
 
-    set((s) => ({ _listeners: { ...s._listeners, [missionId]: unlisten } }))
+    set((s) => ({ _listeners: { ...s._listeners, [missionId]: unlisten } }));
   },
 
   detachListeners: (missionId) => {
-    const { _listeners } = get()
+    const { _listeners } = get();
     if (_listeners[missionId]) {
-      _listeners[missionId]()
-      const { [missionId]: _, ...rest } = _listeners
-      set({ _listeners: rest })
+      _listeners[missionId]();
+      const { [missionId]: _, ...rest } = _listeners;
+      set({ _listeners: rest });
     }
   },
 
   detachAllListeners: () => {
-    const { _listeners } = get()
-    Object.values(_listeners).forEach((u) => u())
-    set({ _listeners: {} })
+    const { _listeners } = get();
+    Object.values(_listeners).forEach((u) => u());
+    set({ _listeners: {} });
   },
-}))
+}));
